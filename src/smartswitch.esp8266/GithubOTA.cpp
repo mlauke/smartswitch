@@ -16,7 +16,6 @@ GithubOTA::GithubOTA(RestClient * rc, const char * host, const char * url, const
   update_filename = filename;
 }
 
-
 bool GithubOTA::checkUpdate(const char * current_release_tag)
 {
   JsonDocument doc;

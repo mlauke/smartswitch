@@ -1,0 +1,56 @@
+<html>
+
+<head>
+  <title>Sonnen SmartSwitch</title>
+</head>
+
+<body>
+  <h1>Sonnen SmartSwitch (Release: <span name="release_tag"></span>)</h1>
+  <form action="/api/update" method="post">
+    <fieldset>
+      <legend>Switch</legend>
+      <input type="radio" name="mode" value="0"><label>Off</label><br />
+      <input type="radio" name="mode" value="1"><label>On</label><br />
+      <input type="radio" name="mode" value="2"><label>Auto</label><br />
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post">
+    <fieldset>
+      <legend>Update-Check on startup</legend>
+      <input type="radio" name="update_startup" value="0"><label>Off</label><br />
+      <input type="radio" name="update_startup" value="1"><label>On</label><br />
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post">
+    <fieldset>
+      <legend>Sonnen Battery</legend>
+      Host: <input name="sn_host"><br />
+      Token: <input name="sn_token"><br />
+      Grid_min (W): <input name="sn_grdmin"><br />
+      Load (W): <input name="sn_loadpower"><br />
+      Status: <br />
+      <input type="submit" name="sonnen" value="Update" />
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post">
+    <fieldset>
+      <legend>Weather (Station: <span name="loc"></span>)</legend>
+      Longitude: <input name="wt_lon"> Latitude: <input name="wt_lat"><br />
+      <input type="submit" name="weather" value="Update" />
+    </fieldset>
+  </form>
+  <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
+    <fieldset>
+      <legend>Update</legend><input type="submit" name="update" value="Update" />
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post" onSubmit="return confirm('Sure? WLAN Access Data will be reset!');">
+    <fieldset>
+      <legend>Reset</legend><input type="submit" name="reset" value="Reset" />
+    </fieldset>
+  </form>
+  <p><a href="/update">Update local</a></p>
+  <script src="/app.js" defer></script>
+</body>
+
+</html>

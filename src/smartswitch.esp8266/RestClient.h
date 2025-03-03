@@ -9,11 +9,13 @@ class RestClient {
   public:
 
     RestClient();
+
     bool fetch(String url, JsonDocument& doc);
     bool fetch(String url, JsonDocument& doc, String hName, String hValue);
 
   protected:
     WiFiClient mWiFiClient;
+      
 };
 
 #endif

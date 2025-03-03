@@ -10,28 +10,30 @@ bool RestClient::fetch(String url, JsonDocument& doc) {
 
 bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValue) {
 
-  bool res = false;
+  bool res;
 
   HTTPClient http;
 
-  http.begin(mWiFiClient, url);
+  Serial.printf("url: %s hdr: %s => %s\n", url.c_str(), hName.c_str(), hValue.c_str());
 
-  if(hName.length() != 0 && hValue.length() != 0){
-    http.addHeader(hName, hValue);
-  }
+  if ((res = http.begin(mWiFiClient, url))) {
 
-  int httpResponseCode = http.GET();
-  Serial.printf("url %s %d\n", url.c_str(), httpResponseCode);
-  if (httpResponseCode == 200) {
-    DeserializationError error = deserializeJson(doc, http.getStream());
-    if (error) {
-      Serial.printf("parsing json error: %s %s\n", url, error.c_str());
+    http.setTimeout(5000);
+    if (hName.length() != 0 && hValue.length() != 0) {
+      http.addHeader(hName, hValue);
     }
-    res = error == DeserializationError::Ok;
-  } else {
-    Serial.printf("no data %s - code: %d %s\n", url, httpResponseCode, http.getString());
+    int httpResponseCode = http.GET();
+    if ((res = httpResponseCode == 200)) {
+      DeserializationError error = deserializeJson(doc, http.getStream());
+      if (error) {
+        Serial.printf("parsing json error: %s - %s\n", url.c_str(), error.c_str());
+      }
+      res = error == DeserializationError::Ok;
+    } else {
+      Serial.printf("no data %s - (%d) %s\n", url.c_str(), httpResponseCode, http.errorToString(httpResponseCode).c_str());
+    }
+    http.end();
   }
-  http.end();  // Free resources
 
   return res;
 }
