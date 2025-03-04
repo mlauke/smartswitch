@@ -37,7 +37,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: smartswitch-binary
-          path: src/smartswitch.esp8266/build/esp8266.esp8266.d1_mini_clone/smartswitch.esp8266.ino.gz
+          path: src/smartswitch.esp8266/build/esp8266.esp8266.d1_mini_clone/smartswitch.esp8266.ino.bin.gz
 
   release:
     needs: build
@@ -51,7 +51,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: smartswitch-binary
-          path: ./  # Where to download the artifact
+          path: .
 
       - name: Create Release
         id: create_release
@@ -64,4 +64,4 @@ jobs:
           prerelease: false
           artifactContentType: "application/gzip"
           artifacts: |
-            smartswitch.ino.bin.gz
+            smartswitch.esp8266.ino.gz
