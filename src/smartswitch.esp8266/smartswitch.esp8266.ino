@@ -40,7 +40,7 @@
 #define STRING(x) #x
 #define _cs(a) sizeof(((struct configStruct*)0)->a) - 1  // '\0' trailing zero
 #define setConfigStr(a, b) \
-  if (b) strncpy(config.a, b, _cs(a))
+  if (strlen(b)) strncpy(config.a, b, fmin(_cs(a), strlen(b)+1))
 
 #define CFG_SZ_HOSTNAME 32
 #define CFG_SZ_REL_TAG 4
@@ -84,7 +84,7 @@ void saveConfigCallback() {
   saveConfigFile = true;
 }
 
-#define MY_HOSTNAME "SmartSwitch"
+#define MY_HOSTNAME "smartswitch"
 #define RELEASE_TAG "v000"
 
 void setup() {
@@ -103,13 +103,8 @@ void setup() {
     if (!loadConfig()) {
       Serial.println("Error loading config");
     }
-    Serial.printf("Config:\nHostname: %s\nRelease: %s\nSonnen Host/Token: %s/%s\n",
-                  config.hostname,
-                  config.release_tag,
-                  config.sonnenHostname,
-                  config.sonnenApiToken);
   } else {
-    Serial.println("failed to mount FS. Attempting to format.");
+    Serial.println("Failed to mount FS. Attempting to format.");
     LittleFS.format();
     Serial.println("format done.");
 
@@ -368,6 +363,7 @@ void handleNotFound() {
 }
 
 void restart() {
+  server.close();
   LittleFS.end();
   ESP.restart();
 }
@@ -381,15 +377,16 @@ void handleGithubUpdate() {
     return;
   }
 
+  setConfigStr(release_tag, gh_updater.release_tag);
+
   if (gh_updater.doUpdate()) {
-    setConfigStr(release_tag, gh_updater.release_tag);
     if (!saveConfig()) {
       Serial.println("Error saving config");
       return;
     }
     Serial.println("config saved.");
 
-    server.send(200, "text/plain", "Update done. Restart");
+    server.send(200, "text/plain", "Update finished. Restart.");
 
     restart();
   } else {
@@ -550,6 +547,9 @@ bool loadConfig() {
   deserializeJson(json, f);
   f.close();
 
+  Serial.println("Config loaded:");
+  serializeJsonPretty(json, Serial);
+
   jsonToConfig(json);
 
   return true;
@@ -563,7 +563,7 @@ bool saveConfig() {
   }
   JsonDocument json;
   configToJson(json);
-  Serial.print("saveConfig()");
+  Serial.print("saveConfig() ");
   serializeJsonPretty(json, Serial);
   serializeJson(json, f);
   f.close();

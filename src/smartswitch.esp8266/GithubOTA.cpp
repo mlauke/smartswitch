@@ -15,8 +15,8 @@ GithubOTA::GithubOTA(const char* host, const char* url, const char* type, const 
 }
 
 bool GithubOTA::checkUpdate(const char* current_release_tag) {
-  JsonDocument doc;
 
+  JsonDocument doc;
   RestClient restClient;
 
   String url = String(update_host) + update_url;
@@ -63,6 +63,7 @@ String GithubOTA::getUpdateError() {
 }
 
 bool GithubOTA::doUpdate() {
+
   WiFiClientSecure updateClient;
 
   if (download_url.length() == 0) {

@@ -19,8 +19,6 @@ public:
   bool doUpdate();
   String getUpdateError();
 
-
-
 protected:
   const char * update_type;
   const char * update_filename;

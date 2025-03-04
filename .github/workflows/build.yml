@@ -25,7 +25,8 @@ jobs:
 
       - name: Install Libraries
         run: |
-          arduino-cli lib install Time@1.6.1 Timezone@1.2.4 ESPEssentials@2.1.5 ElegantOTA@3.1.5 ESP8266TimerInterrupt@1.6.0 ArduinoJson@7.1.0
+          arduino-cli lib install WiFiManager@2.0.17 ArduinoJson@7.3.1
+          # ElegantOTA@3.1.5
 
       - name: Compile Sketch
         run: arduino-cli compile -e --fqbn esp8266:esp8266:d1_mini_clone:xtal=80,vt=flash,exception=disabled,stacksmash=disabled,ssl=all,mmu=4816,non32xfer=fast,FlashMode=dout,FlashFreq=40,eesz=4M1M --warnings all ./src/smartswitch.esp8266
