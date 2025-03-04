@@ -25,7 +25,6 @@
 #include "app_js.h"
 #include "index_html.h"
 
-#define CONSUMER_POWER_MAX_W 3300
 #define GRID_FEED_IN_MIN 50
 
 #define SERIAL_BAUDRATE 115200
@@ -203,7 +202,7 @@ void configDefaults() {  // init config struct with default values
   config.lat = 0.0;
   setConfigStr(tz, "Europe/Berlin");
   setConfigStr(location, "");
-  config.loadPower_W = CONSUMER_POWER_MAX_W;
+  config.loadPower_W = 1000;
   config.gridMin_W = GRID_FEED_IN_MIN;
   config.mode = 2;
   config.update_startup = false;
@@ -252,7 +251,7 @@ void changeHostname(const char* newHostname) {
   Serial.println("Reconnected! New Hostname: " + WiFi.hostname());
 }
 
-void jsonToConfig(DynamicJsonDocument& data) {
+void jsonToConfig(JsonDocument& data) {
 
   config.mode = data["mode"].as<uint8_t>();
   setConfigStr(release_tag, data["release_tag"]);
@@ -275,7 +274,7 @@ void jsonToConfig(DynamicJsonDocument& data) {
   setConfigStr(tz, data["tz"]);
 }
 
-void configToJson(DynamicJsonDocument& data) {
+void configToJson(JsonDocument& data) {
 
   data["mode"] = config.mode;
   data["release_tag"] = config.release_tag;
@@ -300,7 +299,7 @@ void configToJson(DynamicJsonDocument& data) {
 
 void handleData() {
 
-  DynamicJsonDocument data(1024);
+  JsonDocument data;
 
   configToJson(data);
 
@@ -370,9 +369,7 @@ void restart() {
 
 void handleGithubUpdate() {
 
-  RestClient restClient;
-
-  GithubOTA gh_updater(&restClient, UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
+  GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (!gh_updater.checkUpdate(config.release_tag)) {
     server.send(404, "text/plain", "No Update found");
@@ -517,7 +514,7 @@ void updateSwitch() {
     int prod_w = (int)json["Production_W"];
     int cons_w = ((int)json["Consumption_W"] + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
 
-    switchEnabled = !switchEnabled && GridFeedIn_W > CONSUMER_POWER_MAX_W || switchEnabled && GridFeedIn_W > GRID_FEED_IN_MIN;
+    switchEnabled = (!switchEnabled && GridFeedIn_W > config.loadPower_W) || (switchEnabled && GridFeedIn_W > config.gridMin_W);
     //    switchEnabled = (deltaP >= 0 ? 1 : 0);
 
     switchEnabled = switchEnabled && (config.mode == 2) || (config.mode == 1);
@@ -544,7 +541,7 @@ bool loadConfig() {
     return false;
   }
 
-  DynamicJsonDocument json(1024);
+  JsonDocument json;
   deserializeJson(json, f);
   f.close();
 
@@ -559,7 +556,7 @@ bool saveConfig() {
     Serial.printf("Could not open config file %s for writing\n", CONFIGFILE);
     return false;
   }
-  DynamicJsonDocument json(1024);
+  JsonDocument json;
   configToJson(json);
   Serial.print("saveConfig()");
   serializeJsonPretty(json, Serial);

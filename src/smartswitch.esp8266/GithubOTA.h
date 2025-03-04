@@ -6,7 +6,7 @@
 #define UPDATE_HOST     "https://api.github.com"
 #define UPDATE_URL      "/repos/mlauke/smartswitch/releases/latest"
 #define UPDATE_TYPE     "application/gzip"
-#define UPDATE_FILENAME "smartswitch.ino.bin.gz"
+#define UPDATE_FILENAME "smartswitch.esp8266.ino.gz"
 #define CONFIGFILE      "/config.bin"
 
 class GithubOTA
@@ -14,7 +14,7 @@ class GithubOTA
 public:
   const char * release_tag;
 
-  GithubOTA(RestClient *, const char * , const char * , const char * , const char * );
+  GithubOTA(const char * , const char * , const char * , const char * );
   bool checkUpdate(const char *);
   bool doUpdate();
   String getUpdateError();
@@ -22,7 +22,6 @@ public:
 
 
 protected:
-  RestClient * restClient;
   const char * update_type;
   const char * update_filename;
   const char * update_host;

@@ -3,19 +3,30 @@
 
 #include <ArduinoJson.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 
 class RestClient {
 
-  public:
+public:
 
-    RestClient();
+  RestClient();
 
-    bool fetch(String url, JsonDocument& doc);
-    bool fetch(String url, JsonDocument& doc, String hName, String hValue);
+  bool fetch(String url, JsonDocument& doc);
+  bool fetch(String url, JsonDocument& doc, String hName, String hValue);
 
-  protected:
-    WiFiClient mWiFiClient;
-      
+protected:
+  WiFiClientSecure mWiFiClientSecure;
+  WiFiClient mWiFiClient;
+
+private:
+  WiFiClient& getClient(String url) {
+
+    if (url.startsWith("https")) {
+      mWiFiClientSecure.setInsecure();
+      return (WiFiClient&)mWiFiClientSecure;
+    }
+    return mWiFiClient;
+  }
 };
 
 #endif

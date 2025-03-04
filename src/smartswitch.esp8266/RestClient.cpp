@@ -10,13 +10,12 @@ bool RestClient::fetch(String url, JsonDocument& doc) {
 
 bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValue) {
 
-  bool res;
-
   HTTPClient http;
 
   Serial.printf("url: %s hdr: %s => %s\n", url.c_str(), hName.c_str(), hValue.c_str());
 
-  if ((res = http.begin(mWiFiClient, url))) {
+  bool res = http.begin(getClient(url), url);
+  if (res) {
 
     http.setTimeout(5000);
     if (hName.length() != 0 && hValue.length() != 0) {
