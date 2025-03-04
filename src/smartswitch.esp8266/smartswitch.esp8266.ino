@@ -225,14 +225,20 @@ void updateLocation() {
   }
 }
 
+void gzipHeader(){
+  server.sendHeader("content-encoding", "gzip");
+}
+
 void handleAppJs() {
   server.sendHeader("cache-control", "max-age=31536000");  // "ttl max, cache per release"
-  server.send_P(200, "text/javascript", app_js, app_js_len);
+  gzipHeader();
+  server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
 void handleRoot() {
   server.sendHeader("cache-control", "max-age=180");
-  server.send_P(200, "text/html", index_html, index_html_len);
+  gzipHeader();
+  server.send_P(200, "text/html", index_html, sizeof(index_html));
 }
 
 void changeHostname(const char* newHostname) {

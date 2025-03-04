@@ -5,8 +5,8 @@ on:
     branches:
       - main
 
-permissions:                    # Füge diese Zeile hinzu
-  contents: write                # Stellt sicher, dass die Action Schreibberechtigungen für Inhalte hat
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -38,6 +38,7 @@ jobs:
         with:
           name: smartswitch-binary
           path: src/smartswitch.esp8266/build/esp8266.esp8266.d1_mini_clone/smartswitch.esp8266.ino.bin.gz
+          retention-days: 1 # delete after build
 
   release:
     needs: build
@@ -64,4 +65,4 @@ jobs:
           prerelease: false
           artifactContentType: "application/gzip"
           artifacts: |
-            smartswitch.esp8266.ino.gz
+            smartswitch.esp8266.ino.bin.gz
