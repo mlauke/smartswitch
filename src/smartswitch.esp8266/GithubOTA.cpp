@@ -43,7 +43,7 @@ bool GithubOTA::checkUpdate(const char* current_release_tag) {
       const char* asset_url = asset["browser_download_url"];
 
       Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
-      Serial.printf("Name: [%s], Type: [%s]\n", update_filename, update_type);
+      Serial.printf("expected: [%s], Type: [%s]\n", update_filename, update_type);
 
       if (strcmp(asset_type, update_type) == 0 && strcmp(asset_name, update_filename) == 0) {
         download_url = asset_url;

@@ -13,8 +13,7 @@
 #include <WiFiUdp.h>
 #include <WiFiManager.h>
 #include <ArduinoJson.h>
-#include <ElegantOTA.h>
-#include <FS.h>
+#include <LittleFS.h>
 #include <Ticker.h>
 
 #include "GithubOTA.h"
@@ -100,7 +99,7 @@ void setup() {
   Serial.begin(SERIAL_BAUDRATE);
 
   Serial.println("Mounting FS...");
-  if (SPIFFS.begin()) {
+  if (LittleFS.begin()) {
     if (!loadConfig()) {
       Serial.println("Error loading config");
     }
@@ -111,7 +110,7 @@ void setup() {
                   config.sonnenApiToken);
   } else {
     Serial.println("failed to mount FS. Attempting to format.");
-    SPIFFS.format();
+    LittleFS.format();
     Serial.println("format done.");
 
     saveConfig();
@@ -153,12 +152,12 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   ESPhttpUpdate.onStart(onOTABegin);
-  ElegantOTA.onStart(onOTABegin);
-  ElegantOTA.onProgress(onOTAProgress);
+  //ElegantOTA.onStart(onOTABegin);
+  //ElegantOTA.onProgress(onOTAProgress);
   ESPhttpUpdate.onProgress(onOTAProgress);
-  ElegantOTA.onEnd(onOTAEnd);
+  //ElegantOTA.onEnd(onOTAEnd);
 
-  ElegantOTA.begin(&server);
+  //ElegantOTA.begin(&server);
 
   // httpUpdater.setup(&server);
   server.begin();  // Actually start the server
@@ -213,7 +212,7 @@ void updateLocation() {
   if (config.lat == 0.0 && config.lon == 0.0) {
 
     RestClient restClient;
-    DynamicJsonDocument doc(512);
+    JsonDocument doc;
 
     if ((saveConfigFile = restClient.fetch("http://ip-api.com/json/", doc))) {
       config.lon = doc["lon"].as<double>();
@@ -225,7 +224,7 @@ void updateLocation() {
   }
 }
 
-void gzipHeader(){
+void gzipHeader() {
   server.sendHeader("content-encoding", "gzip");
 }
 
@@ -298,7 +297,7 @@ void configToJson(JsonDocument& data) {
   data["lc_lat"] = config.lat;
   data["lc_kWp"] = config.kWp;
   data["lc_az"] = config.az;
-  
+
   data["loc"] = config.location;
   data["tz"] = config.tz;
 }
@@ -369,7 +368,7 @@ void handleNotFound() {
 }
 
 void restart() {
-  SPIFFS.end();
+  LittleFS.end();
   ESP.restart();
 }
 
@@ -419,7 +418,7 @@ void loop() {
     doUpdateFlag = false;
   }
   server.handleClient();
-  ElegantOTA.loop();
+  //ElegantOTA.loop();
 }
 
 void buildInLED(bool onOff) {
@@ -534,13 +533,13 @@ void updateSwitch() {
 
 
 bool loadConfig() {
-  if (!SPIFFS.exists(CONFIGFILE)) {
+  if (!LittleFS.exists(CONFIGFILE)) {
     Serial.println("Config file not found");
 
     return false;
   }
 
-  File f = SPIFFS.open(CONFIGFILE, "r");
+  File f = LittleFS.open(CONFIGFILE, "r");
   if (!f) {
     Serial.printf("Could not open config file %s\n", CONFIGFILE);
 
@@ -557,7 +556,7 @@ bool loadConfig() {
 }
 
 bool saveConfig() {
-  File f = SPIFFS.open(CONFIGFILE, "w");
+  File f = LittleFS.open(CONFIGFILE, "w");
   if (!f) {
     Serial.printf("Could not open config file %s for writing\n", CONFIGFILE);
     return false;
