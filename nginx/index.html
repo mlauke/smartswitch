@@ -34,22 +34,26 @@
   </form>
   <form action="/api/update" method="post">
     <fieldset>
-      <legend>Weather (Station: <span name="loc"></span>)</legend>
-      Longitude: <input name="wt_lon"> Latitude: <input name="wt_lat"><br />
-      <input type="submit" name="weather" value="Update" />
+      <legend>PV Location</legend>
+      Station: <span name="loc">-</span><br />
+      Latitude: <input name="lc_lat"> / Longitude: <input name="lc_lon"><br />
+      Azimuth: <input name="lc_az"><br />
+      kWp: <input name="lc_kWp"><br />
+      <input type="submit" name="location" value="Update" />
     </fieldset>
   </form>
   <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
     <fieldset>
-      <legend>Update</legend><input type="submit" name="update" value="Update" />
+      <legend>Software Update</legend>
+      Git Release: <span name="update_tag"></span> <input type="submit" name="update" value="Update" /><br />
+      Local Image: <a href="/update">Update</a>
     </fieldset>
   </form>
   <form action="/api/update" method="post" onSubmit="return confirm('Sure? WLAN Access Data will be reset!');">
     <fieldset>
-      <legend>Reset</legend><input type="submit" name="reset" value="Reset" />
+      <legend>Factory Reset</legend><input type="submit" name="reset" value="Reset" />
     </fieldset>
   </form>
-  <p><a href="/update">Update local</a></p>
   <script src="/app.js" defer></script>
 </body>
 

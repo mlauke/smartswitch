@@ -9,7 +9,6 @@
 #define UPDATE_FILENAME "smartswitch.ino.bin.gz"
 #define CONFIGFILE      "/config.bin"
 
-
 class GithubOTA
 {
 public:

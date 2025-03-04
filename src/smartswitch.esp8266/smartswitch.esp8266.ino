@@ -41,7 +41,8 @@
 
 #define STRING(x) #x
 #define _cs(a) sizeof(((struct configStruct*)0)->a) - 1  // '\0' trailing zero
-#define setConfigStr(a, b) if(b) strncpy(config.a, b, _cs(a))
+#define setConfigStr(a, b) \
+  if (b) strncpy(config.a, b, _cs(a))
 
 #define CFG_SZ_HOSTNAME 32
 #define CFG_SZ_REL_TAG 4
@@ -68,8 +69,10 @@ struct configStruct {
   char sonnenApiToken[CFG_SZ_SONNENTOKEN + 1];
   uint16_t loadPower_W;
   uint16_t gridMin_W;
-  double lon;
   double lat;
+  double lon;
+  double kWp;   // installed PV power
+  uint16_t az;  // Azimuth
   char location[CFG_SZ_LOCATION + 1];
   char tz[CFG_SZ_TZ + 1];
   uint8_t mode;  // 0 - off, 1 - on, 2 - automatic
@@ -263,8 +266,11 @@ void jsonToConfig(DynamicJsonDocument& data) {
   config.gridMin_W = data["sn_grdmin"].as<uint16_t>();
   config.loadPower_W = data["sn_loadpower"].as<uint16_t>();
 
-  config.lon = data["wt_lon"].as<double>();
-  config.lat = data["wt_lat"].as<double>();
+  config.lon = data["lc_lon"].as<double>();
+  config.lat = data["lc_lat"].as<double>();
+  config.kWp = data["lc_kWp"].as<double>();
+  config.az = data["lc_az"].as<uint16_t>();
+
   setConfigStr(location, data["loc"]);
   setConfigStr(tz, data["tz"]);
 }
@@ -283,8 +289,11 @@ void configToJson(DynamicJsonDocument& data) {
   data["sn_grdmin"] = config.gridMin_W;
   data["sn_loadpower"] = config.loadPower_W;
 
-  data["wt_lon"] = config.lon;
-  data["wt_lat"] = config.lat;
+  data["lc_lon"] = config.lon;
+  data["lc_lat"] = config.lat;
+  data["lc_kWp"] = config.kWp;
+  data["lc_az"] = config.az;
+  
   data["loc"] = config.location;
   data["tz"] = config.tz;
 }
@@ -328,9 +337,11 @@ void handleAPI() {
     config.loadPower_W = server.arg("sn_loadpower").toInt();
     saveConfig();
 
-  } else if (server.hasArg("weather")) {
-    config.lon = server.arg("wt_lon").toDouble();
-    config.lat = server.arg("wt_lat").toDouble();
+  } else if (server.hasArg("location")) {
+    config.lon = server.arg("lc_lon").toDouble();
+    config.lat = server.arg("lc_lat").toDouble();
+    config.kWp = server.arg("lc_kWp").toDouble();
+    config.az = server.arg("lc_az").toInt();
     saveConfig();
 
   } else if (server.hasArg("reset")) {
@@ -550,7 +561,8 @@ bool saveConfig() {
   }
   DynamicJsonDocument json(1024);
   configToJson(json);
-  Serial.print("saveConfig()"); serializeJsonPretty(json, Serial);
+  Serial.print("saveConfig()");
+  serializeJsonPretty(json, Serial);
   serializeJson(json, f);
   f.close();
   saveConfigFile = false;
