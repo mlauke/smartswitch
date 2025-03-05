@@ -1,5 +1,4 @@
 #include "RestClient.h"
-#include <ESP8266HTTPClient.h>
 
 RestClient::RestClient() {
 }
@@ -12,7 +11,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
 
   HTTPClient http;
 
-  Serial.printf("url: %s hdr: %s => %s\n", url.c_str(), hName.c_str(), hValue.c_str());
+  DEBUG("url: %s hdr: %s => %s\n", url.c_str(), hName.c_str(), hValue.c_str());
 
   bool res = http.begin(getClient(url), url);
   if (res) {

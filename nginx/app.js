@@ -1,6 +1,6 @@
-  async function fetchData() {
+  async function fetchData(uri) {
   try {
-    const response = await fetch("/api/data");
+    const response = await fetch(uri);
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response}`);
     }
@@ -12,7 +12,12 @@
         }else if(e instanceof HTMLInputElement) {
           e.value = data[key];
         }else {
-          e.textContent = data[key];
+          var v = data[key];
+          if(typeof(v) == "boolean"){
+            e.textContent = v ? "On" : "Off";
+          }else{
+            e.textContent = v;
+          }
         }
       });
     });
@@ -20,9 +25,10 @@
     console.error('Fetch error:', error);
   }
 }
-fetchData();
+fetchData("/api/data");
 document.querySelectorAll("input[type='radio']").forEach(radio => {
   radio.addEventListener("change", (event) => {
     radio.closest("form").submit();
   });
 });
+setInterval(fetchData, 3000, "/api/status");

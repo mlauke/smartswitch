@@ -2,54 +2,79 @@
 
 <head>
   <title>Sonnen SmartSwitch</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+  button {
+    padding: 4px;
+  }
+  input[type="radio"] {
+    accent-color: #007BFF;
+    width: 18px;
+    height: 18px;
+  }
+  body {
+    background: #ffffff; /* Light theme */
+    color: #333;
+  }
+  body, input, button {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 1rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  @media (prefers-color-scheme: dark) {
+    body, input, button {
+      background: #222;
+      color: #fcf8bf;
+    }
+  }
+  </style>
 </head>
 
 <body>
   <h1>Sonnen SmartSwitch (Release: <span name="release_tag"></span>)</h1>
   <form action="/api/update" method="post">
     <fieldset>
-      <legend>Switch</legend>
-      <input type="radio" name="mode" value="0"><label>Off</label><br />
-      <input type="radio" name="mode" value="1"><label>On</label><br />
-      <input type="radio" name="mode" value="2"><label>Auto</label><br />
-    </fieldset>
-  </form>
-  <form action="/api/update" method="post">
-    <fieldset>
-      <legend>Update-Check on startup</legend>
-      <input type="radio" name="update_startup" value="0"><label>Off</label><br />
-      <input type="radio" name="update_startup" value="1"><label>On</label><br />
+      <legend>Switch ("<span name="switch"></span>")</legend>
+      <label><input type="radio" name="mode" value="0">Off</label><br />
+      <label><input type="radio" name="mode" value="1">On</label><br />
+      <label><input type="radio" name="mode" value="2">Auto</label><br />
     </fieldset>
   </form>
   <form action="/api/update" method="post">
     <fieldset>
       <legend>Sonnen Battery</legend>
       Host: <input name="sn_host"><br />
-      Token: <input name="sn_token"><br />
-      Grid_min (W): <input name="sn_grdmin"><br />
-      Load (W): <input name="sn_loadpower"><br />
+      Token: <input name="sn_token" style="width: 36ch;" maxlength="36"><br />
+      Grid_min (W): <input name="sn_grdmin" style="width: 4ch;" maxlength="4"><br />
+      Load (W): <input name="sn_loadpower" style="width: 4ch;" maxlength="4"><br />
       Status: <br />
-      <input type="submit" name="sonnen" value="Update" />
+      <button type="submit" name="sonnen" value="Update">Update</button>
     </fieldset>
   </form>
   <form action="/api/update" method="post">
     <fieldset>
-      <legend>PV Location</legend>
-      Station: <span name="loc">-</span><br />
-      Latitude: <input name="lc_lat"> / Longitude: <input name="lc_lon"><br />
-      Azimuth: <input name="lc_az"><br />
+      <legend>PV Location (<span name="loc">-</span>)</legend>
+      Latitude: <input name="lc_lat" style="width:8ch;" maxlength="8"> / Longitude: <input name="lc_lon" size="8" maxlength="8"><br />
+      Azimuth (0...360): <input name="lc_az" size="3" maxlength="3"><br />
       kWp: <input name="lc_kWp"><br />
-      <input type="submit" name="location" value="Update" />
+      <button type="submit" name="location" value="Update">Update</button>
     </fieldset>
   </form>
   <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
     <fieldset>
       <legend>Software Update</legend>
-      Git Release: <span name="update_tag"></span> <input type="submit" name="update" value="Update" /><br />
-      Local Image: <a href="/update">Update</a>
+      Git Release: <a href="/api/update?update">Update Check</a><br />
+      From File: <a href="/update">Update</a>
     </fieldset>
   </form>
-  <form action="/api/update" method="post" onSubmit="return confirm('Sure? WLAN Access Data will be reset!');">
+  <form action="/api/update" method="post">
+    <fieldset>
+      <legend>Update-Check on startup</legend>
+      <label><input type="radio" name="update_startup" value="0">Off</label><br />
+      <label><input type="radio" name="update_startup" value="1">On</label><br />
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post" onSubmit="return confirm('Sure? WLAN Access Data will be erased!');">
     <fieldset>
       <legend>Factory Reset</legend><input type="submit" name="reset" value="Reset" />
     </fieldset>

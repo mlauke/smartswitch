@@ -1,9 +1,7 @@
 #ifndef _RESTCLIENT_H
 #define _RESTCLIENT_H
 
-#include <ArduinoJson.h>
-#include <WiFiClient.h>
-#include <WiFiClientSecure.h>
+#include "SmartSwitch.h"
 
 class RestClient {
 

@@ -4,23 +4,12 @@
  * - weather forecast and tracking
  *
  */
-#include <ESP8266WiFi.h>
-#include <ESP8266HTTPClient.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <ESP8266httpUpdate.h>
-#include <WiFiClient.h>
-#include <WiFiUdp.h>
-#include <WiFiManager.h>
-#include <ArduinoJson.h>
-#include <LittleFS.h>
-#include <Ticker.h>
-
+#include "SmartSwitch.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
 
-// (cd nginx;xxd -i index.html | sed "s/=/PROGMEM =/g" | sed "s/unsigned/const/g") > src/smartswitch.esp8266/index_html.h && (cd nginx;xxd -i app.js | sed "s/=/PROGMEM =/g" | sed "s/unsigned/const/g") > src/smartswitch.esp8266/app_js.h
-
+// echo "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h
+// echo "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h
 #include "app_js.h"
 #include "index_html.h"
 
@@ -40,7 +29,7 @@
 #define STRING(x) #x
 #define _cs(a) sizeof(((struct configStruct*)0)->a) - 1  // '\0' trailing zero
 #define setConfigStr(a, b) \
-  if (strlen(b)) strncpy(config.a, b, fmin(_cs(a), strlen(b)+1))
+  if (strlen(b)) strncpy(config.a, b, fmin(_cs(a), strlen(b) + 1))
 
 #define CFG_SZ_HOSTNAME 32
 #define CFG_SZ_REL_TAG 4
@@ -143,6 +132,7 @@ void setup() {
   server.on("/", handleRoot);
   server.on("/app.js", handleAppJs);
   server.on("/api/data", handleData);
+  server.on("/api/status", handleStatus);
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
 
@@ -154,7 +144,7 @@ void setup() {
 
   //ElegantOTA.begin(&server);
 
-  // httpUpdater.setup(&server);
+  //httpUpdater.setup(&server);
   server.begin();  // Actually start the server
   Serial.println("HTTP server started");
 
@@ -297,11 +287,29 @@ void configToJson(JsonDocument& data) {
   data["tz"] = config.tz;
 }
 
+void sendJson(JsonDocument& json){
+  
+  String jsonString;
+
+  size_t r = serializeJsonPretty(json, jsonString);
+  Serial.printf("handleData() json (%d) %s\n", r, jsonString.c_str());
+
+  server.sendHeader("cache-control", "no-cache");
+  server.send(200, "application/json", jsonString);
+}
+
 void handleData() {
 
   JsonDocument data;
-
   configToJson(data);
+
+  sendJson(data);
+}
+
+///api/status
+void handleStatus() {
+
+  JsonDocument data;
 
   data["cons"] = "";
   data["prod"] = "";
@@ -309,12 +317,7 @@ void handleData() {
   data["usoc"] = "";
   data["switch"] = switchEnabled;
 
-  String jsonString;
-  size_t r = serializeJsonPretty(data, jsonString);
-  Serial.printf("handleData() json (%d) %s\n", r, jsonString.c_str());
-
-  server.sendHeader("cache-control", "no-cache");
-  server.send(200, "application/json", jsonString);
+  sendJson(data);
 }
 
 void handleAPI() {
@@ -379,14 +382,18 @@ void handleGithubUpdate() {
 
   setConfigStr(release_tag, gh_updater.release_tag);
 
+  char buffer[128];
+  snprintf(buffer, sizeof(buffer), "Found Update Release %s. Going to install...");
+  DEBUG(buffer);
+
+  server.send(200, "text/plain", buffer);
+
   if (gh_updater.doUpdate()) {
     if (!saveConfig()) {
       Serial.println("Error saving config");
       return;
     }
     Serial.println("config saved.");
-
-    server.send(200, "text/plain", "Update finished. Restart.");
 
     restart();
   } else {
@@ -400,17 +407,14 @@ void loop() {
   if (doUpdateFlag) {
 
     uint32_t heap = ESP.getFreeHeap();
-    Serial.printf(">ESP Heap %uk\n", heap >> 10);
 
     if (ensureConnected()) {
       if (fetchSystemData()) {
         updateSwitch();
-      } else {
-        //statusLED(9);
       }
     }
 
-    Serial.printf("<ESP Heap %uk/%uk\n", heap >> 10, ESP.getFreeHeap() >> 10);
+    Serial.printf("ESP Heap %uk/%uk\n", heap >> 10, ESP.getFreeHeap() >> 10);
 
     doUpdateFlag = false;
   }
@@ -519,13 +523,13 @@ void updateSwitch() {
     switchEnabled = (!switchEnabled && GridFeedIn_W > config.loadPower_W) || (switchEnabled && GridFeedIn_W > config.gridMin_W);
     //    switchEnabled = (deltaP >= 0 ? 1 : 0);
 
-    switchEnabled = switchEnabled && (config.mode == 2) || (config.mode == 1);
-
     Serial.printf("Time %s: usoc: %2d%% p/c: %d/%d grid: %d switch (mode) %d: %d\n", (const char*)json["Timestamp"], usoc, prod_w, cons_w, GridFeedIn_W, config.mode, switchEnabled);
-
-    digitalWrite(GPIO_ID_PIN(PIN_SSR), switchEnabled ? HIGH : LOW);
-    buildInLED(switchEnabled);
   }
+
+  switchEnabled = switchEnabled && (config.mode == 2) || (config.mode == 1);  // with mode
+
+  digitalWrite(GPIO_ID_PIN(PIN_SSR), switchEnabled ? HIGH : LOW);
+  buildInLED(switchEnabled);
 }
 
 
