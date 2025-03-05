@@ -31,4 +31,5 @@ document.querySelectorAll("input[type='radio']").forEach(radio => {
     radio.closest("form").submit();
   });
 });
+fetchData("/api/status");
 setInterval(fetchData, 3000, "/api/status");

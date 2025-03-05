@@ -383,7 +383,7 @@ void handleGithubUpdate() {
   setConfigStr(release_tag, gh_updater.release_tag);
 
   char buffer[128];
-  snprintf(buffer, sizeof(buffer), "Found Update Release %s. Going to install...");
+  snprintf(buffer, sizeof(buffer), "Found Update Release %s. Going to install...", config.release_tag);
   DEBUG(buffer);
 
   server.send(200, "text/plain", buffer);
