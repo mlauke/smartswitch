@@ -209,19 +209,18 @@ void updateLocation() {
   }
 }
 
-void gzipHeader() {
+void commonHeader() {
+  server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
   server.sendHeader("content-encoding", "gzip");
 }
 
 void handleAppJs() {
-  server.sendHeader("cache-control", "max-age=31536000");  // "ttl max, cache per release"
-  gzipHeader();
+  commonHeader();
   server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
 void handleRoot() {
-  server.sendHeader("cache-control", "max-age=180");
-  gzipHeader();
+  commonHeader();
   server.send_P(200, "text/html", index_html, sizeof(index_html));
 }
 
@@ -287,8 +286,8 @@ void configToJson(JsonDocument& data) {
   data["tz"] = config.tz;
 }
 
-void sendJson(JsonDocument& json){
-  
+void sendJson(JsonDocument& json) {
+
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
