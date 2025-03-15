@@ -29,15 +29,13 @@ bool GithubOTA::checkUpdate(const char* current_release_tag) {
 
     release_tag = doc["tag_name"];
 
-    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag, current_release_tag, doc["prerelease"]);
+    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag, current_release_tag, doc["prerelease"].as<bool>());
 
-    if (strncmp(release_tag, current_release_tag, strlen(current_release_tag)) == 0 || doc["prerelease"]) {
+    if (strncmp(release_tag, current_release_tag, strlen(current_release_tag)) == 0 || doc["prerelease"].as<bool>()) {
       return false;
     }
 
-    JsonArray assets = doc["assets"];
-    bool valid_asset = false;
-    for (auto asset : assets) {
+    for (auto asset : doc["assets"].as<JsonArray>()) {
       const char* asset_type = asset["content_type"];
       const char* asset_name = asset["name"];
       const char* asset_url = asset["browser_download_url"];

@@ -25,11 +25,25 @@
     console.error('Fetch error:', error);
   }
 }
+
+function fetchStatus() {
+  fetchData("/api/status");
+  setTimeout(fetchStatus, 3000);
+}
+
 fetchData("/api/data");
+fetchStatus();
+
 document.querySelectorAll("input[type='radio']").forEach(radio => {
   radio.addEventListener("change", (event) => {
-    radio.closest("form").submit();
+    const form = radio.closest("form");
+    let formData = new FormData(form);
+    fetch("/api/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams(formData).toString()
+    });
   });
 });
-fetchData("/api/status");
-setInterval(fetchData, 3000, "/api/status");

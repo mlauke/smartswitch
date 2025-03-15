@@ -22,14 +22,15 @@
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
-#define SONNEN_API_LATEST_DATA "latestdata";
+#define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_STATUS "status"
 
+#define URL_LOCATION "http://ip-api.com/json/"
 
-#define STRING(x) #x
-#define _cs(a) sizeof(((struct configStruct*)0)->a) - 1  // '\0' trailing zero
-#define setConfigStr(a, b) \
-  if (strlen(b)) strncpy(config.a, b, fmin(_cs(a), strlen(b) + 1))
+#define SOLAR_FORECAST_INTERVAL 10 * 60 * 1000  //every 10min
+#define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
+
+#define SYSTEM_UPDATE_INTERVAL 5000  //update intervall millis
 
 #define CFG_SZ_HOSTNAME 32
 #define CFG_SZ_REL_TAG 4
@@ -38,10 +39,6 @@
 #define CFG_SZ_LOCATION 64
 #define CFG_SZ_TZ 32
 
-int IC_InverterMaxPower_w = -1;
-
-bool switchEnabled = false;
-
 WiFiManager wifiManager;
 
 ESP8266WebServer server(WEBSERVER_PORT);
@@ -49,31 +46,16 @@ ESP8266WebServer server(WEBSERVER_PORT);
 Ticker timer;
 volatile bool doUpdateFlag = false;
 
-struct configStruct {
-  char hostname[CFG_SZ_HOSTNAME + 1];
-  char release_tag[CFG_SZ_REL_TAG + 1];
-  char sonnenHostname[CFG_SZ_SONNENHOST + 1];
-  char sonnenApiToken[CFG_SZ_SONNENTOKEN + 1];
-  uint16_t loadPower_W;
-  uint16_t gridMin_W;
-  double lat;
-  double lon;
-  double kWp;   // installed PV power
-  uint16_t az;  // Azimuth
-  char location[CFG_SZ_LOCATION + 1];
-  char tz[CFG_SZ_TZ + 1];
-  uint8_t mode;  // 0 - off, 1 - on, 2 - automatic
-  bool update_startup;
-};
-
+struct systemDataStruct systemData;
 struct configStruct config;
+
 bool saveConfigFile = false;
 
 void saveConfigCallback() {
   saveConfigFile = true;
 }
 
-#define MY_HOSTNAME "smartswitch"
+#define HOSTNAME "smartswitch"
 #define RELEASE_TAG "v000"
 
 void setup() {
@@ -84,6 +66,7 @@ void setup() {
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   configDefaults();
+  systemDefaults();
 
   Serial.begin(SERIAL_BAUDRATE);
 
@@ -148,7 +131,7 @@ void setup() {
   server.begin();  // Actually start the server
   Serial.println("HTTP server started");
 
-  timer.attach(3, timerCallback);
+  timer.attach_ms(SYSTEM_UPDATE_INTERVAL, timerCallback);
 }
 
 void timerCallback() {
@@ -177,19 +160,53 @@ void onOTAEnd(bool success) {
   Serial.println("There was an error during OTA update!");
 }
 
+void systemDefaults() {
+  systemData.pv_forecast_ts = 0;
+}
+
 void configDefaults() {  // init config struct with default values
-  setConfigStr(hostname, MY_HOSTNAME);
+  setConfigStr(hostname, HOSTNAME);
   setConfigStr(release_tag, RELEASE_TAG);
-  setConfigStr(sonnenHostname, "");
-  setConfigStr(sonnenApiToken, "");
+  setConfigStr(sonnenHostname, "\0");
+  setConfigStr(sonnenApiToken, "\0");
   config.lon = 0.0;
   config.lat = 0.0;
+  config.az = 0;    // default azimuth to 0 (south)
+  config.dec = 30;  //default panel declination
   setConfigStr(tz, "Europe/Berlin");
-  setConfigStr(location, "");
+  setConfigStr(location, "\0");
   config.loadPower_W = 1000;
   config.gridMin_W = GRID_FEED_IN_MIN;
   config.mode = 2;
   config.update_startup = false;
+}
+
+bool updateSolarForecast() {
+
+  long ms = millis();
+  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL < ms)) {
+
+    RestClient restClient;
+    JsonDocument doc;
+
+    char url[128];
+    snprintf(url, sizeof(url), URL_SOLAR_FORECAST, config.lat, config.lon, config.az, config.dec, config.kWp);
+
+    if (restClient.fetch(String(url), doc)) {
+
+      serializeJsonPretty(doc, Serial);
+      int i = 0;
+      for (JsonPair entry : doc["result"].as<JsonObject>()) {
+        systemData.pv_forecast_wh_h[i][0] = strtoul(entry.key().c_str(), NULL, 10);
+        systemData.pv_forecast_wh_h[i][1] = entry.value().as<uint32_t>();
+        Serial.printf("%u ", systemData.pv_forecast_wh_h[i]);
+        if (++i == sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0])) break;
+      }
+      Serial.println();
+    }
+    systemData.pv_forecast_ts = ms;  // update timestamp
+  }
+  return true;
 }
 
 void updateLocation() {
@@ -199,7 +216,7 @@ void updateLocation() {
     RestClient restClient;
     JsonDocument doc;
 
-    if ((saveConfigFile = restClient.fetch("http://ip-api.com/json/", doc))) {
+    if ((saveConfigFile = restClient.fetch(URL_LOCATION, doc))) {
       config.lon = doc["lon"].as<double>();
       config.lat = doc["lat"].as<double>();
       snprintf(config.location, CFG_SZ_LOCATION, "%s %s", doc["zip"].as<const char*>(), doc["city"].as<const char*>());
@@ -254,9 +271,9 @@ void jsonToConfig(JsonDocument& data) {
   config.gridMin_W = data["sn_grdmin"].as<uint16_t>();
   config.loadPower_W = data["sn_loadpower"].as<uint16_t>();
 
-  config.lon = data["lc_lon"].as<double>();
-  config.lat = data["lc_lat"].as<double>();
-  config.kWp = data["lc_kWp"].as<double>();
+  config.lon = data["lc_lon"].as<float>();
+  config.lat = data["lc_lat"].as<float>();
+  config.kWp = data["lc_kWp"].as<float>();
   config.az = data["lc_az"].as<uint16_t>();
 
   setConfigStr(location, data["loc"]);
@@ -310,11 +327,11 @@ void handleStatus() {
 
   JsonDocument data;
 
-  data["cons"] = "";
-  data["prod"] = "";
-  data["grid"] = "";
-  data["usoc"] = "";
-  data["switch"] = switchEnabled;
+  data["cons"] = systemData.cons_w;
+  data["prod"] = systemData.prod_w;
+  data["grid"] = systemData.gridFeedIn_W;
+  data["usoc"] = systemData.usoc;
+  data["switch"] = systemData.switchEnabled;
 
   sendJson(data);
 }
@@ -407,11 +424,11 @@ void loop() {
 
     uint32_t heap = ESP.getFreeHeap();
 
-    if (ensureConnected()) {
-      if (fetchSystemData()) {
-        updateSwitch();
-      }
-    }
+    ensureConnected() && fetchSystemData();
+
+    ensureConnected() && updateSolarForecast();
+
+    updateSwitch();
 
     Serial.printf("ESP Heap %uk/%uk\n", heap >> 10, ESP.getFreeHeap() >> 10);
 
@@ -475,60 +492,61 @@ bool fetchSystemData() {
 
   JsonDocument json;
 
-  if (fetchData(SONNEN_API_CONFIGURATIONS, json)) {
-    IC_InverterMaxPower_w = atoi((const char*)json["IC_InverterMaxPower_w"]);
-  } else {
-    Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
+  if (systemData.inv_max_w == -1) {
+    if (fetchData(SONNEN_API_CONFIGURATIONS, json)) {
+      systemData.inv_max_w = json["IC_InverterMaxPower_w"].as<int>();
+    } else {
+      Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
+      return false;
+    }
+    Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
   }
-  Serial.printf("IC_InverterMaxPower_w %d\n", IC_InverterMaxPower_w);
 
-  /*
-  if (sendRequest(SONNEN_API_LATEST_DATA, json)) {
-    FullChargeCapacity_Wh = atoi((const char*)json["FullChargeCapacity"]);
-  } else {
-    Serial.printf("ERROR: fetchSystemData(%s) json is undefined\n", SONNEN_API_CONFIGURATIONS);
+  if (systemData.capacity_wh == 0) {
+    if (fetchData(SONNEN_API_LATEST_DATA, json)) {
+      systemData.capacity_wh = json["FullChargeCapacity"].as<uint16_t>();
+    } else {
+      Serial.printf("ERROR: fetchSystemData(%s) json is undefined\n", SONNEN_API_LATEST_DATA);
+      return false;
+    }
+    Serial.printf("FullChargeCapacity %d\n", systemData.capacity_wh);
   }
-  Serial.printf("IC_InverterMaxPower_w %d\n", IC_InverterMaxPower_w);
 
-*/
-  return IC_InverterMaxPower_w > 0;
+  if (fetchData(SONNEN_API_STATUS, json)) {
+
+    //int rsoc = (int)json["RSOC"];
+    //    int cap = (int)json["FullChargeCapacity"];// battery full charge
+    systemData.usoc = json["USOC"].as<uint8_t>();  //
+                                                   //  int ucap = (int)(cap * usoc / (float)100);
+    systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
+    systemData.prod_w = json["Production_W"].as<uint16_t>();
+    systemData.cons_w = (json["Consumption_W"].as<uint16_t>() + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
+    systemData.cons_avg_w = json["Consumption_Avg"].as<uint16_t>();
+
+    struct tm t;
+    strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &t);
+    systemData.ts = mktime(&t);
+  }
+
+  return true;
 }
 
 void updateSwitch() {
-
   /*
     heater_on = (not(heater_on) && GridFeedIn_W > HEATER_POWER_MAX_W) ||
                  heater_on && GridFeedIn_W > Gin_thr(50) ||
-
-                 battery usoc
-                 time
-
   */
   // Pac_total_W
 
-  JsonDocument json;
-  if (fetchData(SONNEN_API_STATUS, json)) {
+  systemData.switchEnabled = (!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W);
 
-    bool BatteryCharging = (bool)json["BatteryCharging"];
-    bool BatteryDischarging = (bool)json["BatteryDischarging"];
-    //int rsoc = (int)json["RSOC"];
-    //    int cap = (int)json["FullChargeCapacity"];// battery full charge
-    int usoc = (int)json["USOC"];  //
-                                   //  int ucap = (int)(cap * usoc / (float)100);
-    int GridFeedIn_W = (int)json["GridFeedIn_W"];
-    int prod_w = (int)json["Production_W"];
-    int cons_w = ((int)json["Consumption_W"] + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
+  systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
+  //    switchEnabled = (deltaP >= 0 ? 1 : 0);
 
-    switchEnabled = (!switchEnabled && GridFeedIn_W > config.loadPower_W) || (switchEnabled && GridFeedIn_W > config.gridMin_W);
-    //    switchEnabled = (deltaP >= 0 ? 1 : 0);
+  Serial.printf("usoc: %2d%% p/c: %d/%d grid: %d mode %d: heater %d\n", systemData.usoc, systemData.prod_w, systemData.cons_w, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
-    Serial.printf("Time %s: usoc: %2d%% p/c: %d/%d grid: %d switch (mode) %d: %d\n", (const char*)json["Timestamp"], usoc, prod_w, cons_w, GridFeedIn_W, config.mode, switchEnabled);
-  }
-
-  switchEnabled = switchEnabled && (config.mode == 2) || (config.mode == 1);  // with mode
-
-  digitalWrite(GPIO_ID_PIN(PIN_SSR), switchEnabled ? HIGH : LOW);
-  buildInLED(switchEnabled);
+  digitalWrite(GPIO_ID_PIN(PIN_SSR), systemData.switchEnabled ? HIGH : LOW);
+  buildInLED(systemData.switchEnabled);
 }
 
 
