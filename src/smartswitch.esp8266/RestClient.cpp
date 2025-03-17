@@ -3,10 +3,6 @@
 RestClient::RestClient() {
 }
 
-bool RestClient::fetch(String url, JsonDocument& doc) {
-  return fetch(url, doc, "", "");
-}
-
 bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValue) {
 
   HTTPClient http;
@@ -21,16 +17,18 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
     if (hName.length() != 0 && hValue.length() != 0) {
       http.addHeader(hName, hValue);
     }
-    http.addHeader("accept", "application/json");
+    http.addHeader("accept", "application/json", true, true);
+
     int httpResponseCode = http.GET();
     if ((res = httpResponseCode == 200)) {
-      DeserializationError error = deserializeJson(doc, http.getStream());
+      DeserializationError error = deserializeJson(doc, http.getString());
       if (error) {
-        Serial.printf("parsing json error: %s - %s\n", url.c_str(), error.c_str());
+        Serial.printf("json error: %s - %s - response :\n", url.c_str(), error.c_str());
+        Serial.println(http.getString());
       }
       res = error == DeserializationError::Ok;
     } else {
-      Serial.printf("no data %s - (%d) %s\n", url.c_str(), httpResponseCode, http.errorToString(httpResponseCode).c_str());
+      Serial.printf("WARN '%s' code (%d) %s\n", url.c_str(), httpResponseCode, http.errorToString(httpResponseCode).c_str());
     }
     http.end();
   }

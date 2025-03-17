@@ -8,8 +8,10 @@
 #include "GithubOTA.h"
 #include "RestClient.h"
 
-// echo "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h
-// echo "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h
+// \
+echo "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h \
+echo "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h
+
 #include "app_js.h"
 #include "index_html.h"
 
@@ -30,26 +32,13 @@
 #define SOLAR_FORECAST_INTERVAL 10 * 60 * 1000  //every 10min
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
-#define SYSTEM_UPDATE_INTERVAL 5000  //update intervall millis
-
-#define CFG_SZ_HOSTNAME 32
-#define CFG_SZ_REL_TAG 4
-#define CFG_SZ_SONNENHOST 32
-#define CFG_SZ_SONNENTOKEN 36
-#define CFG_SZ_LOCATION 64
-#define CFG_SZ_TZ 32
-
-WiFiManager wifiManager;
-
-ESP8266WebServer server(WEBSERVER_PORT);
-
-Ticker timer;
-volatile bool doUpdateFlag = false;
-
-struct systemDataStruct systemData;
-struct configStruct config;
-
-bool saveConfigFile = false;
+static WiFiManager wifiManager;
+static ESP8266WebServer server(WEBSERVER_PORT);
+static Ticker timer;
+static volatile bool doUpdateFlag = false;
+static systemDataStruct systemData;
+static configStruct config;
+static bool saveConfigFile = false;
 
 void saveConfigCallback() {
   saveConfigFile = true;
@@ -85,11 +74,6 @@ void setup() {
 
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
   wifiManager.addParameter(&custom_hostname);
-  WiFiManagerParameter custom_sonnenHostname("sonnen", "Sonnen Host/IP", config.sonnenHostname, CFG_SZ_SONNENHOST);
-  wifiManager.addParameter(&custom_sonnenHostname);
-  WiFiManagerParameter custom_sonnenApiToken("sonnenApiToken", "Sonnen Api-Token", config.sonnenApiToken, CFG_SZ_SONNENTOKEN);
-  wifiManager.addParameter(&custom_sonnenApiToken);
-
   wifiManager.autoConnect("SmartSwitchAP");
 
   updateLocation();
@@ -97,9 +81,7 @@ void setup() {
   if (saveConfigFile) {
     String lcHostname = String(custom_hostname.getValue());
     lcHostname.toLowerCase();
-    setConfigStr(hostname, lcHostname.c_str());
-    setConfigStr(sonnenHostname, custom_sonnenHostname.getValue());
-    setConfigStr(sonnenApiToken, custom_sonnenApiToken.getValue());
+    setConfigStr(config, hostname, lcHostname.c_str());
     if (!saveConfig()) {
       Serial.println("Error saving config");
     }
@@ -162,29 +144,31 @@ void onOTAEnd(bool success) {
 
 void systemDefaults() {
   systemData.pv_forecast_ts = 0;
+  systemData.cap_bat_min_Wh = 1000;
+  memset(systemData.cons_avg_W_h, 0, sizeof(systemData.cons_avg_W_h));
 }
 
 void configDefaults() {  // init config struct with default values
-  setConfigStr(hostname, HOSTNAME);
-  setConfigStr(release_tag, RELEASE_TAG);
-  setConfigStr(sonnenHostname, "\0");
-  setConfigStr(sonnenApiToken, "\0");
+  setConfigStr(config, hostname, HOSTNAME);
+  setConfigStr(config, release_tag, RELEASE_TAG);
+  setConfigStr(config, sonnenHostname, "");
+  setConfigStr(config, sonnenApiToken, "");
   config.lon = 0.0;
   config.lat = 0.0;
   config.az = 0;    // default azimuth to 0 (south)
   config.dec = 30;  //default panel declination
-  setConfigStr(tz, "Europe/Berlin");
-  setConfigStr(location, "\0");
-  config.loadPower_W = 1000;
+  setConfigStr(config, tz, "Europe/Berlin");
+  setConfigStr(config, location, "");
+  config.loadPower_W = 1000;  //initial assume 1kW
   config.gridMin_W = GRID_FEED_IN_MIN;
-  config.mode = 2;
+  config.mode = 0;  //initial set to off
   config.update_startup = false;
 }
 
 bool updateSolarForecast() {
 
   long ms = millis();
-  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL < ms)) {
+  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL) < ms)) {
 
     RestClient restClient;
     JsonDocument doc;
@@ -195,12 +179,18 @@ bool updateSolarForecast() {
     if (restClient.fetch(String(url), doc)) {
 
       serializeJsonPretty(doc, Serial);
-      int i = 0;
+      uint8_t i = 0;
       for (JsonPair entry : doc["result"].as<JsonObject>()) {
-        systemData.pv_forecast_wh_h[i][0] = strtoul(entry.key().c_str(), NULL, 10);
-        systemData.pv_forecast_wh_h[i][1] = entry.value().as<uint32_t>();
-        Serial.printf("%u ", systemData.pv_forecast_wh_h[i]);
-        if (++i == sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0])) break;
+        uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
+        uint32_t wh = entry.value().as<uint32_t>();
+        Serial.printf("%u %u ", ts, wh);
+        if (i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0])) {
+          systemData.pv_forecast_wh_h[i][0] = ts;
+          systemData.pv_forecast_wh_h[i][1] = wh;
+          i++;
+        } else {
+          Serial.printf("ERROR: overflow %d => %u %u ", i, ts, wh);
+        }
       }
       Serial.println();
     }
@@ -220,7 +210,7 @@ void updateLocation() {
       config.lon = doc["lon"].as<double>();
       config.lat = doc["lat"].as<double>();
       snprintf(config.location, CFG_SZ_LOCATION, "%s %s", doc["zip"].as<const char*>(), doc["city"].as<const char*>());
-      setConfigStr(tz, doc["timezone"]);
+      setConfigStr(config, tz, doc["timezone"]);
       Serial.printf("Location: %f/%f - tz: %s loc: %s\n", config.lon, config.lat, config.tz, config.location);
     }
   }
@@ -260,14 +250,14 @@ void changeHostname(const char* newHostname) {
 void jsonToConfig(JsonDocument& data) {
 
   config.mode = data["mode"].as<uint8_t>();
-  setConfigStr(release_tag, data["release_tag"]);
+  setConfigStr(config, release_tag, data["release_tag"]);
 
   config.update_startup = data["update_startup"];
 
-  setConfigStr(hostname, data["hostname"]);
+  setConfigStr(config, hostname, data["hostname"]);
 
-  setConfigStr(sonnenHostname, data["sn_host"]);
-  setConfigStr(sonnenApiToken, data["sn_token"]);
+  setConfigStr(config, sonnenHostname, data["sn_host"]);
+  setConfigStr(config, sonnenApiToken, data["sn_token"]);
   config.gridMin_W = data["sn_grdmin"].as<uint16_t>();
   config.loadPower_W = data["sn_loadpower"].as<uint16_t>();
 
@@ -276,8 +266,8 @@ void jsonToConfig(JsonDocument& data) {
   config.kWp = data["lc_kWp"].as<float>();
   config.az = data["lc_az"].as<uint16_t>();
 
-  setConfigStr(location, data["loc"]);
-  setConfigStr(tz, data["tz"]);
+  setConfigStr(config, location, data["loc"]);
+  setConfigStr(config, tz, data["tz"]);
 }
 
 void configToJson(JsonDocument& data) {
@@ -327,8 +317,8 @@ void handleStatus() {
 
   JsonDocument data;
 
-  data["cons"] = systemData.cons_w;
-  data["prod"] = systemData.prod_w;
+  data["cons"] = systemData.cons_W;
+  data["prod"] = systemData.prod_W;
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
   data["switch"] = systemData.switchEnabled;
@@ -349,8 +339,8 @@ void handleAPI() {
     saveConfig();
 
   } else if (server.hasArg("sonnen")) {
-    setConfigStr(sonnenHostname, server.arg("sn_host").c_str());
-    setConfigStr(sonnenApiToken, server.arg("sn_token").c_str());
+    setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
+    setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
     config.gridMin_W = server.arg("sn_grdmin").toInt();
     config.loadPower_W = server.arg("sn_loadpower").toInt();
     saveConfig();
@@ -396,7 +386,7 @@ void handleGithubUpdate() {
     return;
   }
 
-  setConfigStr(release_tag, gh_updater.release_tag);
+  setConfigStr(config, release_tag, gh_updater.release_tag);
 
   char buffer[128];
   snprintf(buffer, sizeof(buffer), "Found Update Release %s. Going to install...", config.release_tag);
@@ -424,13 +414,10 @@ void loop() {
 
     uint32_t heap = ESP.getFreeHeap();
 
-    ensureConnected() && fetchSystemData();
+    bool r =
+      ensureConnected() && updateSystemData() && updateSolarForecast() && updateSwitch();
 
-    ensureConnected() && updateSolarForecast();
-
-    updateSwitch();
-
-    Serial.printf("ESP Heap %uk/%uk\n", heap >> 10, ESP.getFreeHeap() >> 10);
+    Serial.printf("ESP Heap %uk/%uk r: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, r);
 
     doUpdateFlag = false;
   }
@@ -488,7 +475,7 @@ bool fetchData(String uri, JsonDocument& doc) {
   return false;
 }
 
-bool fetchSystemData() {
+bool updateSystemData() {
 
   JsonDocument json;
 
@@ -502,14 +489,14 @@ bool fetchSystemData() {
     Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
   }
 
-  if (systemData.capacity_wh == 0) {
+  if (systemData.cap_bat_max_Wh == 0) {
     if (fetchData(SONNEN_API_LATEST_DATA, json)) {
-      systemData.capacity_wh = json["FullChargeCapacity"].as<uint16_t>();
+      systemData.cap_bat_max_Wh = json["FullChargeCapacity"].as<uint16_t>();
     } else {
       Serial.printf("ERROR: fetchSystemData(%s) json is undefined\n", SONNEN_API_LATEST_DATA);
       return false;
     }
-    Serial.printf("FullChargeCapacity %d\n", systemData.capacity_wh);
+    Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
   }
 
   if (fetchData(SONNEN_API_STATUS, json)) {
@@ -519,9 +506,11 @@ bool fetchSystemData() {
     systemData.usoc = json["USOC"].as<uint8_t>();  //
                                                    //  int ucap = (int)(cap * usoc / (float)100);
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
-    systemData.prod_w = json["Production_W"].as<uint16_t>();
-    systemData.cons_w = (json["Consumption_W"].as<uint16_t>() + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
-    systemData.cons_avg_w = json["Consumption_Avg"].as<uint16_t>();
+    systemData.prod_W = json["Production_W"].as<uint16_t>();
+    systemData.cons_W = (json["Consumption_W"].as<uint16_t>() + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
+    uint16_t cons_avg_W = json["Consumption_Avg"].as<uint16_t>();
+
+    systemData.cons_avg_W = median(cons_avg_W);
 
     struct tm t;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &t);
@@ -531,24 +520,50 @@ bool fetchSystemData() {
   return true;
 }
 
-void updateSwitch() {
+uint16_t median(uint16_t cons_W) {
+
+  static uint16_t ix = 0;
+
+  uint32_t cons_avg_W = 0;
+  uint16_t cnt = 0;
+
+  systemData.cons_avg_W_h[ix++ % (sizeof(systemData.cons_avg_W_h) / sizeof(uint16_t))] = cons_W;
+  // Serial.println("avg w:");
+  for (uint16_t i = 0; i < sizeof(systemData.cons_avg_W_h) / sizeof(uint16_t); i++) {
+    //    Serial.printf("%u ", systemData.cons_avg_W_h[i]);
+    if (systemData.cons_avg_W_h[i]) {  //only > 0 are considered, cause after restart/reset it will be empty
+      cons_avg_W += systemData.cons_avg_W_h[i];
+      cnt++;
+    }
+  }
+  //  Serial.printf("avg w last h: %u %u => %uW\n", cnt, cons_avg_W, cons_avg_W / cnt);
+  return cons_avg_W / cnt;
+}
+
+bool updateSwitch() {
   /*
     heater_on = (not(heater_on) && GridFeedIn_W > HEATER_POWER_MAX_W) ||
                  heater_on && GridFeedIn_W > Gin_thr(50) ||
   */
-  // Pac_total_W
-
-  systemData.switchEnabled = (!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W);
+  systemData.switchEnabled = (!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
+                             || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W)
+                             || calcMinBatteryCapacityWh() >= systemData.cap_bat_min_Wh
+                             ;
 
   systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
-  //    switchEnabled = (deltaP >= 0 ? 1 : 0);
 
-  Serial.printf("usoc: %2d%% p/c: %d/%d grid: %d mode %d: heater %d\n", systemData.usoc, systemData.prod_w, systemData.cons_w, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  Serial.printf("ts: %llu usoc: %2d%% p/c: %d/%d avg: %d grid: %d mode %d: heater %d\n", systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   digitalWrite(GPIO_ID_PIN(PIN_SSR), systemData.switchEnabled ? HIGH : LOW);
   buildInLED(systemData.switchEnabled);
+
+  return true;
 }
 
+uint16_t calcMinBatteryCapacityWh(){
+  //systemData.cap_bat_max_Wh
+  return 0;
+}
 
 bool loadConfig() {
   if (!LittleFS.exists(CONFIGFILE)) {

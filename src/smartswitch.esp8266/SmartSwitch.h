@@ -20,22 +20,30 @@
 #define DEBUG(...)
 #endif
 
+#define SYSTEM_UPDATE_INTERVAL 5000  //update intervall millis
+
+
+#define CFG_SZ_HOSTNAME 32
+#define CFG_SZ_REL_TAG 5
+#define CFG_SZ_SONNENHOST 32
+#define CFG_SZ_SONNENTOKEN 37
+#define CFG_SZ_LOCATION 64
+#define CFG_SZ_TZ 32
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define _cs(a) sizeof(((configStruct*)0)->a)
+#define setConfigStr(cfg, property, str) \
+  if (strlen(str)) { \
+    strncpy((cfg).property, (str), MIN(_cs(property), strlen((str)))); \
+  } \
+  (cfg).property[MIN(_cs(property) - 1, strlen((str)))] = '\0';
 
-#define STRING(x) #x
-#define _cs(a) sizeof(((struct configStruct*)0)->a)
-#define setConfigStr(a, b) \
-  if (strlen(b)) { \
-    strncpy(config.a, b, MIN(_cs(a), strlen(b))); \
-    config.a[MIN(_cs(a) - 1, strlen(b))] = '\0'; \
-  }
+typedef struct {
 
-struct configStruct {
-
-  char hostname[CFG_SZ_HOSTNAME + 1];
-  char release_tag[CFG_SZ_REL_TAG + 1];
-  char sonnenHostname[CFG_SZ_SONNENHOST + 1];
-  char sonnenApiToken[CFG_SZ_SONNENTOKEN + 1];
+  char hostname[CFG_SZ_HOSTNAME];
+  char release_tag[CFG_SZ_REL_TAG];
+  char sonnenHostname[CFG_SZ_SONNENHOST];
+  char sonnenApiToken[CFG_SZ_SONNENTOKEN];
 
   uint8_t boiler_T_nom;
   uint8_t boiler_T_max;
@@ -47,28 +55,30 @@ struct configStruct {
   float kWp;    // installed PV power
   uint8_t dec;  // PV panel declination (0..90°)
   uint16_t az;  // PV panel Azimuth
-  char location[CFG_SZ_LOCATION + 1];
+  char location[CFG_SZ_LOCATION];
   char tz[CFG_SZ_TZ + 1];
-  uint8_t mode;  // 0 - off, 1 - on, 2 - automatic
-  bool update_startup;
-};
+  uint8_t mode;         // 0 - off, 1 - on, 2 - automatic
+  bool update_startup;  // release update check on startup
+} configStruct;
 
-struct systemDataStruct {
+typedef struct {
   time_t ts;  // current system time, taken from battery status
 
   bool switchEnabled = false;
 
-  int inv_max_w = -1;    // inverter power max
-  uint8_t usoc;          // 0..100% battery charge
-  uint16_t cap;          // battery capacity
-  uint16_t prod_w;       // prodcution (Watt)
-  uint16_t cons_w;       // consumption (Watt)
-  uint16_t cons_avg_w;   // consumption average (Watt)
-  uint16_t capacity_wh;  // battery capacity
-  int gridFeedIn_W;      // current grid feed in - negative is consumption, positive is fedd in
+  int inv_max_w = -1;       // inverter power max
+  uint8_t usoc;             // 0..100 user state of charge - battery capacity in %
+  uint16_t cap;             // battery capacity
+  uint16_t prod_W;          // prodcution (Watt)
+  uint16_t cons_W;          // consumption (Watt)
+  uint16_t cons_avg_W;      // consumption average (Watt)
+  uint16_t cap_bat_max_Wh;  // max battery capacity
+  uint16_t cap_bat_min_Wh;  // battery min capacity - custom min capacity
+  int gridFeedIn_W;         // current grid feed in - negative is consumption, positive is fedd in
 
-  long pv_forecast_ts;               // last update timestamp in ms since mcu start
-  uint32_t pv_forecast_wh_h[48][2];  //pv production Wh/h for today and tomorrow
-};
+  long pv_forecast_ts;                                            // last update timestamp in ms since mcu start
+  uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
+  uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL / 1000)];  // average consumption of the last hour (long term)
+} systemDataStruct;
 
 #endif
