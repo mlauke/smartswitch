@@ -1,5 +1,4 @@
 <html>
-
 <head>
   <title>Sonnen SmartSwitch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -28,40 +27,188 @@
       color: #fcf8bf;
     }
   }
+  .form-container {
+    width: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .form-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  legend {
+    font-weight: bold;
+  }
+  label {
+    width: 100px; /* Einheitliche Breite für Labels */
+    text-align: left;
+    margin-right: 10px;
+  }
+  input {
+    flex: 1; /* Füllt den restlichen Platz */
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  .battery-container {
+    text-align: center;
+    font-family: Arial, sans-serif;
+    margin-top: 20px;
+}
+
+.battery {
+    width: 75px;
+    height: 150px;
+    border: 4px solid #333;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    background-color: #eee;
+    display: flex;
+    align-items: flex-end; /* Füllt sich von unten nach oben */
+    justify-content: center;
+}
+
+.battery::after {
+    content: "";
+    width: 25px;
+    height: 8px;
+    background-color: #333;
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 3px;
+}
+
+.charge {
+  width: 100%;
+    height: 0%; /* Start bei 0%, wird dynamisch geändert */
+    position: absolute;
+    bottom: 0;
+    transition: height 0.5s ease-in-out, background-color 0.5s;
+}
+.charge-lvl {
+    color: rgb(7, 68, 124);
+    font-weight: bold;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    position: absolute;
+    z-index: 2
+}
+
+/* Farbverlauf von Grün über Gelb zu Rot */
+.charge[data-level="high"] {
+    background-color: #28a745; /* Grün */
+}
+.charge[data-level="medium"] {
+    background-color: #ffc107; /* Gelb */
+    color: black;
+}
+.charge[data-level="low"] {
+    background-color: #dc3545; /* Rot */
+}
   </style>
 </head>
 
 <body>
-  <h1>Sonnen SmartSwitch (Release: <span name="release_tag"></span>)</h1>
-  <form>
+  <h1>Sonnen SmartSwitch</h1>
+  <p>(Release: <span name="release_tag"></span>)</p>
+  <div class="battery-container">
+    <div class="battery">
+        <input hidden name="usoc" id="usoc">
+        <div class="charge" id="charge"></div>
+        <span class="charge-lvl" id="charge-lvl">0%</span>
+      </div>
+  </div>
+  <form class="form-container">
     <fieldset>
-      <legend>Switch ("<span name="switch"></span>")</legend>
+      <legend>Status</legend>
+      <label for="switch">Switch:</label><span name="switch"></span><br/>
+      <label for="cons">Production:</label><span name="prod"></span>Wh<br/>
+      <label for="cons_avg_w">Consumption:</label><span name="cons_avg_w"></span>Wh<br/>
+      <label for="cons_avg_wh">Consumption (avg):</label><span name="cons_avg_wh"></span>Wh<br/>
+      <label for="grid">Grid:</label><span name="grid"></span>W<br/>
+    </fieldset>
+  </form>
+  <form class="form-container">
+    <fieldset>
+      <legend>Mode</legend>
       <label><input type="radio" name="mode" value="0">Off</label><br />
       <label><input type="radio" name="mode" value="1">On</label><br />
       <label><input type="radio" name="mode" value="2">Auto</label><br />
     </fieldset>
   </form>
-  <form action="/api/update" method="post">
+  <form action="/api/update" method="post" class="form-container">
+    <fieldset>
+      <legend>Boiler</legend>
+      <div class="form-group">
+        <label for="bs_t_cur">T (C°):</label>
+        <input name="bs_t_cur" readonly disabled>
+      </div>
+      <div class="form-group">
+        <label for="bs_t_max">T_max (C°):</label>
+        <input name="bs_t_max" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label for="bs_t_nom">T_min (C°):</label>
+        <input name="bs_t_nom" maxlength="4">
+      </div>
+      <button type="submit" name="boiler" value="Update">Update</button>
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post" class="form-container">
     <fieldset>
       <legend>Sonnen Battery</legend>
-      Host: <input name="sn_host"><br />
-      Token: <input name="sn_token" style="width: 36ch;" maxlength="36"><br />
-      Grid_min (W): <input name="sn_grdmin" style="width: 4ch;" maxlength="4"><br />
-      Load (W): <input name="sn_loadpower" style="width: 4ch;" maxlength="4"><br />
-      Status: <br />
+      <div class="form-group">
+        <label for="sn_host">Host:</label>
+        <input name="sn_host">
+      </div>
+      <div class="form-group">
+        <label for="sn_token">Token:</label>
+        <input type="password" name="sn_token" maxlength="36">
+      </div>
+      <div class="form-group">
+        <label for="sn_grdmin">Grid_min (W):</label>
+        <input name="sn_grdmin" maxlength="4">
+      </div>
+      <div class="form-group">
+        <label for="sn_loadpower">Load (W):</label>
+        <input name="sn_loadpower" maxlength="4">
+      </div>
       <button type="submit" name="sonnen" value="Update">Update</button>
     </fieldset>
   </form>
-  <form action="/api/update" method="post">
+  <form action="/api/update" method="post" class="form-container">
     <fieldset>
-      <legend>PV Location (<span name="loc">-</span>)</legend>
-      Latitude: <input name="lc_lat" style="width:8ch;" maxlength="8"> / Longitude: <input name="lc_lon" size="8" maxlength="8"><br />
-      Azimuth (0...360): <input name="lc_az" size="3" maxlength="3"><br />
-      kWp: <input name="lc_kWp"><br />
+      <legend>PV Location</legend>
+      <div class="form-group">
+        <label for="lc_lat">Latitude:</label>
+        <input name="lc_lat" maxlength="8">
+      </div>
+      <div class="form-group">
+        <label for="lc_lon">Longitude:</label>
+        <input name="lc_lon" maxlength="8">
+      </div>
+      <div class="form-group">
+        <label for="loc">Location (i):</label>
+        <input name="loc" readonly disabled>
+      </div>
+      <div class="form-group">
+        <label for="lc_az">Azimuth (0...360):</label>
+        <input name="lc_az" size="3" maxlength="3">
+      </div>
+      <div class="form-group">
+        <label for="lc_kWp">kWp:</label>
+        <input name="lc_kWp">
+      </div>
       <button type="submit" name="location" value="Update">Update</button>
     </fieldset>
   </form>
-  <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
+  <form action="api/update" method="post" onSubmit="return confirm('Sure?');" class="form-container">
     <fieldset>
       <legend>Software Update</legend>
       Git Release: <a href="/api/update?update">Update Check</a><br />

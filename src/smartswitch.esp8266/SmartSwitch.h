@@ -31,6 +31,8 @@
 #define CFG_SZ_TZ 32
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 #define _cs(a) sizeof(((configStruct*)0)->a)
 #define setConfigStr(cfg, property, str) \
   if (strlen(str)) { \
@@ -62,17 +64,17 @@ typedef struct {
 } configStruct;
 
 typedef struct {
-  time_t ts;  // current system time, taken from battery status
+  uint32_t ts;  // current system time, taken from battery status
 
   bool switchEnabled = false;
+  uint8_t boiler_T_cur;
 
   int inv_max_w = -1;       // inverter power max
   uint8_t usoc;             // 0..100 user state of charge - battery capacity in %
-  uint16_t cap;             // battery capacity
   uint16_t prod_W;          // prodcution (Watt)
   uint16_t cons_W;          // consumption (Watt)
-  uint16_t cons_avg_W;      // consumption average (Watt)
-  uint16_t cap_bat_max_Wh;  // max battery capacity
+  uint16_t cons_avg_Wh;     // consumption average (Wh)
+  uint16_t cap_bat_max_Wh;  // max battery capacity (system)
   uint16_t cap_bat_min_Wh;  // battery min capacity - custom min capacity
   int gridFeedIn_W;         // current grid feed in - negative is consumption, positive is fedd in
 

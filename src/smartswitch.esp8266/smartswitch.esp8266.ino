@@ -2,15 +2,13 @@
  * TODOs:
  * - detect accu maintenance mode - full charged, but not used if no production => http://192.168.188.36/api/v2/latestdata "Setpoint Priority": Full Charge Request": true|false
  * - weather forecast and tracking
- *
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
 
-// \
-echo "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h \
-echo "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h
+// echo "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h &&
+// echo "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h
 
 #include "app_js.h"
 #include "index_html.h"
@@ -39,6 +37,9 @@ static volatile bool doUpdateFlag = false;
 static systemDataStruct systemData;
 static configStruct config;
 static bool saveConfigFile = false;
+
+int stdOffset = 3600;  // 1h utc offset
+int dstOffset = 3600;  // 1h suummer time"offset
 
 void saveConfigCallback() {
   saveConfigFile = true;
@@ -144,7 +145,7 @@ void onOTAEnd(bool success) {
 
 void systemDefaults() {
   systemData.pv_forecast_ts = 0;
-  systemData.cap_bat_min_Wh = 1000;
+  systemData.cap_bat_min_Wh = 500;
   memset(systemData.cons_avg_W_h, 0, sizeof(systemData.cons_avg_W_h));
 }
 
@@ -163,6 +164,9 @@ void configDefaults() {  // init config struct with default values
   config.gridMin_W = GRID_FEED_IN_MIN;
   config.mode = 0;  //initial set to off
   config.update_startup = false;
+
+  config.boiler_T_max = 65;
+  config.boiler_T_nom = 50;
 }
 
 bool updateSolarForecast() {
@@ -228,11 +232,10 @@ void handleAppJs() {
 
 void handleRoot() {
   commonHeader();
-  server.send_P(200, "text/html", index_html, sizeof(index_html));
+  server.send_P(200, "text/html;charset=utf-8", index_html, sizeof(index_html));
 }
 
 void changeHostname(const char* newHostname) {
-
   WiFi.disconnect();
   while (WiFi.status() == WL_CONNECTED) {
     delay(100);
@@ -248,7 +251,6 @@ void changeHostname(const char* newHostname) {
 }
 
 void jsonToConfig(JsonDocument& data) {
-
   config.mode = data["mode"].as<uint8_t>();
   setConfigStr(config, release_tag, data["release_tag"]);
 
@@ -268,10 +270,12 @@ void jsonToConfig(JsonDocument& data) {
 
   setConfigStr(config, location, data["loc"]);
   setConfigStr(config, tz, data["tz"]);
+
+  config.boiler_T_max = data["bs_t_max"].as<uint8_t>();
+  config.boiler_T_nom = data["bs_t_nom"].as<uint8_t>();
 }
 
 void configToJson(JsonDocument& data) {
-
   data["mode"] = config.mode;
   data["release_tag"] = config.release_tag;
 
@@ -291,10 +295,12 @@ void configToJson(JsonDocument& data) {
 
   data["loc"] = config.location;
   data["tz"] = config.tz;
+
+  data["bs_t_max"] = config.boiler_T_max;
+  data["bs_t_nom"] = config.boiler_T_nom;
 }
 
 void sendJson(JsonDocument& json) {
-
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
@@ -307,8 +313,8 @@ void sendJson(JsonDocument& json) {
 void handleData() {
 
   JsonDocument data;
-  configToJson(data);
 
+  configToJson(data);
   sendJson(data);
 }
 
@@ -317,17 +323,20 @@ void handleStatus() {
 
   JsonDocument data;
 
-  data["cons"] = systemData.cons_W;
+  data["cons_w"] = systemData.cons_W;
+  data["cons_avg_wh"] = systemData.cons_avg_Wh;
   data["prod"] = systemData.prod_W;
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
+
   data["switch"] = systemData.switchEnabled;
+
+  data["bs_t_cur"] = systemData.boiler_T_cur;
 
   sendJson(data);
 }
 
 void handleAPI() {
-
   if (server.hasArg("mode")) {
     config.mode = server.arg("mode").toInt() & 3;
     Serial.printf("Mode: %d\n", config.mode);
@@ -336,6 +345,11 @@ void handleAPI() {
   } else if (server.hasArg("update_startup")) {
     config.update_startup = server.arg("update_startup").toInt();
     Serial.printf("Enabled: %d\n", config.update_startup);
+    saveConfig();
+
+  } else if (server.hasArg("boiler")) {
+    config.boiler_T_max = server.arg("bs_t_max").toInt();
+    config.boiler_T_nom = server.arg("bs_t_nom").toInt();
     saveConfig();
 
   } else if (server.hasArg("sonnen")) {
@@ -378,7 +392,6 @@ void restart() {
 }
 
 void handleGithubUpdate() {
-
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (!gh_updater.checkUpdate(config.release_tag)) {
@@ -409,7 +422,6 @@ void handleGithubUpdate() {
 
 // main loop
 void loop() {
-
   if (doUpdateFlag) {
 
     uint32_t heap = ESP.getFreeHeap();
@@ -441,7 +453,6 @@ void statusLED(int status) {
 }
 
 bool ensureConnected() {
-
   wl_status_t status = WiFi.status();
   if (status != WL_CONNECTED) {
     Serial.print("Connecting");
@@ -464,7 +475,6 @@ bool ensureConnected() {
 }
 
 bool fetchData(String uri, JsonDocument& doc) {
-
   RestClient restClient;
 
   if (config.sonnenHostname && strlen(config.sonnenHostname) && config.sonnenApiToken && strlen(config.sonnenApiToken)) {
@@ -476,7 +486,6 @@ bool fetchData(String uri, JsonDocument& doc) {
 }
 
 bool updateSystemData() {
-
   JsonDocument json;
 
   if (systemData.inv_max_w == -1) {
@@ -508,20 +517,18 @@ bool updateSystemData() {
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
     systemData.prod_W = json["Production_W"].as<uint16_t>();
     systemData.cons_W = (json["Consumption_W"].as<uint16_t>() + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
-    uint16_t cons_avg_W = json["Consumption_Avg"].as<uint16_t>();
+    systemData.cons_avg_Wh = median(json["Consumption_Avg"].as<uint16_t>());
 
-    systemData.cons_avg_W = median(cons_avg_W);
+    struct tm time;
+    strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
 
-    struct tm t;
-    strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &t);
-    systemData.ts = mktime(&t);
+    systemData.ts = mktime(&time) - stdOffset - (isDST(&time) ? dstOffset : 0);
   }
 
   return true;
 }
 
 uint16_t median(uint16_t cons_W) {
-
   static uint16_t ix = 0;
 
   uint32_t cons_avg_W = 0;
@@ -547,12 +554,13 @@ bool updateSwitch() {
   */
   systemData.switchEnabled = (!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
                              || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W)
-                             || calcMinBatteryCapacityWh() >= systemData.cap_bat_min_Wh
-                             ;
+                             || (forecastMinBatteryCapacityWh() >= systemData.cap_bat_min_Wh);
 
   systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
 
-  Serial.printf("ts: %llu usoc: %2d%% p/c: %d/%d avg: %d grid: %d mode %d: heater %d\n", systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  time_t ts = (time_t)systemData.ts;
+
+  Serial.printf("ts: %s%u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", asctime(gmtime(&ts)), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_Wh, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   digitalWrite(GPIO_ID_PIN(PIN_SSR), systemData.switchEnabled ? HIGH : LOW);
   buildInLED(systemData.switchEnabled);
@@ -560,9 +568,54 @@ bool updateSwitch() {
   return true;
 }
 
-uint16_t calcMinBatteryCapacityWh(){
-  //systemData.cap_bat_max_Wh
-  return 0;
+bool isDST(struct tm* timeinfo) {
+  int year = timeinfo->tm_year + 1900;
+
+  struct tm lastMarchSunday = { 0 };
+  lastMarchSunday.tm_year = year - 1900;
+  lastMarchSunday.tm_mon = 2;  // März
+  lastMarchSunday.tm_mday = 31;
+  lastMarchSunday.tm_hour = 2;
+  mktime(&lastMarchSunday);
+  lastMarchSunday.tm_mday -= lastMarchSunday.tm_wday;
+
+  struct tm lastOctoberSunday = { 0 };
+  lastOctoberSunday.tm_year = year - 1900;
+  lastOctoberSunday.tm_mon = 9;
+  lastOctoberSunday.tm_mday = 31;
+  lastOctoberSunday.tm_hour = 3;
+  mktime(&lastOctoberSunday);
+  lastOctoberSunday.tm_mday -= lastOctoberSunday.tm_wday;
+
+  time_t now = mktime(timeinfo);
+  return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
+}
+
+uint32_t forecastMinBatteryCapacityWh() {
+
+  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
+
+  if (systemData.pv_forecast_ts != 0) {  //pv forecast avaulable
+    for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
+      long ts = systemData.pv_forecast_wh_h[i][0] - systemData.ts;  //select pv forecast upon system ts
+      if (ts > -3600 && ts <= 0) {
+        uint32_t wh = (ts + 3600) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
+        Serial.printf("%d => %ld (s) %u (Wh) cap %u (Wh) %u%%\n", i, ts, wh, cap_bat_Wh, systemData.cap_bat_max_Wh * 100 / cap_bat_Wh);
+
+        for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
+          cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_Wh));
+
+          Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, systemData.cap_bat_max_Wh * 100 / cap_bat_Wh);
+          if (cap_bat_Wh <= systemData.cap_bat_min_Wh) {  // capacity below expected min capacity
+            Serial.println("<= below min capacity");
+            return cap_bat_Wh;
+          }
+          wh = systemData.pv_forecast_wh_h[i][1];
+        }
+      }
+    }
+  }
+  return cap_bat_Wh;
 }
 
 bool loadConfig() {

@@ -1,4 +1,4 @@
-  async function fetchData(uri) {
+async function fetchData(uri) {
   try {
     const response = await fetch(uri);
     if (!response.ok) {
@@ -7,15 +7,15 @@
     const data = await response.json();
     Object.keys(data).forEach(key => {
       document.getElementsByName(key).forEach(e => {
-        if(e.type == "radio"){
+        if (e.type == "radio") {
           e.checked = e.value == data[key];
-        }else if(e instanceof HTMLInputElement) {
+        } else if (e instanceof HTMLInputElement) {
           e.value = data[key];
-        }else {
+        } else {
           var v = data[key];
-          if(typeof(v) == "boolean"){
+          if (typeof (v) === "boolean") {
             e.textContent = v ? "On" : "Off";
-          }else{
+          } else {
             e.textContent = v;
           }
         }
@@ -28,7 +28,26 @@
 
 function fetchStatus() {
   fetchData("/api/status");
+  updateBattery();
   setTimeout(fetchStatus, 3000);
+}
+
+function updateBattery() {
+  const chargeBar = document.getElementById("charge");
+  const level = document.getElementById("usoc").value;
+
+  if(level !== ""){
+    chargeBar.style.height = level + "%";
+    // Farbe anpassen je nach Ladestand
+    if (level > 60) {
+      chargeBar.setAttribute("data-level", "high");
+    } else if (level > 10) {
+      chargeBar.setAttribute("data-level", "medium");
+    } else {
+      chargeBar.setAttribute("data-level", "low");
+    }
+    document.getElementById("charge-lvl").textContent = level + "%";
+  }
 }
 
 fetchData("/api/data");
