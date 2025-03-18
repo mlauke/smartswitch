@@ -51,6 +51,7 @@ typedef struct {
   uint8_t boiler_T_max;
 
   uint16_t loadPower_W;
+  uint16_t cap_bat_min_Wh;  // battery min capacity - custom min capacity
   uint16_t gridMin_W;
   float lat;
   float lon;
@@ -75,7 +76,6 @@ typedef struct {
   uint16_t cons_W;          // consumption (Watt)
   uint16_t cons_avg_Wh;     // consumption average (Wh)
   uint16_t cap_bat_max_Wh;  // max battery capacity (system)
-  uint16_t cap_bat_min_Wh;  // battery min capacity - custom min capacity
   int gridFeedIn_W;         // current grid feed in - negative is consumption, positive is fedd in
 
   long pv_forecast_ts;                                            // last update timestamp in ms since mcu start
