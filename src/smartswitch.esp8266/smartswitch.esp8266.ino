@@ -359,6 +359,7 @@ void handleAPI() {
     setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
     config.gridMin_W = server.arg("sn_grdmin").toInt();
     config.loadPower_W = server.arg("sn_loadpower").toInt();
+    config.cap_bat_min_Wh = server.arg("sn_cap_min").toInt();
     saveConfig();
 
   } else if (server.hasArg("location")) {
