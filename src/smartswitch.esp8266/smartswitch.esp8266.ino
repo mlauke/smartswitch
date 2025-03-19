@@ -89,10 +89,6 @@ void setup() {
     }
   }
 
-  if (config.update_startup) {
-    handleGithubUpdate();
-  }
-
   WiFi.hostname(config.hostname);
   MDNS.begin(config.hostname);
 
@@ -104,14 +100,11 @@ void setup() {
   server.onNotFound(handleNotFound);
 
   ESPhttpUpdate.onStart(onOTABegin);
-  //ElegantOTA.onStart(onOTABegin);
-  //ElegantOTA.onProgress(onOTAProgress);
   ESPhttpUpdate.onProgress(onOTAProgress);
-  //ElegantOTA.onEnd(onOTAEnd);
+  if (config.update_startup) {
+    handleGithubUpdate();
+  }
 
-  //ElegantOTA.begin(&server);
-
-  //httpUpdater.setup(&server);
   server.begin();  // Actually start the server
   Serial.println("HTTP server started");
 
@@ -307,6 +300,7 @@ void configToJson(JsonDocument& data) {
 }
 
 void sendJson(JsonDocument& json) {
+  
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
@@ -338,6 +332,8 @@ void handleStatus() {
   data["switch"] = systemData.switchEnabled;
 
   data["bs_t_cur"] = systemData.boiler_T_cur;
+
+  data["events"] = systemData.events;
 
   sendJson(data);
 }
@@ -382,6 +378,7 @@ void handleAPI() {
     }
   } else if (server.hasArg("update")) {
     handleGithubUpdate();
+    return;
   }
 
   server.sendHeader("location", "/");
@@ -406,23 +403,22 @@ void handleGithubUpdate() {
     return;
   }
 
-  char buffer[256];
-  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Found Update Release %s. Going to install...</p></body></html>", gh_updater.release_tag);
-  server.send(200, "text/plain", buffer);
-  DEBUG(buffer);
-
   if (gh_updater.doUpdate()) {
     setConfigStr(config, release_tag, gh_updater.release_tag);
     if (!saveConfig()) {
       Serial.println("Error saving config");
+      systemData.events.concat("Error saving config\n");
       return;
     }
     Serial.println("config saved.");
-
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", config.release_tag);
+    server.send(200, "text/plain", buffer);
+    DEBUG(buffer);
     restart();
-  } else {
-    server.send(500, "text/plain", gh_updater.getUpdateError());
   }
+  systemData.events.concat(gh_updater.getUpdateError() + "\n");
+  server.send(500, "text/plain", systemData.events);
 }
 
 // main loop

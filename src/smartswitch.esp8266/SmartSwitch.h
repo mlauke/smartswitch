@@ -84,7 +84,7 @@ typedef struct {
   uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
   uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL / 1000)];  // average consumption of the last hour (long term)
 
-  char events[512];  // event buffer
+  String events;  // event buffer
 } systemDataStruct;
 
 #endif
