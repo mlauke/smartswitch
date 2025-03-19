@@ -300,7 +300,7 @@ void configToJson(JsonDocument& data) {
 }
 
 void sendJson(JsonDocument& json) {
-  
+
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
@@ -403,6 +403,11 @@ void handleGithubUpdate() {
     return;
   }
 
+  char buffer[256];
+  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag);
+  server.send(200, "text/plain", buffer);
+  DEBUG(buffer);
+
   if (gh_updater.doUpdate()) {
     setConfigStr(config, release_tag, gh_updater.release_tag);
     if (!saveConfig()) {
@@ -411,14 +416,9 @@ void handleGithubUpdate() {
       return;
     }
     Serial.println("config saved.");
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", config.release_tag);
-    server.send(200, "text/plain", buffer);
-    DEBUG(buffer);
     restart();
   }
   systemData.events.concat(gh_updater.getUpdateError() + "\n");
-  server.send(500, "text/plain", systemData.events);
 }
 
 // main loop
