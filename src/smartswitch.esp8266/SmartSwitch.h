@@ -76,13 +76,15 @@ typedef struct {
   uint8_t usoc;             // 0..100 user state of charge - battery capacity in %
   uint16_t prod_W;          // prodcution (Watt)
   uint16_t cons_W;          // consumption (Watt)
-  uint16_t cons_avg_Wh;     // consumption average (Wh)
+  uint16_t cons_avg_W;      // consumption average (W)
   uint16_t cap_bat_max_Wh;  // max battery capacity (system)
   int gridFeedIn_W;         // current grid feed in - negative is consumption, positive is fedd in
 
   long pv_forecast_ts;                                            // last update timestamp in ms since mcu start
   uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
   uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL / 1000)];  // average consumption of the last hour (long term)
+
+  char events[512];  // event buffer
 } systemDataStruct;
 
 #endif

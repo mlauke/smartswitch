@@ -1,5 +1,4 @@
 <html>
-
 <head>
   <title>Sonnen SmartSwitch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,23 +8,18 @@
       padding: 8px;
       border-radius: 5px;
     }
-
     button {
       padding: 4px;
     }
-
     input[type="radio"] {
       accent-color: #007BFF;
       width: 18px;
       height: 18px;
     }
-
     body {
       background: #ffffff;
-      /* Light theme */
       color: #333;
     }
-
     body,
     input,
     button {
@@ -36,7 +30,6 @@
     }
 
     @media (prefers-color-scheme: dark) {
-
       body,
       input,
       button {
@@ -44,50 +37,40 @@
         color: #fcf8bf;
       }
     }
-
     .form-container {
       width: auto;
       display: flex;
       flex-direction: column;
       gap: 10px;
     }
-
     .form-group {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-
     legend {
       font-weight: bold;
     }
-
     label {
       width: 100px;
-      /* Einheitliche Breite für Labels */
       text-align: left;
       margin-right: 10px;
     }
-
     input {
       flex: 1;
-      /* Füllt den restlichen Platz */
-      padding: 8px;
+      padding: 6px;
       border: 1px solid #ccc;
       border-radius: 5px;
     }
-
     .container {
       display: grid;
       grid-template-columns: 75% 25%;
       gap: 10px;
     }
-
     .battery-container {
       text-align: center;
       font-family: Arial, sans-serif;
     }
-
     .battery {
       width: 75px;
       height: 150px;
@@ -98,10 +81,8 @@
       background-color: #eee;
       display: flex;
       align-items: flex-end;
-      /* Füllt sich von unten nach oben */
       justify-content: center;
     }
-
     .battery::after {
       content: "";
       width: 25px;
@@ -113,7 +94,6 @@
       transform: translateX(-50%);
       border-radius: 3px;
     }
-
     .charge {
       width: 100%;
       height: 0%;
@@ -131,22 +111,15 @@
       position: absolute;
       z-index: 2
     }
-
-    /* Farbverlauf von Grün über Gelb zu Rot */
     .charge[data-level="high"] {
       background-color: #28a745;
-      /* Grün */
     }
-
     .charge[data-level="medium"] {
       background-color: #ffc107;
-      /* Gelb */
       color: black;
     }
-
     .charge[data-level="low"] {
       background-color: #dc3545;
-      /* Rot */
     }
   </style>
 </head>
@@ -160,8 +133,8 @@
       <div>
         <label for="switch">Switch:</label><b name="switch"></b><br />
         <label for="prod">Production:</label><span name="prod"></span> W<br />
-        <label for="cons_w">Consumption:</label><span name="cons_w"></span> Wh<br />
-        <label for="cons_avg_wh">Consumption (avg):</label><span name="cons_avg_wh"></span> Wh<br />
+        <label for="cons_w">Consumption:</label><span name="cons_w"></span> W<br />
+        <label for="cons_avg_wh">Consumption (avg):</label><span name="cons_avg_wh"></span> W<br />
         <label for="grid">Grid:</label><span name="grid"></span> W<br />
       </div>
       <div class="battery-container">
@@ -272,5 +245,4 @@
   </form>
   <script src="/app.js" defer></script>
 </body>
-
 </html>

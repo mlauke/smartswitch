@@ -51,6 +51,8 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(GPIO_ID_PIN(PIN_SSR), OUTPUT);
 
+  toggleSwitch(false);
+
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   configDefaults();
@@ -74,6 +76,7 @@ void setup() {
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
   wifiManager.addParameter(&custom_hostname);
   wifiManager.autoConnect("SmartSwitchAP");
+  wifiManager.setConfigPortalTimeout(8);
 
   updateLocation();
 
@@ -219,19 +222,21 @@ void updateLocation() {
   }
 }
 
-void commonHeader() {
+void commonHeader(size_t contentLength, const char* ctype) {
   server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
+  server.setContentLength(contentLength);
   server.sendHeader("content-encoding", "gzip");
+  server.send(200, ctype, "");
 }
 
 void handleAppJs() {
-  commonHeader();
-  server.send_P(200, "text/javascript", app_js, sizeof(app_js));
+  commonHeader(app_js_length, "text/javascript");
+  server.client().write_P(app_js, sizeof(app_js));
 }
 
 void handleRoot() {
-  commonHeader();
-  server.send_P(200, "text/html;charset=utf-8", index_html, sizeof(index_html));
+  commonHeader(index_html_length, "text/html;charset=utf-8");
+  server.client().write_P(index_html, sizeof(index_html));
 }
 
 void changeHostname(const char* newHostname) {
@@ -325,7 +330,7 @@ void handleStatus() {
   JsonDocument data;
 
   data["cons_w"] = systemData.cons_W;
-  data["cons_avg_wh"] = systemData.cons_avg_Wh;
+  data["cons_avg_w"] = systemData.cons_avg_W;
   data["prod"] = systemData.prod_W;
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
@@ -517,7 +522,7 @@ bool updateSystemData() {
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
     systemData.prod_W = json["Production_W"].as<uint16_t>();
     systemData.cons_W = json["Consumption_W"].as<uint16_t>();  // Consumption_Avg or Consumption_W % 100 more "real time"
-    systemData.cons_avg_Wh = median(json["Consumption_Avg"].as<uint16_t>());
+    systemData.cons_avg_W = median(json["Consumption_Avg"].as<uint16_t>());
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
@@ -555,19 +560,23 @@ bool updateSwitch() {
   */
   systemData.switchEnabled = (systemData.gridFeedIn_W > -GRID_PURCHASE_W)  // grid purchase must be greater then threshold (negative grid feed in denotes purchase)
                              && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
-                                 || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W)
+                                 || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
                                  || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh));
 
   systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
 
   time_t ts = (time_t)systemData.ts;
 
-  Serial.printf("ts: %s%u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", asctime(gmtime(&ts)), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_Wh, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  Serial.printf("ts: %s%u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", asctime(gmtime(&ts)), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
-  digitalWrite(GPIO_ID_PIN(PIN_SSR), systemData.switchEnabled ? HIGH : LOW);
-  buildInLED(systemData.switchEnabled);
+  toggleSwitch(systemData.switchEnabled);
 
   return true;
+}
+
+void toggleSwitch(bool switchEnabled) {
+  digitalWrite(GPIO_ID_PIN(PIN_SSR), switchEnabled ? HIGH : LOW);
+  buildInLED(switchEnabled);
 }
 
 bool isDST(struct tm* timeinfo) {
@@ -595,24 +604,25 @@ bool isDST(struct tm* timeinfo) {
 
 uint32_t forecastBatteryCapacityWh() {
 
-  if (systemData.pv_forecast_wh_h[0][0] == 0) {  //no forecast data, cannot calculate forecast assume battery will be empty
+  if (systemData.pv_forecast_wh_h[0][0] == 0) {  // no forecast data, cannot calculate forecast, assume battery will become empty
     Serial.println("<= no solar forcast");
     return 0;
   }
 
   uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
 
+  uint32_t ts = systemData.ts - (systemData.ts % 3600);  // ts of last full hour
+
   for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
-    long ts = systemData.pv_forecast_wh_h[i][0] - systemData.ts;  //select pv forecast upon system ts
+    if (systemData.pv_forecast_wh_h[i][0] == ts) {  //select pv forecast upon system ts
 
-    if (ts > -3600 && ts <= 0) {
-      uint32_t wh = (ts + 3600) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
-      Serial.printf("%d => %ld (s) %u (Wh) cap %u (Wh) %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+      uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // pv production in this hour
+      Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
-        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_Wh));
+        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_W));
         Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity

@@ -30,8 +30,8 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
     } else {
       Serial.printf("WARN '%s' code (%d) %s\n", url.c_str(), httpResponseCode, http.errorToString(httpResponseCode).c_str());
     }
-    http.end();
   }
+  http.end();
 
   return res;
 }
