@@ -553,9 +553,10 @@ bool updateSwitch() {
     heater_on = (not(heater_on) && GridFeedIn_W > HEATER_POWER_MAX_W) ||
                  heater_on && GridFeedIn_W > Gin_thr(50) ||
   */
-  systemData.switchEnabled = (!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
-                             || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W)
-                             || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh);
+  systemData.switchEnabled = (systemData.gridFeedIn_W < GRID_PURCHASE_W)  // switch off if grid purchase below threshold
+                             && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
+                                 || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W)
+                                 || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh));
 
   systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
 
