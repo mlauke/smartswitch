@@ -1,139 +1,178 @@
 <html>
+
 <head>
   <title>Sonnen SmartSwitch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-  button {
-    padding: 4px;
-  }
-  input[type="radio"] {
-    accent-color: #007BFF;
-    width: 18px;
-    height: 18px;
-  }
-  body {
-    background: #ffffff; /* Light theme */
-    color: #333;
-  }
-  body, input, button {
-    font-family: Arial, Helvetica, sans-serif;
-    font-size: 1rem;
-    margin: 4px;
-    -webkit-font-smoothing: antialiased;
-  }
-  @media (prefers-color-scheme: dark) {
-    body, input, button {
-      background: #222;
-      color: #fcf8bf;
+    fieldset {
+      border: 2px solid #333;
+      padding: 8px;
+      border-radius: 5px;
     }
-  }
-  .form-container {
-    width: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .form-group {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  legend {
-    font-weight: bold;
-  }
-  label {
-    width: 100px; /* Einheitliche Breite für Labels */
-    text-align: left;
-    margin-right: 10px;
-  }
-  input {
-    flex: 1; /* Füllt den restlichen Platz */
-    padding: 8px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-  }
-  .battery-container {
-    text-align: center;
-    font-family: Arial, sans-serif;
-    margin-top: 20px;
-}
 
-.battery {
-    width: 75px;
-    height: 150px;
-    border: 4px solid #333;
-    border-radius: 8px;
-    position: relative;
-    overflow: hidden;
-    background-color: #eee;
-    display: flex;
-    align-items: flex-end; /* Füllt sich von unten nach oben */
-    justify-content: center;
-}
+    button {
+      padding: 4px;
+    }
 
-.battery::after {
-    content: "";
-    width: 25px;
-    height: 8px;
-    background-color: #333;
-    position: absolute;
-    top: -12px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-radius: 3px;
-}
+    input[type="radio"] {
+      accent-color: #007BFF;
+      width: 18px;
+      height: 18px;
+    }
 
-.charge {
-  width: 100%;
-    height: 0%; /* Start bei 0%, wird dynamisch geändert */
-    position: absolute;
-    bottom: 0;
-    transition: height 0.5s ease-in-out, background-color 0.5s;
-}
-.charge-lvl {
-    color: rgb(7, 68, 124);
-    font-weight: bold;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    position: absolute;
-    z-index: 2
-}
+    body {
+      background: #ffffff;
+      /* Light theme */
+      color: #333;
+    }
 
-/* Farbverlauf von Grün über Gelb zu Rot */
-.charge[data-level="high"] {
-    background-color: #28a745; /* Grün */
-}
-.charge[data-level="medium"] {
-    background-color: #ffc107; /* Gelb */
-    color: black;
-}
-.charge[data-level="low"] {
-    background-color: #dc3545; /* Rot */
-}
+    body,
+    input,
+    button {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 1rem;
+      margin: 4px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    @media (prefers-color-scheme: dark) {
+
+      body,
+      input,
+      button {
+        background: #222;
+        color: #fcf8bf;
+      }
+    }
+
+    .form-container {
+      width: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .form-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    legend {
+      font-weight: bold;
+    }
+
+    label {
+      width: 100px;
+      /* Einheitliche Breite für Labels */
+      text-align: left;
+      margin-right: 10px;
+    }
+
+    input {
+      flex: 1;
+      /* Füllt den restlichen Platz */
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 75% 25%;
+      gap: 10px;
+    }
+
+    .battery-container {
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+
+    .battery {
+      width: 75px;
+      height: 150px;
+      border: 4px solid #333;
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      background-color: #eee;
+      display: flex;
+      align-items: flex-end;
+      /* Füllt sich von unten nach oben */
+      justify-content: center;
+    }
+
+    .battery::after {
+      content: "";
+      width: 25px;
+      height: 8px;
+      background-color: #333;
+      position: absolute;
+      top: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 3px;
+    }
+
+    .charge {
+      width: 100%;
+      height: 0%;
+      position: absolute;
+      bottom: 0;
+      transition: height 0.5s ease-in-out, background-color 0.5s;
+    }
+
+    .charge-lvl {
+      color: rgb(7, 68, 124);
+      font-weight: bold;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      position: absolute;
+      z-index: 2
+    }
+
+    /* Farbverlauf von Grün über Gelb zu Rot */
+    .charge[data-level="high"] {
+      background-color: #28a745;
+      /* Grün */
+    }
+
+    .charge[data-level="medium"] {
+      background-color: #ffc107;
+      /* Gelb */
+      color: black;
+    }
+
+    .charge[data-level="low"] {
+      background-color: #dc3545;
+      /* Rot */
+    }
   </style>
 </head>
 
 <body>
   <h1>Sonnen SmartSwitch</h1>
   <p>(Release: <span name="release_tag"></span>)</p>
-  <div class="battery-container">
-    <div class="battery">
-        <input hidden name="usoc" id="usoc">
-        <div class="charge" id="charge"></div>
-        <span class="charge-lvl" id="charge-lvl">0%</span>
+  <fieldset>
+    <legend>Status</legend>
+    <div class="container">
+      <div>
+        <label for="switch">Switch:</label><b name="switch"></b><br />
+        <label for="prod">Production:</label><span name="prod"></span> W<br />
+        <label for="cons_w">Consumption:</label><span name="cons_w"></span> Wh<br />
+        <label for="cons_avg_wh">Consumption (avg):</label><span name="cons_avg_wh"></span> Wh<br />
+        <label for="grid">Grid:</label><span name="grid"></span> W<br />
       </div>
+      <div class="battery-container">
+        <div class="battery">
+          <input hidden name="usoc" id="usoc">
+          <div class="charge" id="charge"></div>
+          <span class="charge-lvl" id="charge-lvl">0%</span>
+        </div>
+      </div>
+  </fieldset>
   </div>
-  <form class="form-container">
-    <fieldset>
-      <legend>Status</legend>
-      <label for="switch">Switch:</label><span name="switch"></span><br/>
-      <label for="cons">Production:</label><span name="prod"></span>Wh<br/>
-      <label for="cons_w">Consumption:</label><span name="cons_w"></span>Wh<br/>
-      <label for="cons_avg_wh">Consumption (avg):</label><span name="cons_avg_wh"></span>Wh<br/>
-      <label for="grid">Grid:</label><span name="grid"></span>W<br/>
-    </fieldset>
-  </form>
   <form class="form-container">
     <fieldset>
       <legend>Mode</legend>
@@ -190,16 +229,16 @@
     <fieldset>
       <legend>PV Location</legend>
       <div class="form-group">
+        <label for="loc">Location:</label>
+        <input name="loc" readonly disabled></span>
+      </div>
+      <div class="form-group">
         <label for="lc_lat">Latitude:</label>
         <input name="lc_lat" maxlength="8">
       </div>
       <div class="form-group">
         <label for="lc_lon">Longitude:</label>
         <input name="lc_lon" maxlength="8">
-      </div>
-      <div class="form-group">
-        <label for="loc">Location (i):</label>
-        <input name="loc" readonly disabled>
       </div>
       <div class="form-group">
         <label for="lc_az">Azimuth (0...360):</label>

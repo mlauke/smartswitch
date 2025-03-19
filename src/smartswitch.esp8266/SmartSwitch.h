@@ -13,7 +13,7 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 
-#define DEBUG_ENABLED
+//#define DEBUG_ENABLED
 #ifdef DEBUG_ENABLED
 #define DEBUG(...) Serial.printf(__VA_ARGS__)
 #else
@@ -65,7 +65,8 @@ typedef struct {
 } configStruct;
 
 typedef struct {
-  uint32_t ts;  // current system time, taken from battery status
+  uint32_t ts;       // current system time, taken from battery status
+  uint16_t tm_yday;  // day of year
 
   bool switchEnabled = false;
   uint8_t boiler_T_cur;

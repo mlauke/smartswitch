@@ -13,8 +13,6 @@
 #include "app_js.h"
 #include "index_html.h"
 
-#define GRID_FEED_IN_MIN 50
-
 #define SERIAL_BAUDRATE 115200
 #define WEBSERVER_PORT 80
 
@@ -144,24 +142,25 @@ void onOTAEnd(bool success) {
 }
 
 void systemDefaults() {
-  systemData.pv_forecast_ts = 0;  
+  systemData.pv_forecast_ts = 0;
+  memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   memset(systemData.cons_avg_W_h, 0, sizeof(systemData.cons_avg_W_h));
 }
 
 void configDefaults() {  // init config struct with default values
   setConfigStr(config, hostname, HOSTNAME);
   setConfigStr(config, release_tag, RELEASE_TAG);
-  setConfigStr(config, sonnenHostname, "");
-  setConfigStr(config, sonnenApiToken, "");
+  config.sonnenHostname[0] = '\0';
+  config.sonnenApiToken[0] = '\0';
   config.lon = 0.0;
   config.lat = 0.0;
   config.az = 0;    // default azimuth to 0 (south)
   config.dec = 30;  //default panel declination
   setConfigStr(config, tz, "Europe/Berlin");
-  setConfigStr(config, location, "");
+  config.location[0] = '\0';
   config.loadPower_W = 1000;  //initial assume 1kW
   config.cap_bat_min_Wh = 500;
-  config.gridMin_W = GRID_FEED_IN_MIN;
+  config.gridMin_W = 50;
   config.mode = 0;  //initial set to off
   config.update_startup = false;
 
@@ -402,15 +401,13 @@ void handleGithubUpdate() {
     return;
   }
 
-  setConfigStr(config, release_tag, gh_updater.release_tag);
-
-  char buffer[128];
-  snprintf(buffer, sizeof(buffer), "Found Update Release %s. Going to install...", config.release_tag);
+  char buffer[256];
+  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Found Update Release %s. Going to install...</p></body></html>", gh_updater.release_tag);
+  server.send(200, "text/plain", buffer);
   DEBUG(buffer);
 
-  server.send(200, "text/plain", buffer);
-
   if (gh_updater.doUpdate()) {
+    setConfigStr(config, release_tag, gh_updater.release_tag);
     if (!saveConfig()) {
       Serial.println("Error saving config");
       return;
@@ -519,13 +516,14 @@ bool updateSystemData() {
                                                    //  int ucap = (int)(cap * usoc / (float)100);
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
     systemData.prod_W = json["Production_W"].as<uint16_t>();
-    systemData.cons_W = (json["Consumption_W"].as<uint16_t>() + 50) / 100 * 100;  // Consumption_Avg or Consumption_W % 100 more "real time"
+    systemData.cons_W = json["Consumption_W"].as<uint16_t>();  // Consumption_Avg or Consumption_W % 100 more "real time"
     systemData.cons_avg_Wh = median(json["Consumption_Avg"].as<uint16_t>());
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
 
     systemData.ts = mktime(&time) - stdOffset - (isDST(&time) ? dstOffset : 0);
+    systemData.tm_yday = time.tm_yday;
   }
 
   return true;
@@ -557,7 +555,7 @@ bool updateSwitch() {
   */
   systemData.switchEnabled = (!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
                              || (systemData.switchEnabled && systemData.gridFeedIn_W > config.gridMin_W)
-                             || (forecastMinBatteryCapacityWh() >= config.cap_bat_min_Wh);
+                             || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh);
 
   systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
 
@@ -594,27 +592,37 @@ bool isDST(struct tm* timeinfo) {
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
-uint32_t forecastMinBatteryCapacityWh() {
+uint32_t forecastBatteryCapacityWh() {
+
+  if (systemData.pv_forecast_wh_h[0][0] == 0) {  //no forecast data, cannot calculate forecast assume battery will be empty
+    Serial.println("<= no solar forcast");
+    return 0;
+  }
 
   uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
 
-  if (systemData.pv_forecast_ts != 0) {  //pv forecast avaulable
-    for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
-      long ts = systemData.pv_forecast_wh_h[i][0] - systemData.ts;  //select pv forecast upon system ts
-      if (ts > -3600 && ts <= 0) {
-        uint32_t wh = (ts + 3600) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
-        Serial.printf("%d => %ld (s) %u (Wh) cap %u (Wh) %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+  for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
-        for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
-          cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_Wh));
+    long ts = systemData.pv_forecast_wh_h[i][0] - systemData.ts;  //select pv forecast upon system ts
 
-          Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
-          if (cap_bat_Wh <= config.cap_bat_min_Wh) {  // capacity below expected min capacity
-            Serial.println("<= below min capacity");
-            return cap_bat_Wh;
-          }
-          wh = systemData.pv_forecast_wh_h[i][1];
+    if (ts > -3600 && ts <= 0) {
+      uint32_t wh = (ts + 3600) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
+      Serial.printf("%d => %ld (s) %u (Wh) cap %u (Wh) %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+
+      for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
+
+        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_Wh));
+        Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+
+        if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
+          Serial.println("<= below min capacity");
+          return cap_bat_Wh;
         }
+        if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
+          Serial.println("<= max capacity reachable");
+          return cap_bat_Wh;
+        }
+        wh = systemData.pv_forecast_wh_h[i][1];
       }
     }
   }
