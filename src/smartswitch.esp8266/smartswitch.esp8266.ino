@@ -578,7 +578,9 @@ void toggleSwitch(bool switchEnabled) {
 bool isDST(struct tm* timeinfo) {
   int year = timeinfo->tm_year + 1900;
 
-  struct tm lastMarchSunday = { 0 };
+  struct tm lastMarchSunday;
+  lastMarchSunday.tm_min = 0;
+  lastMarchSunday.tm_sec = 0;
   lastMarchSunday.tm_year = year - 1900;
   lastMarchSunday.tm_mon = 2;  // März
   lastMarchSunday.tm_mday = 31;
@@ -586,7 +588,9 @@ bool isDST(struct tm* timeinfo) {
   mktime(&lastMarchSunday);
   lastMarchSunday.tm_mday -= lastMarchSunday.tm_wday;
 
-  struct tm lastOctoberSunday = { 0 };
+  struct tm lastOctoberSunday;
+  lastOctoberSunday.tm_min = 0;
+  lastOctoberSunday.tm_sec = 0;
   lastOctoberSunday.tm_year = year - 1900;
   lastOctoberSunday.tm_mon = 9;
   lastOctoberSunday.tm_mday = 31;
