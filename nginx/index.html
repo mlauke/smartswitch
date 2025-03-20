@@ -128,9 +128,11 @@
       <button type="submit">Update</button>
     </fieldset>
   </form>
-  <form action="/api/update" method="post" onSubmit="return confirm('Sure? WLAN Access Data will be erased!');">
+  <form action="/api/update" method="post">
     <fieldset>
-      <legend>Factory Reset</legend><input type="submit" name="reset" value="Reset" />
+      <legend>System</legend>
+      <input type="submit" name="restart" value="Restart" />
+      <input type="submit" name="reset" value="Factory Reset" onclick="return confirm('Sure? WLAN Access Data will be erased!');">
     </fieldset>
   </form>
   <script src="/app.js" defer></script>

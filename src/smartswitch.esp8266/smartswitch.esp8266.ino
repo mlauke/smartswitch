@@ -93,6 +93,7 @@ void setup() {
   }
 
   server.begin();  // Actually start the server
+  server.keepAlive(false);
   Serial.println("HTTP server started");
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL, timerCallback);
@@ -328,6 +329,9 @@ void handleStatus() {
 }
 
 void handleAPI() {
+
+  bool doRestart = false;
+
   if (server.hasArg("mode")) {
     config.mode = server.arg("mode").toInt() & 3;
     Serial.printf("Mode: %d\n", config.mode);
@@ -361,18 +365,16 @@ void handleAPI() {
 
   } else if (server.hasArg("hostname")) {
     setConfigStr(config, hostname, server.arg("hostname").c_str());
-    saveConfig();
-    restart();
+    doRestart = saveConfig();
 
   } else if (server.hasArg("restart")) {
-    restart();
+    doRestart = saveConfig();
 
   } else if (server.hasArg("reset")) {
     if (server.arg("reset").toInt()) {
       configDefaults();
-      saveConfig();
       wifiManager.resetSettings();  // reset wifi settings
-      restart();
+      doRestart = saveConfig();
     }
   } else if (server.hasArg("update")) {
     handleGithubUpdate();
@@ -381,6 +383,11 @@ void handleAPI() {
 
   server.sendHeader("location", "/");
   server.send(303);
+  server.client().flush();
+
+  if (doRestart) {
+    restart();
+  }
 }
 
 void handleNotFound() {
@@ -402,7 +409,7 @@ void handleGithubUpdate() {
   }
 
   char buffer[256];
-  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
+  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
   server.send(200, "text/html;charset=utf-8", buffer);
   DEBUG(buffer);
 
