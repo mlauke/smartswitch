@@ -38,6 +38,7 @@
 #define SYSTEM_UPDATE_INTERVAL 5000  //update intervall millis
 
 #define GRID_PURCHASE_W 100
+#define BAT_CAP_MAX 80
 
 #define CFG_SZ_HOSTNAME 32
 #define CFG_SZ_REL_TAG 5

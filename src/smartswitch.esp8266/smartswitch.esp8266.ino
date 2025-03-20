@@ -213,6 +213,7 @@ void cacheControlHeader(bool cache) {
 
 void commonHeader() {
   //server.sendHeader("last-modified", "");
+  server.sendHeader("connection", "close");
   server.sendHeader("content-encoding", "gzip");
 }
 
@@ -566,7 +567,9 @@ bool updateSwitch(bool validData) {
                              && (systemData.gridFeedIn_W > -GRID_PURCHASE_W)  // grid purchase must be greater then threshold (negative grid feed in denotes purchase)
                              && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
                                  || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
-                                 || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh));
+                                 || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh)
+                                 || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX)
+                                 );
 
   systemData.switchEnabled = (systemData.switchEnabled && config.mode == 2) || (config.mode == 1);  // with mode
 
