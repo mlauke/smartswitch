@@ -9,6 +9,7 @@ public:
 
   RestClient();
 
+  String lastError();
   bool fetch(String url, JsonDocument& doc, String hName = "", String hValue = "");
 
 protected:
@@ -16,6 +17,8 @@ protected:
   WiFiClient mWiFiClient;
 
 private:
+  String _lastError;
+
   WiFiClient& getClient(String url) {
 
     if (url.startsWith("https")) {

@@ -14,12 +14,13 @@
     <legend>Status</legend>
     <div class="container">
       <div>
-        <div for="switch">Switch: <span class="switch" name="switch"></span></div>
-        <div for="prod">Production: <span name="prod"></span> W</div>
-        <div for="cons_w">Consumption: <span name="cons_w"></span> W</div>
-        <div for="cons_avg_w">Consumption (avg): <span name="cons_avg_w"></span> W</div>
-        <div for="grid">Grid: <span name="grid"></span> W</div>
-        <div for="events">Events: <span name="events"></span></div>
+        <div>Switch: <span class="switch" name="switch" data-value="false"></span></div>
+        <div>Production: <span name="prod"></span> W</div>
+        <div>Consumption: <span name="cons_w"></span> W</div>
+        <div>Consumption (avg): <span name="cons_avg_w"></span> W</div>
+        <div>Grid: <span name="grid"></span> W</div>
+        <div>Events: <textarea data-append name="events"></textarea>
+        </div>
       </div>
       <div class="battery-container">
         <div class="battery">

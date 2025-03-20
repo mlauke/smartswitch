@@ -339,6 +339,8 @@ void handleStatus() {
   data["events"] = systemData.events;
 
   sendJson("status", data);
+
+  systemData.events.clear();
 }
 
 void handleAPI() {
@@ -370,7 +372,11 @@ void handleAPI() {
     config.lat = server.arg("lc_lat").toDouble();
     config.kWp = server.arg("lc_kWp").toDouble();
     config.az = server.arg("lc_az").toInt();
+    systemData.pv_forecast_ts = 0;  // force fetch new data
     saveConfig();
+
+  } else if (server.hasArg("restart")) {
+    restart();
 
   } else if (server.hasArg("reset")) {
     if (server.arg("reset").toInt()) {
@@ -415,13 +421,19 @@ void handleGithubUpdate() {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig()) {
       Serial.println("Error saving config");
-      systemData.events.concat("Error saving config\n");
+      pushEvent("Error saving config");
       return;
     }
     Serial.println("config saved.");
     restart();
   }
-  systemData.events.concat(gh_updater.getUpdateError() + "\n");
+  pushEvent(gh_updater.getUpdateError());
+}
+
+void pushEvent(String event) {
+  //systemData.events.concat(systemData.ts);
+  systemData.events.concat(event);
+  systemData.events.concat("\n");
 }
 
 // main loop
@@ -430,10 +442,10 @@ void loop() {
 
     uint32_t heap = ESP.getFreeHeap();
 
-    bool valid =
+    bool validData =
       ensureConnected() && updateSystemData() && updateSolarForecast();
 
-    updateSwitch(valid);
+    updateSwitch(validData);
 
     Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, valid);
 
@@ -481,15 +493,20 @@ bool ensureConnected() {
 }
 
 bool fetchData(String uri, JsonDocument& doc) {
+
+  bool r = false;
+
   RestClient restClient;
 
   if (config.sonnenHostname && strlen(config.sonnenHostname) && config.sonnenApiToken && strlen(config.sonnenApiToken)) {
     char url[128];
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    return restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
+    r = restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
+    if (!r) {
+      pushEvent(restClient.lastError());
+    }
   }
-  //  systemData.events.concat();
-  return false;
+  return r;
 }
 
 bool updateSystemData() {
@@ -568,8 +585,7 @@ bool updateSwitch(bool validData) {
                              && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
                                  || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
                                  || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh)
-                                 || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX)
-                                 );
+                                 || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX));
 
   systemData.switchEnabled = (systemData.switchEnabled && config.mode == 2) || (config.mode == 1);  // with mode
 
@@ -638,10 +654,12 @@ uint32_t forecastBatteryCapacityWh() {
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
           Serial.println("<= below min capacity");
+          pushEvent("below min capacity.");
           return cap_bat_Wh;
         }
         if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
           Serial.println("<= max capacity reachable");
+          pushEvent("bat max capacity reachable.");
           return cap_bat_Wh;
         }
         ts = systemData.pv_forecast_wh_h[i][0];

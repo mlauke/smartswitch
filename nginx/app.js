@@ -7,6 +7,7 @@ async function fetchData(uri, cb) {
       throw new Error(`HTTP error! Status: ${response}`);
     }
     const data = await response.json();
+    //data["events"] = new Date().toISOString() + ": " + "foo\n";
     Object.keys(data).forEach(key => {
       document.getElementsByName(key).forEach(e => {
         if (e.type == "radio") {
@@ -19,7 +20,7 @@ async function fetchData(uri, cb) {
             e.textContent = v ? "On" : "Off";
             e.setAttribute("data-value", v);
           } else {
-            e.textContent = v;
+            e.textContent = (e.hasAttribute("data-append") ? e.textContent + v : v);
           }
         }
       });
@@ -31,8 +32,8 @@ async function fetchData(uri, cb) {
 }
 
 function fetchStatus() {
-  fetchData("/api/status", function (r) {
-    if (r !== undefined && r.ok) {
+  fetchData("/api/status", function (response) {
+    if (response !== undefined && response.ok) {
       updateBattery();
     }
     setTimeout(fetchStatus, 3000);
