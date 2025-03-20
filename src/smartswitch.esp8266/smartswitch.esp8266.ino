@@ -12,6 +12,7 @@
    echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
 
 #include "app_js.h"
+#include "app_css.h"
 #include "index_html.h"
 
 static WiFiManager wifiManager;
