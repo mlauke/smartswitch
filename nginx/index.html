@@ -1,127 +1,10 @@
+<!DOCTYPE html>
 <html>
+
 <head>
   <title>Sonnen SmartSwitch</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    fieldset {
-      border: 2px solid #333;
-      padding: 8px;
-      border-radius: 5px;
-    }
-    button {
-      padding: 4px;
-    }
-    input[type="radio"] {
-      accent-color: #007BFF;
-      width: 18px;
-      height: 18px;
-    }
-    body {
-      background: #ffffff;
-      color: #333;
-    }
-    body,
-    input,
-    button {
-      font-family: Arial, Helvetica, sans-serif;
-      font-size: 1rem;
-      margin: 4px;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    @media (prefers-color-scheme: dark) {
-      body,
-      input,
-      button {
-        background: #222;
-        color: #fcf8bf;
-      }
-    }
-    .form-container {
-      width: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .form-group {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    legend {
-      font-weight: bold;
-    }
-    label {
-      width: 100px;
-      text-align: left;
-      margin-right: 10px;
-    }
-    input {
-      flex: 1;
-      padding: 6px;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-    .container {
-      display: grid;
-      grid-template-columns: 75% 25%;
-      gap: 10px;
-    }
-    .battery-container {
-      text-align: center;
-      font-family: Arial, sans-serif;
-    }
-    .battery {
-      width: 75px;
-      height: 150px;
-      border: 4px solid #333;
-      border-radius: 8px;
-      position: relative;
-      overflow: hidden;
-      background-color: #eee;
-      display: flex;
-      align-items: flex-end;
-      justify-content: center;
-    }
-    .battery::after {
-      content: "";
-      width: 25px;
-      height: 8px;
-      background-color: #333;
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      border-radius: 3px;
-    }
-    .charge {
-      width: 100%;
-      height: 0%;
-      position: absolute;
-      bottom: 0;
-      transition: height 0.5s ease-in-out, background-color 0.5s;
-    }
-
-    .charge-lvl {
-      color: rgb(7, 68, 124);
-      font-weight: bold;
-      text-align: center;
-      display: flex;
-      align-items: center;
-      position: absolute;
-      z-index: 2
-    }
-    .charge[data-level="high"] {
-      background-color: #28a745;
-    }
-    .charge[data-level="medium"] {
-      background-color: #ffc107;
-      color: black;
-    }
-    .charge[data-level="low"] {
-      background-color: #dc3545;
-    }
-  </style>
+  <link rel="stylesheet" href="/app.css">
 </head>
 
 <body>
@@ -131,12 +14,12 @@
     <legend>Status</legend>
     <div class="container">
       <div>
-        <label for="switch">Switch:</label><b name="switch"></b><br />
-        <label for="prod">Production:</label><span name="prod"></span> W<br />
-        <label for="cons_w">Consumption:</label><span name="cons_w"></span> W<br />
-        <label for="cons_avg_w">Consumption (avg):</label><span name="cons_avg_w"></span> W<br />
-        <label for="grid">Grid:</label><span name="grid"></span> W<br />
-        <label for="events">Events:</label><span name="events"></span>
+        <div for="switch">Switch: <span class="switch" name="switch"></span></div>
+        <div for="prod">Production: <span name="prod"></span> W</div>
+        <div for="cons_w">Consumption: <span name="cons_w"></span> W</div>
+        <div for="cons_avg_w">Consumption (avg): <span name="cons_avg_w"></span> W</div>
+        <div for="grid">Grid: <span name="grid"></span> W</div>
+        <div for="events">Events: <span name="events"></span></div>
       </div>
       <div class="battery-container">
         <div class="battery">
@@ -160,15 +43,15 @@
       <legend>Boiler</legend>
       <div class="form-group">
         <label for="bs_t_cur">T (C°):</label>
-        <input name="bs_t_cur" readonly disabled>
+        <input id="bs_t_cur" name="bs_t_cur" readonly disabled>
       </div>
       <div class="form-group">
         <label for="bs_t_max">T_max (C°):</label>
-        <input name="bs_t_max" maxlength="4">
+        <input id="bs_t_max" name="bs_t_max" maxlength="4">
       </div>
       <div class="form-group">
         <label for="bs_t_nom">T_min (C°):</label>
-        <input name="bs_t_nom" maxlength="4">
+        <input id="bs_t_nom" name="bs_t_nom" maxlength="4">
       </div>
       <button type="submit" name="boiler" value="Update">Update</button>
     </fieldset>
@@ -178,23 +61,23 @@
       <legend>Sonnen Battery</legend>
       <div class="form-group">
         <label for="sn_host">Host:</label>
-        <input name="sn_host">
+        <input id="sn_host" name="sn_host">
       </div>
       <div class="form-group">
         <label for="sn_token">Token:</label>
-        <input type="password" name="sn_token" maxlength="36">
+        <input id="sn_token" type="password" name="sn_token" maxlength="36">
       </div>
       <div class="form-group">
         <label for="sn_grdmin">Grid_min (W):</label>
-        <input name="sn_grdmin" maxlength="4">
+        <input id="sn_grdmin" name="sn_grdmin" maxlength="4">
       </div>
       <div class="form-group">
         <label for="sn_loadpower">Load (W):</label>
-        <input name="sn_loadpower" maxlength="4">
+        <input id="sn_loadpower" name="sn_loadpower" maxlength="4">
       </div>
       <div class="form-group">
         <label for="sn_cap_min">Capacity min (Wh):</label>
-        <input name="sn_cap_min" maxlength="6">
+        <input id="sn_cap_min" name="sn_cap_min" maxlength="6">
       </div>
       <button type="submit" name="sonnen" value="Update">Update</button>
     </fieldset>
@@ -204,23 +87,23 @@
       <legend>PV Location</legend>
       <div class="form-group">
         <label for="loc">Location:</label>
-        <input name="loc" readonly disabled></span>
+        <input id="loc" name="loc" readonly disabled></span>
       </div>
       <div class="form-group">
         <label for="lc_lat">Latitude:</label>
-        <input name="lc_lat" maxlength="8">
+        <input id="lc_lat" name="lc_lat" maxlength="8">
       </div>
       <div class="form-group">
         <label for="lc_lon">Longitude:</label>
-        <input name="lc_lon" maxlength="8">
+        <input id="lc_lon" name="lc_lon" maxlength="8">
       </div>
       <div class="form-group">
         <label for="lc_az">Azimuth (0...360):</label>
-        <input name="lc_az" size="3" maxlength="3">
+        <input id="lc_az" name="lc_az" size="3" maxlength="3">
       </div>
       <div class="form-group">
         <label for="lc_kWp">kWp:</label>
-        <input name="lc_kWp">
+        <input id="lc_kWp" name="lc_kWp">
       </div>
       <button type="submit" name="location" value="Update">Update</button>
     </fieldset>
@@ -245,4 +128,5 @@
   </form>
   <script src="/app.js" defer></script>
 </body>
+
 </html>

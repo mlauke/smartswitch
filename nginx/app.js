@@ -15,6 +15,7 @@ async function fetchData(uri, cb) {
           var v = data[key];
           if (typeof (v) === "boolean") {
             e.textContent = v ? "On" : "Off";
+            e.setAttribute("data-value", v);
           } else {
             e.textContent = v;
           }

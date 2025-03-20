@@ -1,32 +1,18 @@
 /**
  * TODOs:
  * - detect accu maintenance mode - full charged, but not used if no production => http://192.168.188.36/api/v2/latestdata "Setpoint Priority": Full Charge Request": true|false
- * - weather forecast and tracking
+ * - 
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
 
-// echo "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h &&
-// echo "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h
+// echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
+   echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
+   echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
 
 #include "app_js.h"
 #include "index_html.h"
-
-#define SERIAL_BAUDRATE 115200
-#define WEBSERVER_PORT 80
-
-#define PIN_SSR 5  // GPIO 5 (D1)
-
-#define SONNEN_API_URI "api/v2"
-#define SONNEN_API_CONFIGURATIONS "configurations"
-#define SONNEN_API_LATEST_DATA "latestdata"
-#define SONNEN_API_STATUS "status"
-
-#define URL_LOCATION "http://ip-api.com/json/"
-
-#define SOLAR_FORECAST_INTERVAL 10 * 60 * 1000  //every 10min
-#define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
 static WiFiManager wifiManager;
 static ESP8266WebServer server(WEBSERVER_PORT);
@@ -94,6 +80,7 @@ void setup() {
 
   server.on("/", handleRoot);
   server.on("/app.js", handleAppJs);
+  server.on("/app.css", handleAppCss);
   server.on("/api/data", handleData);
   server.on("/api/status", handleStatus);
   server.on("/api/update", handleAPI);
@@ -226,6 +213,11 @@ void handleAppJs() {
   server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
+void handleAppCss() {
+  commonHeader();
+  server.send_P(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
+}
+
 void handleRoot() {
   commonHeader();
   server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
@@ -298,12 +290,12 @@ void configToJson(JsonDocument& data) {
   data["bs_t_nom"] = config.boiler_T_nom;
 }
 
-void sendJson(JsonDocument& json) {
+void sendJson(String from, JsonDocument& json) {
 
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
-  Serial.printf("handleData() json (%d) %s\n", r, jsonString.c_str());
+  Serial.printf("%s - json (%d) %s\n", from.c_str(), r, jsonString.c_str());
 
   server.sendHeader("cache-control", "no-cache");
   server.send(200, "application/json", jsonString);
@@ -314,7 +306,7 @@ void handleData() {
   JsonDocument data;
 
   configToJson(data);
-  sendJson(data);
+  sendJson("data", data);
 }
 
 ///api/status
@@ -334,7 +326,7 @@ void handleStatus() {
 
   data["events"] = systemData.events;
 
-  sendJson(data);
+  sendJson("status", data);
 }
 
 void handleAPI() {
@@ -404,7 +396,7 @@ void handleGithubUpdate() {
 
   char buffer[256];
   snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
-  server.send(200, "text/plain", buffer);
+  server.send(200, "text/html;charset=utf-8", buffer);
   DEBUG(buffer);
 
   if (gh_updater.doUpdate()) {
@@ -616,13 +608,12 @@ uint32_t forecastBatteryCapacityWh() {
 
     if (systemData.pv_forecast_wh_h[i][0] == ts) {  //select pv forecast upon system ts
 
-      uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // pv production in this hour
-      Serial.printf("init %d => %u (s) %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+      uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
 
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
         cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_W));
-        Serial.printf("%d => %u (s) %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+        Serial.printf("%d => %u (s) %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
           Serial.println("<= below min capacity");
@@ -632,6 +623,7 @@ uint32_t forecastBatteryCapacityWh() {
           Serial.println("<= max capacity reachable");
           return cap_bat_Wh;
         }
+        ts = systemData.pv_forecast_wh_h[i][0];
         wh = systemData.pv_forecast_wh_h[i][1];
       }
     }

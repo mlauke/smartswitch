@@ -1,0 +1,156 @@
+fieldset {
+  border: 2px solid #333;
+  padding: 8px;
+  border-radius: 5px;
+}
+
+button {
+  padding: 4px;
+}
+
+input[type="radio"] {
+  accent-color: #007BFF;
+  width: 18px;
+  height: 18px;
+}
+
+body {
+  background: #ffffff;
+  color: #333;
+}
+
+body,
+input,
+button {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 1rem;
+  margin: 4px;
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+
+  body,
+  input,
+  button {
+    background: #222;
+    color: #fcf8bf;
+  }
+
+  span.switch[data-value="true"] {
+    color: #000;
+  }
+}
+
+.form-container {
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+span.switch {
+  border-style: solid;
+  border-width: 1px;
+  padding: 1 12;
+  border-radius: 4px;
+  background-color: #f05050;
+}
+
+span.switch[text="On"] {
+  background-color: #90e090;
+}
+
+legend {
+  font-weight: bold;
+}
+
+label {
+  width: 100px;
+  text-align: left;
+  margin-right: 10px;
+}
+
+input {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: 75% 25%;
+  align-items: center;
+}
+
+.battery-container {
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+.battery {
+  width: 75px;
+  height: 150px;
+  border: 4px solid #333;
+  border-radius: 8px;
+  position: relative;
+  overflow: hidden;
+  background-color: #eee;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.battery::after {
+  content: "";
+  width: 25px;
+  height: 8px;
+  background-color: #333;
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 3px;
+}
+
+.charge {
+  width: 100%;
+  height: 0%;
+  position: absolute;
+  bottom: 0;
+  transition: height 0.5s ease-in-out, background-color 0.5s;
+}
+
+.charge-lvl {
+  color: rgb(7, 68, 124);
+  font-weight: bold;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  position: absolute;
+  z-index: 2
+}
+
+.charge[data-level="high"] {
+  background-color: #28a745;
+}
+
+.charge[data-level="medium"] {
+  background-color: #ffc107;
+  color: black;
+}
+
+.charge[data-level="low"] {
+  background-color: #dc3545;
+}
+
+span.switch[data-value="true"] {
+  background-color: #90f090;
+}

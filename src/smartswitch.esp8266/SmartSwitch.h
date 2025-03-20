@@ -20,6 +20,21 @@
 #define DEBUG(...)
 #endif
 
+#define SERIAL_BAUDRATE 115200
+#define WEBSERVER_PORT 80
+
+#define PIN_SSR 5  // GPIO 5 (D1)
+
+#define SONNEN_API_URI "api/v2"
+#define SONNEN_API_CONFIGURATIONS "configurations"
+#define SONNEN_API_LATEST_DATA "latestdata"
+#define SONNEN_API_STATUS "status"
+
+#define URL_LOCATION "http://ip-api.com/json/"
+
+#define SOLAR_FORECAST_INTERVAL 10 * 60 * 1000  //every 10min
+#define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
+
 #define SYSTEM_UPDATE_INTERVAL 5000  //update intervall millis
 
 #define GRID_PURCHASE_W 100
