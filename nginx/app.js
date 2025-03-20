@@ -1,6 +1,8 @@
 async function fetchData(uri, cb) {
+
+  var response;
   try {
-    const response = await fetch(uri);
+    response = await fetch(uri);
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response}`);
     }
@@ -22,15 +24,15 @@ async function fetchData(uri, cb) {
         }
       });
     });
-    cb !== undefined && cb(response);
   } catch (error) {
     console.error('Fetch error:', error);
   }
+  cb !== undefined && cb(response);
 }
 
 function fetchStatus() {
   fetchData("/api/status", function (r) {
-    if (r.ok) {
+    if (r !== undefined && r.ok) {
       updateBattery();
     }
     setTimeout(fetchStatus, 3000);
