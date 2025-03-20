@@ -1,4 +1,4 @@
-async function fetchData(uri) {
+async function fetchData(uri, cb) {
   try {
     const response = await fetch(uri);
     if (!response.ok) {
@@ -21,22 +21,26 @@ async function fetchData(uri) {
         }
       });
     });
+    cb !== undefined && cb(response);
   } catch (error) {
     console.error('Fetch error:', error);
   }
 }
 
 function fetchStatus() {
-  fetchData("/api/status");
-  updateBattery();
-  setTimeout(fetchStatus, 3000);
+  fetchData("/api/status", function (r) {
+    if (r.ok) {
+      updateBattery();
+    }
+    setTimeout(fetchStatus, 3000);
+  });
 }
 
 function updateBattery() {
   const chargeBar = document.getElementById("charge");
   const level = document.getElementById("usoc").value;
 
-  if(level !== ""){
+  if (level !== "") {
     chargeBar.style.height = level + "%";
     // Farbe anpassen je nach Ladestand
     if (level > 60) {

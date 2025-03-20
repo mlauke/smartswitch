@@ -216,21 +216,19 @@ void updateLocation() {
   }
 }
 
-void commonHeader(size_t contentLength, const char* ctype) {
+void commonHeader() {
   server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
-  server.setContentLength(contentLength);
   server.sendHeader("content-encoding", "gzip");
-  server.send(200, ctype, "");
 }
 
 void handleAppJs() {
-  commonHeader(app_js_length, "text/javascript");
-  server.client().write_P(app_js, sizeof(app_js));
+  commonHeader();
+  server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
 void handleRoot() {
-  commonHeader(index_html_length, "text/html;charset=utf-8");
-  server.client().write_P(index_html, sizeof(index_html));
+  commonHeader();
+  server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
 }
 
 void changeHostname(const char* newHostname) {
@@ -619,12 +617,12 @@ uint32_t forecastBatteryCapacityWh() {
     if (systemData.pv_forecast_wh_h[i][0] == ts) {  //select pv forecast upon system ts
 
       uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // pv production in this hour
-      Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+      Serial.printf("init %d => %u (s) %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
         cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_W));
-        Serial.printf("%d => %u (s) %u (Wh) cap %u (Wh) %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+        Serial.printf("%d => %u (s) %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, systemData.pv_forecast_wh_h[i][0], wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
           Serial.println("<= below min capacity");
