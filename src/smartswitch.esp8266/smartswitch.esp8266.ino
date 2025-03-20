@@ -34,6 +34,7 @@ void saveConfigCallback() {
 #define RELEASE_TAG "v000"
 
 void setup() {
+  Serial.begin(SERIAL_BAUDRATE);
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(GPIO_ID_PIN(PIN_SSR), OUTPUT);
@@ -44,8 +45,6 @@ void setup() {
 
   configDefaults();
   systemDefaults();
-
-  Serial.begin(SERIAL_BAUDRATE);
 
   Serial.println("Mounting FS...");
   if (LittleFS.begin()) {
@@ -64,8 +63,6 @@ void setup() {
   wifiManager.addParameter(&custom_hostname);
   wifiManager.autoConnect("SmartSwitchAP");
   wifiManager.setConfigPortalTimeout(8);
-
-  updateLocation();
 
   if (saveConfigFile) {
     String lcHostname = String(custom_hostname.getValue());
@@ -86,6 +83,8 @@ void setup() {
   server.on("/api/status", handleStatus);
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
+
+  updateLocation();
 
   ESPhttpUpdate.onStart(onOTABegin);
   ESPhttpUpdate.onProgress(onOTAProgress);
@@ -133,7 +132,7 @@ void systemDefaults() {
 }
 
 void configDefaults() {  // init config struct with default values
-  setConfigStr(config, hostname, HOSTNAME);
+  setConfigStr(config, hostname, WiFi.hostname().c_str());
   setConfigStr(config, release_tag, RELEASE_TAG);
   config.sonnenHostname[0] = '\0';
   config.sonnenApiToken[0] = '\0';
@@ -233,21 +232,6 @@ void handleRoot() {
   commonHeader();
   cacheControlHeader(false);
   server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
-}
-
-void changeHostname(const char* newHostname) {
-  WiFi.disconnect();
-  while (WiFi.status() == WL_CONNECTED) {
-    delay(100);
-  }
-  WiFi.hostname(newHostname);
-  WiFi.reconnect();
-  while (!ensureConnected()) {
-    delay(500);
-    Serial.print(".");
-  }
-
-  Serial.println("Reconnected! New Hostname: " + WiFi.hostname());
 }
 
 void jsonToConfig(JsonDocument& data) {
@@ -375,6 +359,11 @@ void handleAPI() {
     systemData.pv_forecast_ts = 0;  // force fetch new data
     saveConfig();
 
+  } else if (server.hasArg("hostname")) {
+    setConfigStr(config, hostname, server.arg("hostname").c_str());
+    saveConfig();
+    restart();
+
   } else if (server.hasArg("restart")) {
     restart();
 
@@ -447,7 +436,7 @@ void loop() {
 
     updateSwitch(validData);
 
-    Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, valid);
+    Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, validData);
 
     doUpdateFlag = false;
   }

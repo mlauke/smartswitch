@@ -19,7 +19,7 @@
         <div>Consumption: <span name="cons_w"></span> W</div>
         <div>Consumption (avg): <span name="cons_avg_w"></span> W</div>
         <div>Grid: <span name="grid"></span> W</div>
-        <div>Events: <textarea data-append name="events"></textarea>
+        <div>Events: <span name="events"></span>
         </div>
       </div>
       <div class="battery-container">
@@ -113,13 +113,19 @@
     <fieldset>
       <legend>Software Update</legend>
       Git Release: <a href="/api/update?update">Update Check</a><br />
+      <label>Update-Check on startup:</label>
+      <input type="radio" name="update_startup" value="0">Off
+      <input type="radio" name="update_startup" value="1">On
     </fieldset>
   </form>
-  <form>
+  <form action="api/update" method="post" class="form-container">
     <fieldset>
-      <legend>Update-Check on startup</legend>
-      <label><input type="radio" name="update_startup" value="0">Off</label><br />
-      <label><input type="radio" name="update_startup" value="1">On</label><br />
+      <legend>Network</legend>
+      <div>
+        <label for="hostname">Hostname:</label>
+        <input name="hostname">
+      </div>
+      <button type="submit">Update</button>
     </fieldset>
   </form>
   <form action="/api/update" method="post" onSubmit="return confirm('Sure? WLAN Access Data will be erased!');">
