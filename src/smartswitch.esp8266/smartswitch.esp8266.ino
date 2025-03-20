@@ -218,7 +218,7 @@ void commonHeader() {
 
 void handleAppJs() {
   commonHeader();
-  cacheControlHeader(true);  
+  cacheControlHeader(true);
   server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
@@ -429,10 +429,12 @@ void loop() {
 
     uint32_t heap = ESP.getFreeHeap();
 
-    bool r =
-      ensureConnected() && updateSystemData() && updateSolarForecast() && updateSwitch();
+    bool valid =
+      ensureConnected() && updateSystemData() && updateSolarForecast();
 
-    Serial.printf("ESP Heap %uk/%uk r: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, r);
+    updateSwitch(valid);
+
+    Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, valid);
 
     doUpdateFlag = false;
   }
@@ -485,10 +487,12 @@ bool fetchData(String uri, JsonDocument& doc) {
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
     return restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
   }
+  //  systemData.events.concat();
   return false;
 }
 
 bool updateSystemData() {
+
   JsonDocument json;
 
   if (systemData.inv_max_w == -1) {
@@ -505,7 +509,7 @@ bool updateSystemData() {
     if (fetchData(SONNEN_API_LATEST_DATA, json)) {
       systemData.cap_bat_max_Wh = json["FullChargeCapacity"].as<uint16_t>();
     } else {
-      Serial.printf("ERROR: fetchSystemData(%s) json is undefined\n", SONNEN_API_LATEST_DATA);
+      Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_LATEST_DATA);
       return false;
     }
     Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
@@ -527,9 +531,11 @@ bool updateSystemData() {
 
     systemData.ts = mktime(&time) - stdOffset - (isDST(&time) ? dstOffset : 0);
     systemData.tm_yday = time.tm_yday;
+
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 uint16_t median(uint16_t cons_W) {
@@ -551,17 +557,18 @@ uint16_t median(uint16_t cons_W) {
   return cons_avg_W / cnt;
 }
 
-bool updateSwitch() {
+bool updateSwitch(bool validData) {
   /*
     heater_on = (not(heater_on) && GridFeedIn_W > HEATER_POWER_MAX_W) ||
                  heater_on && GridFeedIn_W > Gin_thr(50) ||
   */
-  systemData.switchEnabled = (systemData.gridFeedIn_W > -GRID_PURCHASE_W)  // grid purchase must be greater then threshold (negative grid feed in denotes purchase)
+  systemData.switchEnabled = validData
+                             && (systemData.gridFeedIn_W > -GRID_PURCHASE_W)  // grid purchase must be greater then threshold (negative grid feed in denotes purchase)
                              && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
                                  || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
                                  || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh));
 
-  systemData.switchEnabled = (systemData.switchEnabled && (config.mode == 2)) || (config.mode == 1);  // with mode
+  systemData.switchEnabled = (systemData.switchEnabled && config.mode == 2) || (config.mode == 1);  // with mode
 
   time_t ts = (time_t)systemData.ts;
 

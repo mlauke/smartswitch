@@ -12,7 +12,8 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
   bool res = http.begin(getClient(url), url);
   if (res) {
 
-    http.setTimeout(5000);
+    http.setTimeout(8000);
+    http.setReuse(false);
     http.setUserAgent("SmartSwitch");
     if (hName.length() != 0 && hValue.length() != 0) {
       http.addHeader(hName, hValue);
