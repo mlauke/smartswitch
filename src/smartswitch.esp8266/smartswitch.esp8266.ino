@@ -139,6 +139,7 @@ void onOTAEnd(bool success) {
 
 void systemDefaults() {
   systemData.pv_forecast_ts = 0;
+  systemData.events = "";
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   memset(systemData.cons_avg_W_h, 0, sizeof(systemData.cons_avg_W_h));
 }
@@ -404,12 +405,12 @@ void handleGithubUpdate() {
   }
 
   char buffer[256];
-  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag);
+  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='10;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
   server.send(200, "text/plain", buffer);
   DEBUG(buffer);
 
   if (gh_updater.doUpdate()) {
-    setConfigStr(config, release_tag, gh_updater.release_tag);
+    setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig()) {
       Serial.println("Error saving config");
       systemData.events.concat("Error saving config\n");

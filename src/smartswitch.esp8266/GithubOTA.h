@@ -12,7 +12,7 @@
 class GithubOTA
 {
 public:
-  const char * release_tag;
+  String release_tag;
 
   GithubOTA(const char * , const char * , const char * , const char * );
   bool checkUpdate(const char *);

@@ -27,11 +27,11 @@ bool GithubOTA::checkUpdate(const char* current_release_tag) {
       return false;
     }
 
-    release_tag = doc["tag_name"];
+    release_tag = String(doc["tag_name"]);
 
-    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag, current_release_tag, doc["prerelease"].as<bool>());
+    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, doc["prerelease"].as<bool>());
 
-    if (strncmp(release_tag, current_release_tag, strlen(current_release_tag)) == 0 || doc["prerelease"].as<bool>()) {
+    if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || doc["prerelease"].as<bool>()) {
       return false;
     }
 
