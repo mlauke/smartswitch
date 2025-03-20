@@ -204,23 +204,33 @@ void updateLocation() {
   }
 }
 
+void cacheControlHeader(bool cache) {
+  if (cache)
+    server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
+  else
+    server.sendHeader("cache-control", "no-cache");
+}
+
 void commonHeader() {
-  server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
+  //server.sendHeader("last-modified", "");
   server.sendHeader("content-encoding", "gzip");
 }
 
 void handleAppJs() {
   commonHeader();
+  cacheControlHeader(true);  
   server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
 void handleAppCss() {
   commonHeader();
+  cacheControlHeader(true);
   server.send_P(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
 }
 
 void handleRoot() {
   commonHeader();
+  cacheControlHeader(false);
   server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
 }
 
@@ -298,7 +308,7 @@ void sendJson(String from, JsonDocument& json) {
   size_t r = serializeJsonPretty(json, jsonString);
   Serial.printf("%s - json (%d) %s\n", from.c_str(), r, jsonString.c_str());
 
-  server.sendHeader("cache-control", "no-cache");
+  cacheControlHeader(false);
   server.send(200, "application/json", jsonString);
 }
 
