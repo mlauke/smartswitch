@@ -587,14 +587,17 @@ bool updateSwitch(bool validData) {
                           || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
 
                           || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh)
-                          || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX));
+                          || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX));  // TODO FIXME
 
 
-  if (desiredState) {                                                                                      // on?
-    if (systemData.switchEnabled) {                                                                        // already on?
-      desiredState = (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W && inverterLatencyCnt++ <= 2);  // grid purchase active? (negative grid feed in denotes purchase)
-    } else {                                                                                               // off (switch) => on (desired) transition
-      inverterLatencyCnt = 0;
+  if (desiredState) {                                              // on?
+    if (systemData.switchEnabled) {                                // already on?
+      if (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W) {  // grid purchase active? (negative grid feed in denotes purchase)
+        inverterLatencyCnt++;
+      } else {
+        inverterLatencyCnt = 0;  // reset count, was just a peak or initial latency peak
+      }
+      desiredState = inverterLatencyCnt <= 2;
     }
   }
   if (inverterLatencyCnt > 0) {
