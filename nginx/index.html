@@ -19,7 +19,12 @@
         <div>Consumption: <span name="cons_w"></span> W</div>
         <div>Consumption (avg): <span name="cons_avg_w"></span> W</div>
         <div>Grid: <span name="grid"></span> W</div>
-        <div>Events: <span name="events"></span>
+        <div>Events (<a href="javascript:showLog();">Log</a>): <span name="events"></span></div>
+        <div id="overlay" class="overlay">
+          <div class="overlay-content">
+            <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
+            <ul id="eventLog" class="eventLog"></ul>
+          </div>
         </div>
       </div>
       <div class="battery-container">

@@ -181,6 +181,8 @@ bool updateSolarForecast() {
         }
       }
       Serial.println();
+    } else {
+      putEvent("ERROR: solar forcast " + restClient.lastError());
     }
     systemData.pv_forecast_ts = ms;  // update timestamp
   }
@@ -417,19 +419,24 @@ void handleGithubUpdate() {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig()) {
       Serial.println("Error saving config");
-      pushEvent("Error saving config");
+      putEvent("Error saving config");
       return;
     }
     Serial.println("config saved.");
     restart();
   }
-  pushEvent(gh_updater.getUpdateError());
+  putEvent(gh_updater.getUpdateError());
 }
 
-void pushEvent(String event) {
-  //systemData.events.concat(systemData.ts);
-  systemData.events.concat(event);
-  systemData.events.concat("\n");
+void putEvent(const char* event) {
+  putEvent(String(event));
+}
+
+void putEvent(String event) {
+  String msg = String(toDate(systemData.ts)) + " - " + event + "\n" + systemData.events;  // before
+  Serial.println(msg);
+  systemData.events.clear();
+  systemData.events.concat(msg);
 }
 
 // main loop
@@ -499,7 +506,7 @@ bool fetchData(String uri, JsonDocument& doc) {
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
     r = restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
     if (!r) {
-      pushEvent(restClient.lastError());
+      putEvent(restClient.lastError());
     }
   }
   return r;
@@ -572,22 +579,30 @@ uint16_t median(uint16_t cons_W) {
 }
 
 bool updateSwitch(bool validData) {
-  /*
-    heater_on = (not(heater_on) && GridFeedIn_W > HEATER_POWER_MAX_W) ||
-                 heater_on && GridFeedIn_W > Gin_thr(50) ||
-  */
-  systemData.switchEnabled = validData
-                             && (systemData.gridFeedIn_W > -GRID_PURCHASE_W)  // grid purchase must be greater then threshold (negative grid feed in denotes purchase)
-                             && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
-                                 || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
-                                 || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh)
-                                 || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX));
 
-  systemData.switchEnabled = (systemData.switchEnabled && config.mode == 2) || (config.mode == 1);  // with mode
+  static uint8_t inverterLatencyCnt = 0;
 
-  time_t ts = (time_t)systemData.ts;
+  bool desiredState = validData
+                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
 
-  Serial.printf("ts: %s%u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", asctime(gmtime(&ts)), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+                          || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh)
+                          || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX));
+
+
+  if (desiredState) {                                                                                      // on?
+    if (systemData.switchEnabled) {                                                                        // already on?
+      desiredState = (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W && inverterLatencyCnt++ <= 2);  // grid purchase active? (negative grid feed in denotes purchase)
+    } else {                                                                                               // off (switch) => on (desired) transition
+      inverterLatencyCnt = 0;
+    }
+  }
+  if (inverterLatencyCnt > 0) {
+    putEvent(String("latency count ") + inverterLatencyCnt);
+  }
+  systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1);  // combine with mode
+
+  Serial.printf("ts: %s%u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   toggleSwitch(systemData.switchEnabled);
 
@@ -626,10 +641,20 @@ bool isDST(struct tm* timeinfo) {
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
+static char* toDate(uint32 utc) {
+  time_t ts = (time_t)utc;
+  char* str = asctime(gmtime(&ts));
+  char* p = strrchr(str, '\n');
+  if (p != NULL) {
+    *p = '\0';
+  }
+  return str;
+}
+
 uint32_t forecastBatteryCapacityWh() {
 
   if (systemData.pv_forecast_wh_h[0][0] == 0) {  // no forecast data, cannot calculate forecast, assume battery will become empty
-    Serial.println("<= no solar forcast");
+    putEvent("no solar forcast");
     return 0;
   }
 
@@ -646,16 +671,15 @@ uint32_t forecastBatteryCapacityWh() {
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
         cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_W));
-        Serial.printf("%d => %u (s) %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+
+        Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
-          Serial.println("<= below min capacity");
-          pushEvent("below min capacity.");
+          putEvent("min capacity reached at " + String(toDate(ts)));
           return cap_bat_Wh;
         }
         if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
-          Serial.println("<= max capacity reachable");
-          pushEvent("bat max capacity reachable.");
+          putEvent("max capacity reached at " + String(toDate(ts)));
           return cap_bat_Wh;
         }
         ts = systemData.pv_forecast_wh_h[i][0];

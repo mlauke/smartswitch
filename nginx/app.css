@@ -1,3 +1,47 @@
+/* overlay */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.7);
+  /* Semi-transparent black */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.overlay-content {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 90%;
+  width: 90%;
+  text-align: center;
+
+  .eventLog {
+    text-align: left;
+  }
+
+  button {
+    padding: 10px 15px;
+    font-size: 16px;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+}
+
+/* */
 fieldset {
   border: 2px solid #333;
   padding: 8px;
@@ -96,8 +140,8 @@ input {
 }
 
 .battery {
-  width: 75px;
-  height: 150px;
+  width: 80px;
+  height: 160px;
   border: 4px solid #333;
   border-radius: 8px;
   position: relative;
