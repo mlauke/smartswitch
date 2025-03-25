@@ -158,7 +158,7 @@ input {
 }
 
 .errors {
-  display: block;
+  display: none;
   color: #d1050c;
   overflow-wrap: anywhere;
 }

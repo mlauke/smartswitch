@@ -1,6 +1,7 @@
 /**
  * TODOs:
- * - production > load and battery is charging does not load
+ * - production > load and battery is charging at max - 6000W, 3000W load, charge 4500W
+ * - 
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
@@ -22,8 +23,8 @@ static systemDataStruct systemData;
 static configStruct config;
 static bool saveConfigFile = false;
 
-int stdOffset = 3600;  // 1h utc offset
-int dstOffset = 3600;  // 1h suummer time"offset
+int stdOffset = 3600;  // 1h utc offset Europe/Berlin
+int dstOffset = 3600;  // 1h suummer time offset
 
 void saveConfigCallback() {
   saveConfigFile = true;
@@ -620,8 +621,8 @@ bool updateSwitch(bool validData) {
 
   bool desiredState = validData
                       && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W >= -GRID_PURCHASE_THRESHOLD_W)
-                          || (systemData.dischargeNotAllowed == false && forecastBatteryCapacityWh() >= config.cap_bat_min_Wh));
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetReachable()));
 
   if (desiredState) {                                              // on?
     if (systemData.switchEnabled) {                                // already on?
@@ -678,9 +679,10 @@ bool isDST(struct tm* timeinfo) {
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
-static char* toDate(uint32 utc) {
-  time_t ts = (time_t)utc;
-  char* str = asctime(gmtime(&ts));
+static char* toDate(uint32 utc_ts) {
+  time_t time = (time_t)utc_ts;
+  // TODO localtime
+  char* str = asctime(gmtime(&time));
   char* p = strrchr(str, '\n');
   if (p != NULL) {
     *p = '\0';
@@ -688,11 +690,11 @@ static char* toDate(uint32 utc) {
   return str;
 }
 
-uint32_t forecastBatteryCapacityWh() {
+bool batteryCapacityTargetReachable() {
 
-  if (systemData.pv_forecast_wh_h[0][0] == 0) {  // no solar forecast data, assume battery will become empty
+  if (systemData.pv_forecast_wh_h[0][0] == 0) {
     putEvent("no solar forecast");
-    return 0;
+    return false;  // no solar forecast data, assume battery will become empty
   }
 
   uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
@@ -713,18 +715,18 @@ uint32_t forecastBatteryCapacityWh() {
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
           putEvent("min capacity reached at " + String(toDate(ts)));
-          return cap_bat_Wh;
+          return false;
         }
         if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
           putEvent("max capacity reached at " + String(toDate(ts)));
-          return cap_bat_Wh;
+          return true;
         }
         ts = systemData.pv_forecast_wh_h[i][0];
         wh = systemData.pv_forecast_wh_h[i][1];
       }
     }
   }
-  return cap_bat_Wh;
+  return cap_bat_Wh >= config.cap_bat_min_Wh;
 }
 
 bool loadConfig() {
