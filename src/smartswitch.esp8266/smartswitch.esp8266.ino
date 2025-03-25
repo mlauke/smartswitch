@@ -13,7 +13,7 @@
 
 #include "app_js.h"
 #include "app_css.h"
-#include "favicon.h"
+#include "app_icon.h"
 #include "index_html.h"
 
 static WiFiManager wifiManager;
