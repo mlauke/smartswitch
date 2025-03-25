@@ -464,16 +464,11 @@ void putLog(logEntry& log, const char* event) {
   log.msg.clear();
   log.msg.concat(event);
   log.ts = systemData.ts;
-  Serial.printf("%u %s\n", systemData.ts, event);
-}
-
-void putLog(logEntry* log, uint8_t* ix, const char* event) {
-  logEntry entry = log[(*ix)++ % 8];
-  putLog(entry, event);
+  Serial.printf("log() %u %s\n", systemData.ts, event);
 }
 
 void putEvent(const char* event) {
-  putLog(systemData.events, &systemData.eventIx, event);
+  putLog(systemData.events[systemData.eventIx++ % 8], event);
 }
 
 void putEvent(String event) {
@@ -588,8 +583,10 @@ bool updateSystemData() {
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
+    
+    systemData.dstOffset = isDST(&time) ? dstOffset : 0;
 
-    systemData.ts = mktime(&time) - stdOffset - (isDST(&time) ? dstOffset : 0);
+    systemData.ts = mktime(&time) - stdOffset - systemData.dstOffset;
     systemData.tm_yday = time.tm_yday;
 
     clearBatteryError();
@@ -681,9 +678,16 @@ bool isDST(struct tm* timeinfo) {
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
-static char* toDate(uint32 utc_ts) {
-  time_t time = (time_t)utc_ts;
-  // TODO localtime
+static char* toLocalDate(uint32 utc_ts) {
+  return toDate(utc_ts, (stdOffset + systemData.dstOffset));
+}
+
+static char* toDate(uint32_t utc_ts) {
+  return toDate(utc_ts, 0);
+}
+
+static char* toDate(uint32_t utc_ts, uint16_t offset) {
+  time_t time = (time_t)(utc_ts + offset);
   char* str = asctime(gmtime(&time));
   char* p = strrchr(str, '\n');
   if (p != NULL) {
@@ -716,11 +720,11 @@ bool batteryCapacityTargetReachable() {
         Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
-          putEvent("min capacity reached at " + String(toDate(ts)));
+          putEvent("min capacity reached at " + String(toLocalDate(ts)));
           return false;
         }
         if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
-          putEvent("max capacity reached at " + String(toDate(ts)));
+          putEvent("max capacity reached at " + String(toLocalDate(ts)));
           return true;
         }
         ts = systemData.pv_forecast_wh_h[i][0];

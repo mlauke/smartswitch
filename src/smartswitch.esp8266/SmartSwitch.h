@@ -89,6 +89,7 @@ typedef struct {
 typedef struct {
   uint32_t ts;       // current system time, taken from battery status
   uint16_t tm_yday;  // day of year
+  uint16_t dstOffset;
 
   bool switchEnabled = false;
   uint8_t boiler_T_cur;

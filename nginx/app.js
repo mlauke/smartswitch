@@ -20,7 +20,7 @@ async function fetchData(uri, cb) {
             e.textContent = v ? "On" : "Off";
             e.setAttribute("data-value", v);
           } else if (Array.isArray(v) && v.length) {
-            e.textContent = v[0];
+            e.textContent = toLogEntry(v[0]);
           } else {
             e.textContent = v;
           }
@@ -83,11 +83,15 @@ function closeLog() {
   logOverlay !== null && logOverlay.classList.remove("active");
 }
 
+function toLogEntry(e){
+  return new Date(e.ts * 1000).toLocaleString() + " - " + e.msg;
+}
+
 function renderLog(el, ls, nm) {
   el.innerHTML = "";
   ls.forEach(e => {
     const t = document.createElement(nm);
-    t.textContent = new Date(e.ts * 1000).toLocaleString() + " - " + e.msg;
+    t.textContent = toLogEntry(e);
     el.appendChild(t);
   });
 }
