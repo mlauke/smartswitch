@@ -1,3 +1,4 @@
+#include "ESP8266HTTPClient.h"
 #include "RestClient.h"
 
 RestClient::RestClient() {
@@ -16,7 +17,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
   bool res = http.begin(getClient(url), url);
   if (res) {
 
-    http.setTimeout(8000);
+    http.setTimeout(REQUEST_TIMEOUT);
     http.setReuse(false);
     http.setUserAgent("SmartSwitch");
     if (hName.length() != 0 && hValue.length() != 0) {
@@ -34,7 +35,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
       }
       res = error == DeserializationError::Ok;
     } else {
-      _lastError = "WARN " + url + " code (" + httpResponseCode + ") " + http.errorToString(httpResponseCode);
+      _lastError = url + " code: " + httpResponseCode + " " + http.errorToString(httpResponseCode);
       Serial.println(_lastError);
     }
   }

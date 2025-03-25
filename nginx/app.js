@@ -8,7 +8,6 @@ async function fetchData(uri, cb) {
       throw new Error(`HTTP error! Status: ${response}`);
     }
     data = await response.json();
-    //data["events"] = new Date().toISOString() + ": " + "foo\n";
     Object.keys(data).forEach(key => {
       document.getElementsByName(key).forEach(e => {
         if (e.type == "radio") {
@@ -20,8 +19,14 @@ async function fetchData(uri, cb) {
           if (typeof (v) === "boolean") {
             e.textContent = v ? "On" : "Off";
             e.setAttribute("data-value", v);
+          } else if (Array.isArray(v) && v.length) {
+            if(e.getAttribute("data-elem")){
+              renderHtml(e, v, e.getAttribute("data-elem"));
+            }else{
+              e.textContent = v[0];
+            }
           } else {
-            e.textContent = (e.hasAttribute("data-append") ? e.textContent + v : v);
+            e.textContent = v;
           }
         }
       });
@@ -37,7 +42,7 @@ function fetchStatus() {
     if (response !== undefined && response.ok) {
       updateBattery();
       const events = json["events"];
-      if (events !== undefined && events !== "") {
+      if (events !== undefined && events.length) {
         eventLog.addEvents(events);
       }
     }
@@ -66,9 +71,8 @@ function updateBattery() {
 class EventLog {
   events = [];
 
-  addEvents(e){
-    this.events.unshift(e);
-    this.events.splice(64);
+  addEvents(eLs) {
+    this.events = eLs;
   }
 }
 
@@ -79,16 +83,20 @@ function closeLog() {
   logOverlay !== null && logOverlay.classList.remove("active");
 }
 
+function renderHtml(el, ls, nm){
+  el.innerHTML = "";
+  ls.forEach(e => {
+    const t = document.createElement(nm);
+    t.textContent = e;
+    el.appendChild(t);
+  });
+}
+
 function showLog() {
   const logElem = document.getElementById("eventLog");
   const logOverlay = document.getElementById("overlay");
   if (logElem !== null) {
-    logElem.innerHTML = "";
-    eventLog.events.forEach(event => {
-      const e = document.createElement("li");
-      e.textContent = event;
-      logElem.appendChild(e);
-    });
+    renderHtml(logElem, eventLog.events, "li");
     logOverlay.classList.add("active");
   }
 }

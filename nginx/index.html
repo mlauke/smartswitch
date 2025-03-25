@@ -10,6 +10,10 @@
 <body>
   <h1>Sonnen SmartSwitch</h1>
   <p>(Release: <span name="release_tag"></span>)</p>
+  <fieldset class="errors">
+    <legend>Error</legend>
+    <div name="errors" data-elem="span"></div>
+  </fieldset>
   <fieldset>
     <legend>Status</legend>
     <div class="container">
@@ -19,7 +23,7 @@
         <div>Consumption: <span name="cons_w"></span> W</div>
         <div>Consumption (avg): <span name="cons_avg_w"></span> W</div>
         <div>Grid: <span name="grid"></span> W</div>
-        <div>Events (<a href="javascript:showLog();">Log</a>): <span name="events"></span></div>
+        <div>Events (<a href="javascript:showLog();">Log</a>): <span class="events" name="events"></span></div>
         <div id="overlay" class="overlay">
           <div class="overlay-content">
             <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
@@ -106,6 +110,10 @@
       <div class="form-group">
         <label for="lc_az">Azimuth (0...360):</label>
         <input id="lc_az" name="lc_az" size="3" maxlength="3">
+      </div>
+      <div class="form-group">
+        <label for="lc_dec">Panel Declination (0...90):</label>
+        <input id="lc_dec" name="lc_dec" size="2" maxlength="2">
       </div>
       <div class="form-group">
         <label for="lc_kWp">kWp:</label>

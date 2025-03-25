@@ -1,7 +1,6 @@
 /**
  * TODOs:
- * - detect accu maintenance mode - full charged, but not used if no production => http://192.168.188.36/api/v2/latestdata "Setpoint Priority": Full Charge Request": true|false
- * - 
+ * - production > load and battery is charging does not load
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
@@ -127,7 +126,6 @@ void onOTAEnd(bool success) {
 
 void systemDefaults() {
   systemData.pv_forecast_ts = 0;
-  systemData.events = "";
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   memset(systemData.cons_avg_W_h, 0, sizeof(systemData.cons_avg_W_h));
 }
@@ -177,12 +175,12 @@ bool updateSolarForecast() {
           systemData.pv_forecast_wh_h[i][1] = wh;
           i++;
         } else {
-          Serial.printf("ERROR: overflow %d => %u %u ", i, ts, wh);
+          putEvent("WARN: overflow " + i);
         }
       }
-      Serial.println();
+      clearLocationError();
     } else {
-      putEvent("ERROR: solar forcast " + restClient.lastError());
+      putLocationError("WARN solar forcast " + restClient.lastError());
     }
     systemData.pv_forecast_ts = ms;  // update timestamp
   }
@@ -255,6 +253,7 @@ void jsonToConfig(JsonDocument& data) {
   config.lat = data["lc_lat"].as<float>();
   config.kWp = data["lc_kWp"].as<float>();
   config.az = data["lc_az"].as<uint16_t>();
+  config.dec = data["lc_dec"].as<uint16_t>();
 
   setConfigStr(config, location, data["loc"]);
   setConfigStr(config, tz, data["tz"]);
@@ -281,6 +280,7 @@ void configToJson(JsonDocument& data) {
   data["lc_lat"] = config.lat;
   data["lc_kWp"] = config.kWp;
   data["lc_az"] = config.az;
+  data["lc_dec"] = config.dec;
 
   data["loc"] = config.location;
   data["tz"] = config.tz;
@@ -308,6 +308,12 @@ void handleData() {
   sendJson("data", data);
 }
 
+void addErrors(JsonArray& errors, String* logs) {
+  if (!logs[0].isEmpty()) {
+    errors.add(logs[0]);
+  }
+}
+
 ///api/status
 void handleStatus() {
 
@@ -318,16 +324,24 @@ void handleStatus() {
   data["prod"] = systemData.prod_W;
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
-
   data["switch"] = systemData.switchEnabled;
-
   data["bs_t_cur"] = systemData.boiler_T_cur;
 
-  data["events"] = systemData.events;
+  JsonArray errors = data["errors"].to<JsonArray>();
+  addErrors(errors, systemData.error_bs);
+  addErrors(errors, systemData.error_fc);
+  addErrors(errors, systemData.error_bt);
+
+  JsonArray events = data["events"].to<JsonArray>();
+  int i = 8;
+  while (i-- > 0) {
+    String e = systemData.events[(systemData.eventIx + i) % 8];
+    if (!e.isEmpty()) {
+      events.add(e);
+    }
+  }
 
   sendJson("status", data);
-
-  systemData.events.clear();
 }
 
 void handleAPI() {
@@ -362,6 +376,7 @@ void handleAPI() {
     config.lat = server.arg("lc_lat").toDouble();
     config.kWp = server.arg("lc_kWp").toDouble();
     config.az = server.arg("lc_az").toInt();
+    config.dec = server.arg("lc_dec").toInt();
     systemData.pv_forecast_ts = 0;  // force fetch new data
     saveConfig();
 
@@ -428,15 +443,38 @@ void handleGithubUpdate() {
   putEvent(gh_updater.getUpdateError());
 }
 
+void clearLocationError() {
+  systemData.error_fc[0].clear();
+}
+
+void putLocationError(String event) {
+  putLog(systemData.error_fc, event.c_str());
+}
+
+void clearBatteryError() {
+  systemData.error_bt[0].clear();
+}
+
+void putBatteryError(String event) {
+  putLog(systemData.error_bt, event.c_str());
+}
+
+void putLog(String* log, const char* event) {
+  String msg = String(toDate(systemData.ts)) + " - " + event;
+  Serial.println(msg);
+  log[0] = msg;
+}
+
 void putEvent(const char* event) {
   putEvent(String(event));
 }
 
 void putEvent(String event) {
-  String msg = String(toDate(systemData.ts)) + " - " + event + "\n" + systemData.events;  // before
+  String msg = String(toDate(systemData.ts)) + " - " + event;
   Serial.println(msg);
-  systemData.events.clear();
-  systemData.events.concat(msg);
+  systemData.events[systemData.eventIx % 8].clear();
+  systemData.events[systemData.eventIx % 8].concat(msg);
+  systemData.eventIx++;
 }
 
 // main loop
@@ -506,7 +544,7 @@ bool fetchData(String uri, JsonDocument& doc) {
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
     r = restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
     if (!r) {
-      putEvent(restClient.lastError());
+      putBatteryError(restClient.lastError());
     }
   }
   return r;
@@ -538,14 +576,12 @@ bool updateSystemData() {
 
   if (fetchData(SONNEN_API_STATUS, json)) {
 
-    //int rsoc = (int)json["RSOC"];
-    //    int cap = (int)json["FullChargeCapacity"];// battery full charge
-    systemData.usoc = json["USOC"].as<uint8_t>();  //
-                                                   //  int ucap = (int)(cap * usoc / (float)100);
+    systemData.usoc = json["USOC"].as<uint8_t>();
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
     systemData.prod_W = json["Production_W"].as<uint16_t>();
-    systemData.cons_W = json["Consumption_W"].as<uint16_t>();  // Consumption_Avg or Consumption_W % 100 more "real time"
-    systemData.cons_avg_W = median(json["Consumption_Avg"].as<uint16_t>());
+    systemData.cons_W = json["Consumption_W"].as<uint16_t>();
+    systemData.cons_avg_W = median(systemData.cons_W);
+    systemData.dischargeNotAllowed = json["dischargeNotAllowed"].as<bool>();
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
@@ -553,9 +589,9 @@ bool updateSystemData() {
     systemData.ts = mktime(&time) - stdOffset - (isDST(&time) ? dstOffset : 0);
     systemData.tm_yday = time.tm_yday;
 
+    clearBatteryError();
     return true;
   }
-
   return false;
 }
 
@@ -584,28 +620,26 @@ bool updateSwitch(bool validData) {
 
   bool desiredState = validData
                       && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
-
-                          || (forecastBatteryCapacityWh() >= config.cap_bat_min_Wh)
-                          || (systemData.prod_W > config.loadPower_W && systemData.usoc >= BAT_CAP_MAX));  // TODO FIXME
-
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W >= -GRID_PURCHASE_THRESHOLD_W)
+                          || (systemData.dischargeNotAllowed == false && forecastBatteryCapacityWh() >= config.cap_bat_min_Wh));
 
   if (desiredState) {                                              // on?
     if (systemData.switchEnabled) {                                // already on?
       if (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W) {  // grid purchase active? (negative grid feed in denotes purchase)
         inverterLatencyCnt++;
-      } else {
-        inverterLatencyCnt = 0;  // reset count, was just a peak or initial latency peak
       }
-      desiredState = inverterLatencyCnt <= 2;
+      desiredState = inverterLatencyCnt <= MAX(1, SONNEN_INVERTER_LATENCY / SYSTEM_UPDATE_INTERVAL);
+      if (!desiredState) {
+        putEvent(String("off - latency count ") + inverterLatencyCnt);
+      }
+    } else {  // off, but on desired, reset latency counter
+      inverterLatencyCnt = 0;
     }
   }
-  if (inverterLatencyCnt > 0) {
-    putEvent(String("latency count ") + inverterLatencyCnt);
-  }
+
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1);  // combine with mode
 
-  Serial.printf("ts: %s%u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  Serial.printf("ts: %s %u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   toggleSwitch(systemData.switchEnabled);
 
@@ -656,8 +690,8 @@ static char* toDate(uint32 utc) {
 
 uint32_t forecastBatteryCapacityWh() {
 
-  if (systemData.pv_forecast_wh_h[0][0] == 0) {  // no forecast data, cannot calculate forecast, assume battery will become empty
-    putEvent("no solar forcast");
+  if (systemData.pv_forecast_wh_h[0][0] == 0) {  // no solar forecast data, assume battery will become empty
+    putEvent("no solar forecast");
     return 0;
   }
 

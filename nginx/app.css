@@ -19,6 +19,7 @@
   opacity: 1;
   visibility: visible;
 }
+
 .overlay-content {
   background: white;
   padding: 20px;
@@ -84,13 +85,16 @@ button {
   span.switch[data-value="true"] {
     color: #000;
   }
+
+  fieldset.errors {
+    color: #f84a1b;
+  }
 }
 
 .form-container {
   width: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
 .form-group {
@@ -150,6 +154,17 @@ input {
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  z-index: -1;
+}
+
+.errors {
+  display: block;
+  color: #d1050c;
+  overflow-wrap: anywhere;
+}
+
+.events {
+  font-size: smaller;
 }
 
 .battery::after {
@@ -179,7 +194,6 @@ input {
   display: flex;
   align-items: center;
   position: absolute;
-  z-index: 2
 }
 
 .charge[data-level="high"] {

@@ -29,14 +29,14 @@
 #define SONNEN_API_CONFIGURATIONS "configurations"
 #define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_STATUS "status"
+#define SONNEN_INVERTER_LATENCY 2  // assume 2s latency until battery inverter compensates the load
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
 #define SOLAR_FORECAST_INTERVAL 10 * 60 * 1000  //every 10min
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
-#define SYSTEM_UPDATE_INTERVAL 5000  //update intervall millis
-
+#define SYSTEM_UPDATE_INTERVAL 2000  //update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
 #define BAT_CAP_MAX 80
 
@@ -88,19 +88,26 @@ typedef struct {
   bool switchEnabled = false;
   uint8_t boiler_T_cur;
 
-  int inv_max_w = -1;       // inverter power max
-  uint8_t usoc;             // 0..100 user state of charge - battery capacity in %
-  uint16_t prod_W;          // prodcution (Watt)
-  uint16_t cons_W;          // consumption (Watt)
-  uint16_t cons_avg_W;      // consumption average (W)
-  uint16_t cap_bat_max_Wh;  // max battery capacity (system)
-  int gridFeedIn_W;         // current grid feed in - negative is consumption, positive is fedd in
+  int inv_max_w = -1;        // inverter power max
+  uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
+  uint16_t prod_W;           // prodcution (Watt)
+  uint16_t cons_W;           // consumption (Watt)
+  uint16_t cons_avg_W;       // consumption average (W)
+  uint16_t cap_bat_max_Wh;   // max battery capacity (system)
+  int gridFeedIn_W;          // current grid feed in - negative is consumption, positive is fedd in
+  bool dischargeNotAllowed;  // e.g. true due to battery maintenance
 
   long pv_forecast_ts;                                            // last update timestamp in ms since mcu start
   uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
   uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL / 1000)];  // average consumption of the last hour (long term)
 
-  String events;  // event buffer
+  String events[16];  // event buffer
+  uint8_t eventIx = 0;
+
+  String error_bs[1];  // boiler system errors
+  String error_fc[1];  // location / solar forecast errors
+  String error_bt[1];  // battery errors
+
 } systemDataStruct;
 
 #endif

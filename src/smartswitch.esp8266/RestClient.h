@@ -3,6 +3,8 @@
 
 #include "SmartSwitch.h"
 
+#define REQUEST_TIMEOUT 8000
+
 class RestClient {
 
 public:
