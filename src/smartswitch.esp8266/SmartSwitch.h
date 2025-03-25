@@ -29,14 +29,15 @@
 #define SONNEN_API_CONFIGURATIONS "configurations"
 #define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_STATUS "status"
-#define SONNEN_INVERTER_LATENCY 4  // assume latency until battery inverter compensates the load
+#define SONNEN_INVERTER_LATENCY_MS 5000  // assume latency until battery inverter compensates the load
+#define SONNEN_INVERTER_LATENCY_COUNT MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
 #define SOLAR_FORECAST_INTERVAL 12 * 60 * 1000  // every 10min
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
-#define SYSTEM_UPDATE_INTERVAL 2000  //update intervall millis
+#define SYSTEM_UPDATE_INTERVAL_MS 2000  //update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
 
 #define CFG_SZ_HOSTNAME 32
@@ -104,7 +105,7 @@ typedef struct {
 
   long pv_forecast_ts;                                            // last update timestamp in ms since mcu start
   uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
-  uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL / 1000)];  // average consumption of the last hour (long term)
+  uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000)];  // average consumption of the last hour (long term)
 
   logEntry events[16];  // event buffer
   uint8_t eventIx = 0;

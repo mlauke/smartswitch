@@ -12,6 +12,7 @@ public:
   RestClient();
 
   String lastError();
+  int lastResponseCode();
   bool fetch(String url, JsonDocument& doc, String hName = "", String hValue = "");
 
 protected:
@@ -20,6 +21,7 @@ protected:
 
 private:
   String _lastError;
+  int _lastResponseCode;
 
   WiFiClient& getClient(String url) {
 

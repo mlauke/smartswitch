@@ -8,6 +8,10 @@ String RestClient::lastError() {
   return _lastError;
 }
 
+int RestClient::lastResponseCode() {
+  return _lastResponseCode;
+}
+
 bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValue) {
 
   HTTPClient http;
@@ -25,8 +29,8 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
     }
     http.addHeader("accept", "application/json", true, true);
 
-    int httpResponseCode = http.GET();
-    if ((res = httpResponseCode == 200)) {
+    _lastResponseCode = http.GET();
+    if ((res = _lastResponseCode == 200)) {
       DeserializationError error = deserializeJson(doc, http.getString());
       if (error) {
         _lastError = "json error: " + url + " - " + String(error.c_str());
@@ -35,7 +39,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
       }
       res = error == DeserializationError::Ok;
     } else {
-      _lastError = url + " code: " + httpResponseCode + " " + http.errorToString(httpResponseCode);
+      _lastError = url + " code: " + _lastResponseCode + " " + http.errorToString(_lastResponseCode);
       Serial.println(_lastError);
     }
   }

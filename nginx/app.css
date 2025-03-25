@@ -3,7 +3,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 60%;
+  height: 100%;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
@@ -68,7 +68,6 @@ body,
 input,
 button {
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 1rem;
   margin: 4px;
   -webkit-font-smoothing: antialiased;
 }
@@ -141,8 +140,9 @@ input {
 
 .container {
   display: grid;
-  grid-template-columns: 74% 25%;
+  grid-template-columns: 75% 25%;
   align-items: center;
+  gap: 4px;
 }
 
 .battery-container {

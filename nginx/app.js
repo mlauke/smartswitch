@@ -78,12 +78,7 @@ class EventLog {
 
 const eventLog = new EventLog(10);
 
-function closeLog() {
-  const logOverlay = document.getElementById("overlay");
-  logOverlay !== null && logOverlay.classList.remove("active");
-}
-
-function toLogEntry(e){
+function toLogEntry(e) {
   return new Date(e.ts * 1000).toLocaleString() + " - " + e.msg;
 }
 
@@ -97,12 +92,17 @@ function renderLog(el, ls, nm) {
 }
 
 function showLog() {
+  const overlay = document.getElementById("overlay");
   const logElem = document.getElementById("eventLog");
-  const logOverlay = document.getElementById("overlay");
   if (logElem !== null) {
     renderLog(logElem, eventLog.events, "li");
-    logOverlay.classList.add("active");
+    overlay.classList.add("active");
   }
+}
+
+function closeLog() {
+  const logOverlay = document.getElementById("overlay");
+  logOverlay !== null && logOverlay.classList.remove("active");
 }
 
 fetchData("/api/data");

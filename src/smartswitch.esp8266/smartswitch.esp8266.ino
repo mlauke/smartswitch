@@ -1,7 +1,7 @@
 /**
  * TODOs:
- * - local time on event level
- * - 
+ * - local time format on event msg level
+ * - skip updateSwitch if not set to Auto
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
@@ -98,7 +98,7 @@ void setup() {
   server.keepAlive(false);
   Serial.println("HTTP server started");
 
-  timer.attach_ms(SYSTEM_UPDATE_INTERVAL, timerCallback);
+  timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 }
 
 void timerCallback() {
@@ -185,7 +185,7 @@ bool updateSolarForecast() {
     } else {
       putLocationError("WARN solar forcast " + restClient.lastError());
     }
-    systemData.pv_forecast_ts = ms;  // update timestamp
+    systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
   }
   return true;
 }
@@ -635,9 +635,9 @@ bool updateSwitch(bool validData) {
       if (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W) {  // grid purchase active? (negative grid feed in denotes purchase)
         inverterLatencyCnt++;
       }
-      desiredState = inverterLatencyCnt <= MAX(1, SONNEN_INVERTER_LATENCY / SYSTEM_UPDATE_INTERVAL);
+      desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
       if (!desiredState) {
-        putEvent(String("off - latency count ") + inverterLatencyCnt);
+        putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
       }
     } else {  // off, but on desired, reset latency counter
       inverterLatencyCnt = 0;
@@ -693,14 +693,13 @@ static char* toDate(uint32_t utc_ts) {
   return toDate(utc_ts, 0);
 }
 
+static char tsfmt[20];
+
 static char* toDate(uint32_t utc_ts, uint16_t offset) {
   time_t time = (time_t)(utc_ts + offset);
-  char* str = asctime(gmtime(&time));
-  char* p = strrchr(str, '\n');
-  if (p != NULL) {
-    *p = '\0';
-  }
-  return str;
+  tm* timeinfo = gmtime(&time);
+  strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", timeinfo);
+  return tsfmt;
 }
 
 bool batteryCapacityTargetReachable() {
