@@ -2,6 +2,7 @@
  * TODOs:
  * - local time format on event msg level
  * - skip updateSwitch if not set to Auto
+ * - wait or delay reset/restart and response send to server
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
@@ -628,7 +629,7 @@ bool updateSwitch(bool validData) {
   bool desiredState = validData
                       && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
                           || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetReachable()));
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));
 
   if (desiredState) {                                              // on?
     if (systemData.switchEnabled) {                                // already on?
@@ -702,7 +703,7 @@ static char* toDate(uint32_t utc_ts, uint16_t offset) {
   return tsfmt;
 }
 
-bool batteryCapacityTargetReachable() {
+bool batteryCapacityTargetFulfilled() {
 
   if (systemData.pv_forecast_wh_h[0][0] == 0) {
     return false;  // no solar forecast data, assume battery will become empty
@@ -737,7 +738,9 @@ bool batteryCapacityTargetReachable() {
       }
     }
   }
-  return cap_bat_Wh >= config.cap_bat_min_Wh;
+
+  int hysterese_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
+  return cap_bat_Wh >= (MAX(0, config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh)));
 }
 
 bool loadConfig() {
