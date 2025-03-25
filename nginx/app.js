@@ -20,11 +20,7 @@ async function fetchData(uri, cb) {
             e.textContent = v ? "On" : "Off";
             e.setAttribute("data-value", v);
           } else if (Array.isArray(v) && v.length) {
-            if (e.getAttribute("data-elem")) {
-              renderHtml(e, v, e.getAttribute("data-elem"));
-            } else {
-              e.textContent = v[0];
-            }
+            e.textContent = v[0];
           } else {
             e.textContent = v;
           }
@@ -47,9 +43,8 @@ function fetchStatus() {
       }
       const errors = json["errors"];
       if (errors !== undefined) {
-        Array.from(document.getElementsByClassName("errors")).forEach(elem => {
-          elem.style.display = errors.length ? "block" : "none";
-        });
+        renderLog(document.getElementById("errorLog"), errors, "span");
+        document.getElementById("errors").style.display = errors.length ? "block" : "none";
       }
     }
     setTimeout(fetchStatus, 3000);
@@ -62,13 +57,12 @@ function updateBattery() {
 
   if (level !== "") {
     chargeBar.style.height = level + "%";
-    // Farbe anpassen je nach Ladestand
     if (level > 60) {
-      chargeBar.setAttribute("data-level", "high");
+      chargeBar.setAttribute("data-lvl", "high");
     } else if (level > 10) {
-      chargeBar.setAttribute("data-level", "medium");
+      chargeBar.setAttribute("data-lvl", "medium");
     } else {
-      chargeBar.setAttribute("data-level", "low");
+      chargeBar.setAttribute("data-lvl", "low");
     }
     document.getElementById("charge-lvl").textContent = level + "%";
   }
@@ -89,11 +83,11 @@ function closeLog() {
   logOverlay !== null && logOverlay.classList.remove("active");
 }
 
-function renderHtml(el, ls, nm) {
+function renderLog(el, ls, nm) {
   el.innerHTML = "";
   ls.forEach(e => {
     const t = document.createElement(nm);
-    t.textContent = e;
+    t.textContent = new Date(e.ts * 1000).toLocaleString() + " - " + e.msg;
     el.appendChild(t);
   });
 }
@@ -102,7 +96,7 @@ function showLog() {
   const logElem = document.getElementById("eventLog");
   const logOverlay = document.getElementById("overlay");
   if (logElem !== null) {
-    renderHtml(logElem, eventLog.events, "li");
+    renderLog(logElem, eventLog.events, "li");
     logOverlay.classList.add("active");
   }
 }

@@ -29,7 +29,7 @@
 #define SONNEN_API_CONFIGURATIONS "configurations"
 #define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_STATUS "status"
-#define SONNEN_INVERTER_LATENCY 2  // assume 2s latency until battery inverter compensates the load
+#define SONNEN_INVERTER_LATENCY 4  // assume latency until battery inverter compensates the load
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
@@ -82,6 +82,11 @@ typedef struct {
 } configStruct;
 
 typedef struct {
+  uint32_t ts;
+  String msg;
+} logEntry;
+
+typedef struct {
   uint32_t ts;       // current system time, taken from battery status
   uint16_t tm_yday;  // day of year
 
@@ -101,12 +106,13 @@ typedef struct {
   uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
   uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL / 1000)];  // average consumption of the last hour (long term)
 
-  String events[16];  // event buffer
+  logEntry events[16];  // event buffer
   uint8_t eventIx = 0;
 
-  String error_bs[1];  // boiler system errors
-  String error_fc[1];  // location / solar forecast errors
-  String error_bt[1];  // battery errors
+  logEntry error_bs;  // last boiler system error
+  logEntry error_bt;  // last battery error
+  logEntry error_lc;  // last solar forecast or location error
+  uint8_t errorIx = 0;
 
 } systemDataStruct;
 

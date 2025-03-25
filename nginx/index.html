@@ -8,11 +8,10 @@
 </head>
 
 <body>
-  <h1>Sonnen SmartSwitch</h1>
-  <p>(Release: <span name="release_tag"></span>)</p>
-  <fieldset class="errors">
+  <h1>Sonnen SmartSwitch <span class="release" name="release_tag"></span></h1>
+  <fieldset id="errors" class="errors" style="display: none;">
     <legend>Error</legend>
-    <div name="errors" data-elem="span"></div>
+    <div id="errorLog"></div>
   </fieldset>
   <fieldset>
     <legend>Status</legend>
@@ -125,6 +124,7 @@
   <form action="api/update" method="post" onSubmit="return confirm('Sure?');" class="form-container">
     <fieldset>
       <legend>Software Update</legend>
+      Release: <span name="release_tag"></span><br />
       Git Release: <a href="/api/update?update">Update Check</a><br />
       Update-Check on Startup:
       <input type="radio" name="update_startup" value="0">Off
@@ -145,7 +145,8 @@
     <fieldset>
       <legend>System</legend>
       <input type="submit" name="restart" value="Restart" />
-      <input type="submit" name="reset" value="Factory Reset" onclick="return confirm('Sure? WLAN Access Data will be erased!');">
+      <input type="submit" name="reset" value="Factory Reset"
+        onclick="return confirm('Sure? WLAN Access Data will be erased!');">
     </fieldset>
   </form>
   <script src="/app.js" defer></script>

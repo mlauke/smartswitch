@@ -1,6 +1,6 @@
 /**
  * TODOs:
- * - production > load and battery is charging at max - 6000W, 3000W load, charge 4500W
+ * - local time on event level
  * - 
  */
 #include "SmartSwitch.h"
@@ -309,9 +309,11 @@ void handleData() {
   sendJson("data", data);
 }
 
-void addErrors(JsonArray& errors, String* logs) {
-  if (!logs[0].isEmpty()) {
-    errors.add(logs[0]);
+void addLog(JsonArray& array, logEntry& log) {
+  if (!log.msg.isEmpty()) {
+    JsonObject e = array.add<JsonObject>();
+    e["ts"] = log.ts;
+    e["msg"] = log.msg;
   }
 }
 
@@ -329,17 +331,15 @@ void handleStatus() {
   data["bs_t_cur"] = systemData.boiler_T_cur;
 
   JsonArray errors = data["errors"].to<JsonArray>();
-  addErrors(errors, systemData.error_bs);
-  addErrors(errors, systemData.error_fc);
-  addErrors(errors, systemData.error_bt);
+  addLog(errors, systemData.error_bt);
+  addLog(errors, systemData.error_bs);
+  addLog(errors, systemData.error_lc);
 
   JsonArray events = data["events"].to<JsonArray>();
-  int i = 8;
+  int i = sizeof(systemData.events) / sizeof(systemData.events[0]);
   while (i-- > 0) {
-    String e = systemData.events[(systemData.eventIx + i) % 8];
-    if (!e.isEmpty()) {
-      events.add(e);
-    }
+    logEntry log = systemData.events[(systemData.eventIx + i) % 8];
+    addLog(events, log);
   }
 
   sendJson("status", data);
@@ -445,37 +445,39 @@ void handleGithubUpdate() {
 }
 
 void clearLocationError() {
-  systemData.error_fc[0].clear();
+  systemData.error_lc.msg.clear();
 }
 
 void putLocationError(String event) {
-  putLog(systemData.error_fc, event.c_str());
+  putLog(systemData.error_lc, event.c_str());
 }
 
 void clearBatteryError() {
-  systemData.error_bt[0].clear();
+  systemData.error_bt.msg.clear();
 }
 
 void putBatteryError(String event) {
   putLog(systemData.error_bt, event.c_str());
 }
 
-void putLog(String* log, const char* event) {
-  String msg = String(toDate(systemData.ts)) + " - " + event;
-  Serial.println(msg);
-  log[0] = msg;
+void putLog(logEntry& log, const char* event) {
+  log.msg.clear();
+  log.msg.concat(event);
+  log.ts = systemData.ts;
+  Serial.printf("%u %s\n", systemData.ts, event);
+}
+
+void putLog(logEntry* log, uint8_t* ix, const char* event) {
+  logEntry entry = log[(*ix)++ % 8];
+  putLog(entry, event);
 }
 
 void putEvent(const char* event) {
-  putEvent(String(event));
+  putLog(systemData.events, &systemData.eventIx, event);
 }
 
 void putEvent(String event) {
-  String msg = String(toDate(systemData.ts)) + " - " + event;
-  Serial.println(msg);
-  systemData.events[systemData.eventIx % 8].clear();
-  systemData.events[systemData.eventIx % 8].concat(msg);
-  systemData.eventIx++;
+  putEvent(event.c_str());
 }
 
 // main loop
