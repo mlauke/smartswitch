@@ -583,7 +583,7 @@ bool updateSystemData() {
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
-    
+
     systemData.dstOffset = isDST(&time) ? dstOffset : 0;
 
     systemData.ts = mktime(&time) - stdOffset - systemData.dstOffset;
@@ -699,7 +699,6 @@ static char* toDate(uint32_t utc_ts, uint16_t offset) {
 bool batteryCapacityTargetReachable() {
 
   if (systemData.pv_forecast_wh_h[0][0] == 0) {
-    putEvent("no solar forecast");
     return false;  // no solar forecast data, assume battery will become empty
   }
 

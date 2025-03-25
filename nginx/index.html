@@ -144,7 +144,8 @@
   <form action="/api/update" method="post">
     <fieldset>
       <legend>System</legend>
-      <input type="submit" name="restart" value="Restart" />
+      <input type="submit" name="restart" value="Restart"
+        onclick="return confirm('Sure?');">
       <input type="submit" name="reset" value="Factory Reset"
         onclick="return confirm('Sure? WLAN Access Data will be erased!');">
     </fieldset>
