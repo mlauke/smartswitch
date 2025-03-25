@@ -35,7 +35,7 @@ async function fetchData(uri, cb) {
 
 function fetchStatus() {
   fetchData("/api/status", function (response, json) {
-    if (response !== undefined && response.ok && data !== undefined) {
+    if (response !== undefined && response.ok && json !== undefined) {
       updateBattery();
       const events = json["events"];
       if (events !== undefined && events.length) {

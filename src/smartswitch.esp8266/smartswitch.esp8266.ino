@@ -13,6 +13,7 @@
 
 #include "app_js.h"
 #include "app_css.h"
+#include "favicon.h"
 #include "index_html.h"
 
 static WiFiManager wifiManager;
@@ -77,6 +78,7 @@ void setup() {
   MDNS.begin(config.hostname);
 
   server.on("/", handleRoot);
+  server.on("/favicon.ico", handleFavicon);
   server.on("/app.js", handleAppJs);
   server.on("/app.css", handleAppCss);
   server.on("/api/data", handleData);
@@ -216,6 +218,11 @@ void commonHeader() {
   //server.sendHeader("last-modified", "");
   server.sendHeader("connection", "close");
   server.sendHeader("content-encoding", "gzip");
+}
+
+void handleFavicon() {
+  cacheControlHeader(true);
+  server.send_P(200, "image/x-icon", app_icon, sizeof(app_icon));
 }
 
 void handleAppJs() {
