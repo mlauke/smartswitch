@@ -630,8 +630,9 @@ bool updateSwitch(bool validData) {
   static uint8_t inverterLatencyCnt = 0;
 
   bool desiredState = validData
-                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
+                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)
+                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)  //if surplus (waste) exceeds load
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)                 // if load enabled and still grid feed in
                           || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));
 
   if (desiredState) {                                                                                            // on?
