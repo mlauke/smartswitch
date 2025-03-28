@@ -187,6 +187,39 @@ input {
   border-radius: 3px;
 }
 
+.arrow-up,
+.arrow-down {
+  color: #fcf8bf;
+}
+
+.arrow-up[data-value="1"] {
+  animation: colorCharge 1s infinite alternate ease-in-out;
+}
+
+.arrow-down[data-value="-1"] {
+  animation: colorDischarge 1s infinite alternate ease-in-out;
+}
+
+@keyframes colorCharge {
+  0% {
+    color: #fcf8bf;
+  }
+
+  100% {
+    color: #28a746;
+  }
+}
+
+@keyframes colorDischarge {
+  0% {
+    color: #fcf8bf;
+  }
+
+  100% {
+    color: #dc3546;
+  }
+}
+
 .charge {
   width: 100%;
   height: 0%;
@@ -205,18 +238,18 @@ input {
 }
 
 .charge[data-lvl="high"] {
-  background-color: #28a745;
+  background: linear-gradient(to top, #28a746, #6f6);
 }
 
 .charge[data-lvl="medium"] {
-  background-color: #ffc107;
+  background: linear-gradient(to top, #ffc107, #ffd34f);
   color: black;
 }
 
 .charge[data-lvl="low"] {
-  background-color: #dc3545;
+  background: linear-gradient(to top, #dc3546, #e96572);
 }
 
 span.switch[data-value="true"] {
-  background-color: #90f090;
+  background-color: #6f6;
 }

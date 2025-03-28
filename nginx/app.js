@@ -22,7 +22,11 @@ async function fetchData(uri, cb) {
           } else if (Array.isArray(v) && v.length) {
             e.textContent = toLogEntry(v[0]);
           } else {
-            e.textContent = v;
+            if (e.hasAttribute("data-value")) {
+              e.setAttribute("data-value", v);
+            } else {
+              e.textContent = v;
+            }
           }
         }
       });
@@ -56,14 +60,14 @@ function updateBattery() {
   const level = document.getElementById("usoc").value;
 
   if (level !== "") {
+    var lvl = "low";
     chargeBar.style.height = level + "%";
     if (level > 60) {
-      chargeBar.setAttribute("data-lvl", "high");
+      lvl = "high";
     } else if (level > 10) {
-      chargeBar.setAttribute("data-lvl", "medium");
-    } else {
-      chargeBar.setAttribute("data-lvl", "low");
+      lvl = "medium";
     }
+    chargeBar.setAttribute("data-lvl", lvl);
     document.getElementById("charge-lvl").textContent = level + "%";
   }
 }

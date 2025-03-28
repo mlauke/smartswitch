@@ -27,7 +27,7 @@
 
 #define PIN_MBUS_RX 4  // GPIO4 (D2 on NodeMCU)
 #define PIN_MBUS_TX 6  // GPIO5 (D1 on NodeMCU)
-#define PIN_SSR 5  // GPIO 6 (D3)
+#define PIN_SSR 5      // GPIO 6 (D3)
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
@@ -107,10 +107,10 @@ typedef struct {
   uint16_t cap_bat_max_Wh;   // max battery capacity (system)
   int gridFeedIn_W;          // current grid feed in - negative is consumption, positive is fedd in
   bool dischargeNotAllowed;  // e.g. true due to battery maintenance
+  short charge;              // battery charge state 0 - none, 1 - charge, -1 - discharge
 
-  long pv_forecast_ts;                                            // last update timestamp in ms since mcu start
-  uint32_t pv_forecast_wh_h[49][2];                               // pair of timestamp and pv production (Wh/h) for today and tomorrow
-  uint16_t cons_avg_W_h[3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000)];  // average consumption of the last hour (long term)
+  long pv_forecast_ts;               // last update timestamp in ms since mcu start
+  uint32_t pv_forecast_wh_h[49][2];  // pair of timestamp and pv production (Wh/h) for today and tomorrow
 
   logEntry events[16];  // event buffer
   uint8_t eventIx = 0;

@@ -1,7 +1,5 @@
 /**
  * TODOs:
- * - bug: switches on if below min capacity (if max capacity reached e.g. following day and this day neither min/max is reached)
- * - feat: local time format on event msg level
  * - battery system data update every day
  * - feat: skip updateSwitch if not set to Auto
  * - feat: wait or delay reset/restart and response send to server
@@ -134,7 +132,6 @@ void onOTAEnd(bool success) {
 void systemDefaults() {
   systemData.pv_forecast_ts = 0;
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
-  memset(systemData.cons_avg_W_h, 0, sizeof(systemData.cons_avg_W_h));
 }
 
 void configDefaults() {  // init config struct with default values
@@ -187,7 +184,7 @@ bool updateSolarForecast() {
       }
       clearLocationError();
     } else {
-      putLocationError("WARN solar forcast " + restClient.lastError());
+      putLocationError("WARN solar forecast " + restClient.lastError());
     }
     systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
   }
@@ -338,6 +335,7 @@ void handleStatus() {
   data["prod"] = systemData.prod_W;
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
+  data["chrg"] = systemData.charge;
   data["switch"] = systemData.switchEnabled;
   data["bs_t_cur"] = systemData.boiler_T_cur;
 
@@ -589,8 +587,9 @@ bool updateSystemData() {
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
     systemData.prod_W = json["Production_W"].as<uint16_t>();
     systemData.cons_W = json["Consumption_W"].as<uint16_t>();
-    systemData.cons_avg_W = median(systemData.cons_W);
+    systemData.cons_avg_W = json["Consumption_Avg"].as<uint16_t>();
     systemData.dischargeNotAllowed = json["dischargeNotAllowed"].as<bool>();
+    systemData.charge = json["BatteryCharging"].as<short>() - json["BatteryDischarging"].as<short>();
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
@@ -604,25 +603,6 @@ bool updateSystemData() {
     return true;
   }
   return false;
-}
-
-uint16_t median(uint16_t cons_W) {
-  static uint16_t ix = 0;
-
-  uint32_t cons_avg_W = 0;
-  uint16_t cnt = 0;
-
-  systemData.cons_avg_W_h[ix++ % (sizeof(systemData.cons_avg_W_h) / sizeof(uint16_t))] = cons_W;
-  // Serial.println("avg w:");
-  for (uint16_t i = 0; i < sizeof(systemData.cons_avg_W_h) / sizeof(uint16_t); i++) {
-    //    Serial.printf("%u ", systemData.cons_avg_W_h[i]);
-    if (systemData.cons_avg_W_h[i]) {  //only > 0 are considered, cause after restart/reset it will be empty
-      cons_avg_W += systemData.cons_avg_W_h[i];
-      cnt++;
-    }
-  }
-  //  Serial.printf("avg w last h: %u %u => %uW\n", cnt, cons_avg_W, cons_avg_W / cnt);
-  return cons_avg_W / cnt;
 }
 
 bool updateSwitch(bool validData) {
@@ -711,14 +691,16 @@ bool batteryCapacityTargetFulfilled() {
     return false;  // no solar forecast data, assume battery will become empty
   }
 
-  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;  //current capacity
+  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;  // current battery capacity
   uint16_t cons_W = (systemData.switchEnabled ? MIN(systemData.cons_W, MAX(0, systemData.cons_W - config.loadPower_W)) : systemData.cons_W);
 
   uint32_t ts = systemData.ts - (systemData.ts % 3600);  // start timestamp of last full hour
 
+  bool foundPvData = false;
+
   for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
-    if (systemData.pv_forecast_wh_h[i][0] == ts) {  //seek to pv forecast upon system ts
+    if ((foundPvData = systemData.pv_forecast_wh_h[i][0] == ts)) {  // seek to pv forecast upon system ts
 
       uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
 
@@ -744,7 +726,7 @@ bool batteryCapacityTargetFulfilled() {
 
   uint16_t hysterese_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
   putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysterese_Wh + "Wh (hys) at " + toLocalDate(ts));
-  return cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh));
+  return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh));
 }
 
 bool loadConfig() {
