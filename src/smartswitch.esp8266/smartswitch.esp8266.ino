@@ -634,11 +634,9 @@ bool updateSwitch(bool validData) {
                           || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)
                           || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));
 
-  if (desiredState) {                                              // on?
-    if (systemData.switchEnabled) {                                // already on?
-      if (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W) {  // grid purchase active? (negative grid feed in denotes purchase)
-        inverterLatencyCnt++;
-      }
+  if (desiredState) {                                                                                            // on?
+    if (systemData.switchEnabled) {                                                                              // already on?
+      inverterLatencyCnt = (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
       desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
       if (!desiredState) {
         putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
@@ -736,7 +734,7 @@ bool batteryCapacityTargetFulfilled() {
         // cumulate battery capacity upon production forecast
         cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, (uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData.inv_max_w, (int)wh - cons_W)));
         Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
-        
+
         ts = systemData.pv_forecast_wh_h[i][0];
         wh = systemData.pv_forecast_wh_h[i][1];
       }
@@ -744,7 +742,7 @@ bool batteryCapacityTargetFulfilled() {
   }
 
   uint16_t hysterese_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
-  putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysterese_Wh + "Wh (hys) at " + toDate(ts));
+  putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysterese_Wh + "Wh (hys) at " + toLocalDate(ts));
   return cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh));
 }
 
