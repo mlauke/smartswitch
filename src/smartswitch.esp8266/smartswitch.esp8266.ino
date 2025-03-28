@@ -1,8 +1,10 @@
 /**
  * TODOs:
- * - local time format on event msg level
- * - skip updateSwitch if not set to Auto
- * - wait or delay reset/restart and response send to server
+ * - bug: switches on if below min capacity (if max capacity reached e.g. following day and this day neither min/max is reached)
+ * - feat: local time format on event msg level
+ * - battery system data update every day
+ * - feat: skip updateSwitch if not set to Auto
+ * - feat: wait or delay reset/restart and response send to server
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
@@ -24,6 +26,7 @@ static volatile bool doUpdateFlag = false;
 static systemDataStruct systemData;
 static configStruct config;
 static bool saveConfigFile = false;
+static SoftwareSerial mbusIo(PIN_MBUS_RX, PIN_MBUS_TX);
 
 int stdOffset = 3600;  // 1h utc offset Europe/Berlin
 int dstOffset = 3600;  // 1h suummer time offset
@@ -709,38 +712,40 @@ bool batteryCapacityTargetFulfilled() {
     return false;  // no solar forecast data, assume battery will become empty
   }
 
-  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
+  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;  //current capacity
+  uint16_t cons_W = (systemData.switchEnabled ? MIN(systemData.cons_W, MAX(0, systemData.cons_W - config.loadPower_W)) : systemData.cons_W);
 
-  uint32_t ts = systemData.ts - (systemData.ts % 3600);  // ts of last full hour
+  uint32_t ts = systemData.ts - (systemData.ts % 3600);  // start timestamp of last full hour
 
   for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
-    if (systemData.pv_forecast_wh_h[i][0] == ts) {  //select pv forecast upon system ts
+    if (systemData.pv_forecast_wh_h[i][0] == ts) {  //seek to pv forecast upon system ts
 
       uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
 
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
-        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, (int32_t)(cap_bat_Wh + wh) - (int16_t)systemData.cons_avg_W));
-
-        Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
-
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
-          putEvent("min capacity reached at " + String(toLocalDate(ts)));
+          putEvent("min capacity at " + String(toLocalDate(ts)));
           return false;
         }
         if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
-          putEvent("max capacity reached at " + String(toLocalDate(ts)));
+          putEvent("max capacity at " + String(toLocalDate(ts)));
           return true;
         }
+        // cumulate battery capacity upon production forecast
+        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, (uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData.inv_max_w, (int)wh - cons_W)));
+        Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+        
         ts = systemData.pv_forecast_wh_h[i][0];
         wh = systemData.pv_forecast_wh_h[i][1];
       }
     }
   }
 
-  int hysterese_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
-  return cap_bat_Wh >= (MAX(0, config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh)));
+  uint16_t hysterese_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
+  putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysterese_Wh + "Wh (hys) at " + toDate(ts));
+  return cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh));
 }
 
 bool loadConfig() {
