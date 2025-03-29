@@ -182,6 +182,8 @@ bool updateSolarForecast() {
           putEvent("WARN: overflow " + i);
         }
       }
+      setConfigStr(config, location, doc["message"]["info"]["place"].as<const char*>());
+
       clearLocationError();
     } else {
       putLocationError("WARN solar forecast " + restClient.lastError());
@@ -691,8 +693,8 @@ bool batteryCapacityTargetFulfilled() {
     return false;  // no solar forecast data, assume battery will become empty
   }
 
-  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;  // current battery capacity
-  uint16_t cons_W = (systemData.switchEnabled ? MIN(systemData.cons_W, MAX(0, systemData.cons_W - config.loadPower_W)) : systemData.cons_W);
+  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;                                                                              // current battery capacity
+  uint16_t cons_W = (systemData.switchEnabled && systemData.cons_W > config.loadPower_W) ? systemData.cons_W - config.loadPower_W : systemData.cons_W;  // consumption without load
 
   uint32_t ts = systemData.ts - (systemData.ts % 3600);  // start timestamp of last full hour
 

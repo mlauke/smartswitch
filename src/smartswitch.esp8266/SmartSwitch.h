@@ -39,8 +39,8 @@
 #define URL_LOCATION "http://ip-api.com/json/"
 
 #define SOLAR_FORECAST_INTERVAL 12 * 60 * 1000  // every 10min
-#define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
-//#define URL_SOLAR_FORECAST "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
+//#define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
+#define URL_SOLAR_FORECAST "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
 #define SYSTEM_UPDATE_INTERVAL_MS 2000  //update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
