@@ -147,7 +147,7 @@ void configDefaults() {  // init config struct with default values
   config.location[0] = '\0';
   config.loadPower_W = 1000;  //initial assume 1kW
   config.cap_bat_min_Wh = 500;
-  config.gridMin_W = 50;
+  config.gridMin_W = GRID_PURCHASE_THRESHOLD_W;
   config.mode = 0;  //initial set to off
   config.update_startup = false;
 
@@ -163,6 +163,7 @@ bool updateSolarForecast() {
     RestClient restClient;
     JsonDocument doc;
 
+    String solarUrl = strstr(config.hostname, "-dev") == NULL ? URL_SOLAR_FORECAST : URL_SOLAR_FORECAST_DEV;
     char url[128];
     snprintf(url, sizeof(url), URL_SOLAR_FORECAST, config.lat, config.lon, config.az, config.dec, config.kWp);
 
@@ -378,9 +379,9 @@ void handleAPI() {
   } else if (server.hasArg("sonnen")) {
     setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
     setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
-    config.gridMin_W = server.arg("sn_grdmin").toInt();
-    config.loadPower_W = server.arg("sn_loadpower").toInt();
-    config.cap_bat_min_Wh = server.arg("sn_cap_min").toInt();
+    config.gridMin_W = MAX(50, server.arg("sn_grdmin").toInt());
+    config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
+    config.cap_bat_min_Wh = MAX(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
     saveConfig();
 
   } else if (server.hasArg("location")) {
@@ -612,14 +613,14 @@ bool updateSwitch(bool validData) {
   static uint8_t inverterLatencyCnt = 0;
 
   bool desiredState = validData
-                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)
-                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)  //if surplus (waste) exceeds load
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)                 // if load enabled and still grid feed in
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));
+                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
+                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                              // if surplus (waste) exceeds load
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)                                                             // if load enabled and still grid feed in
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));                                       // forecast battery capacity and be aware of discharge allowed
 
   if (desiredState) {                                                                                            // on?
     if (systemData.switchEnabled) {                                                                              // already on?
-      inverterLatencyCnt = (systemData.gridFeedIn_W < -GRID_PURCHASE_THRESHOLD_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
+      inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
       desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
       if (!desiredState) {
         putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
