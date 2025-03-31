@@ -62,6 +62,8 @@ input[type="radio"] {
 body {
   background: #ffffff;
   color: #333;
+  display: grid;
+  justify-content: center;
 }
 
 body,
@@ -97,7 +99,7 @@ button {
   }
 }
 
-.form-group {
+.fg {
   display: grid;
   grid-template-columns: 30% 70%;
   align-items: center;

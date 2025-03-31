@@ -1,5 +1,6 @@
 /**
  * TODOs:
+ * - fix: min capacity calculation "flicker" => use rounded avg 
  * - battery system data update every day
  * - feat: skip updateSwitch if not set to Auto
  * - feat: wait or delay reset/restart and response send to server
