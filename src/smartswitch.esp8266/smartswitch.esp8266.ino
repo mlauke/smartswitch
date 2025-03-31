@@ -3,6 +3,10 @@
  * - battery system data update every day
  * - feat: skip updateSwitch if not set to Auto
  * - feat: wait or delay reset/restart and response send to server
+ * - feat: suspend/sleep for a while (or double the amount of sleep) 
+ *      - if switch is off and will stay off
+ *      - if boilder temp. is alread yreached
+ * - feat: measure consumption avg per hour and week day and save to config for better long term approximation
  */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
@@ -317,6 +321,8 @@ void handleData() {
   JsonDocument data;
 
   configToJson(data);
+  data["sn_cap_max"] = systemData.cap_bat_max_Wh;
+
   sendJson("data", data);
 }
 
@@ -379,9 +385,9 @@ void handleAPI() {
   } else if (server.hasArg("sonnen")) {
     setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
     setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
-    config.gridMin_W = MAX(50, server.arg("sn_grdmin").toInt());
+    config.gridMin_W = MAX(50, MAX(0, server.arg("sn_grdmin").toInt()));
     config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
-    config.cap_bat_min_Wh = MAX(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
+    config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
     saveConfig();
 
   } else if (server.hasArg("location")) {

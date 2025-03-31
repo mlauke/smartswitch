@@ -21,7 +21,8 @@
         <div>Production: <span name="prod"></span> W</div>
         <div>Consumption: <span name="cons_w"></span> W</div>
         <div>Consumption (avg): <span name="cons_avg_w"></span> W</div>
-        <div>Battery Load: <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg" class="arrow-down">▼</span></div>
+        <div>Battery Load: <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg"
+            class="arrow-down">▼</span></div>
         <div>Grid: <span name="grid"></span> W</div>
         <div>Events (<a href="javascript:showLog();">Log</a>): <span class="events" name="events"></span></div>
         <div id="overlay" class="overlay">
@@ -40,7 +41,7 @@
       </div>
   </fieldset>
   </div>
-  <form class="form-container">
+  <form>
     <fieldset>
       <legend>Mode</legend>
       <label><input type="radio" name="mode" value="0">Off</label><br />
@@ -48,7 +49,7 @@
       <label><input type="radio" name="mode" value="2">Auto</label><br />
     </fieldset>
   </form>
-  <form action="/api/update" method="post" class="form-container">
+  <form action="/api/update" method="post">
     <fieldset>
       <legend>Boiler</legend>
       <div class="form-group">
@@ -56,17 +57,20 @@
         <input id="bs_t_cur" name="bs_t_cur" readonly disabled>
       </div>
       <div class="form-group">
-        <label for="bs_t_max">T_max (C°):</label>
+        <label for="bs_t_max">T<sub>max</sub> (C°):</label>
         <input id="bs_t_max" name="bs_t_max" maxlength="4">
       </div>
       <div class="form-group">
-        <label for="bs_t_nom">T_min (C°):</label>
+        <label for="bs_t_nom">T<sub>min</sub> (C°):</label>
         <input id="bs_t_nom" name="bs_t_nom" maxlength="4">
       </div>
-      <button type="submit" name="boiler" value="Update">Update</button>
+      <div class="form-group">
+        <div></div>
+        <button type="submit" name="boiler" value="Update">Update</button>
+      </div>
     </fieldset>
   </form>
-  <form action="/api/update" method="post" class="form-container">
+  <form action="/api/update" method="post">
     <fieldset>
       <legend>Sonnen Battery</legend>
       <div class="form-group">
@@ -78,21 +82,24 @@
         <input id="sn_token" type="password" name="sn_token" maxlength="36">
       </div>
       <div class="form-group">
-        <label for="sn_grdmin">Grid_min (W):</label>
-        <input id="sn_grdmin" name="sn_grdmin" maxlength="4">
-      </div>
-      <div class="form-group">
         <label for="sn_loadpower">Load (W):</label>
         <input id="sn_loadpower" name="sn_loadpower" maxlength="4">
       </div>
       <div class="form-group">
-        <label for="sn_cap_min">Capacity min (Wh):</label>
+        <label for="sn_cap_min">Capacity min (0..<span name="sn_cap_max"></span> Wh):</label>
         <input id="sn_cap_min" name="sn_cap_min" maxlength="6">
       </div>
-      <button type="submit" name="sonnen" value="Update">Update</button>
+      <div class="form-group">
+        <label for="sn_grdmin">Grid min</sub> (W):</label>
+        <input id="sn_grdmin" name="sn_grdmin" maxlength="4">
+      </div>
+      <div class="form-group">
+        <div></div>
+        <button type="submit" name="sonnen" value="Update">Update</button>
+      </div>
     </fieldset>
   </form>
-  <form action="/api/update" method="post" class="form-container">
+  <form action="/api/update" method="post">
     <fieldset>
       <legend>PV Location</legend>
       <div class="form-group">
@@ -119,10 +126,13 @@
         <label for="lc_kWp">kWp:</label>
         <input id="lc_kWp" name="lc_kWp">
       </div>
-      <button type="submit" name="location" value="Update">Update</button>
+      <div class="form-group">
+        <div></div>
+        <button type="submit" name="location" value="Update">Update</button>
+      </div>
     </fieldset>
   </form>
-  <form action="api/update" method="post" onSubmit="return confirm('Sure?');" class="form-container">
+  <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
     <fieldset>
       <legend>Software Update</legend>
       Release: <span name="release_tag"></span><br />
@@ -132,7 +142,7 @@
       <input type="radio" name="update_startup" value="1">On
     </fieldset>
   </form>
-  <form action="api/update" method="post" class="form-container">
+  <form action="api/update" method="post">
     <fieldset>
       <legend>Network</legend>
       <div>
@@ -145,8 +155,7 @@
   <form action="/api/update" method="post">
     <fieldset>
       <legend>System</legend>
-      <input type="submit" name="restart" value="Restart"
-        onclick="return confirm('Sure?');">
+      <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
       <input type="submit" name="reset" value="Factory Reset"
         onclick="return confirm('Sure? WLAN Access Data will be erased!');">
     </fieldset>
