@@ -1,8 +1,29 @@
+// MIT License
+//
+// Copyright (c) 2024 Marko Lauke
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #ifndef SMARTSWITCH_H
 #define SMARTSWITCH_H
 
 #include <ArduinoJson.h>
-#include <MBusinoLib.h>
 #include <SoftwareSerial.h>
 #include <LittleFS.h>
 #include <Ticker.h>
@@ -23,11 +44,12 @@
 #endif
 
 #define SERIAL_BAUDRATE 115200
+#define LPB_BAUDRATE 4800
 #define WEBSERVER_PORT 80
 
-#define PIN_MBUS_RX 4  // GPIO4 (D2 on NodeMCU)
-#define PIN_MBUS_TX 6  // GPIO5 (D1 on NodeMCU)
-#define PIN_SSR 5      // GPIO 6 (D3)
+#define PIN_LPB_TX 5  // GPIO5 (D1)
+#define PIN_LPB_RX 4  // GPIO4 (D2)
+#define PIN_SSR 0     // GPIO6 (D3)
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
@@ -103,7 +125,10 @@ typedef struct {
   uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
   uint16_t prod_W;           // prodcution (Watt)
   uint16_t cons_W;           // consumption (Watt)
+  uint16_t cons_W_rnd;       // consumption rounded as multiple of 100 (Watt)
+  uint16_t cons_W_norm;      // normalized consumption without load
   uint16_t cons_avg_W;       // consumption average (W)
+  uint16_t cap_bat_Wh;       // current capacity
   uint16_t cap_bat_max_Wh;   // max battery capacity (system)
   int gridFeedIn_W;          // current grid feed in - negative is consumption, positive is fedd in
   bool dischargeNotAllowed;  // e.g. true due to battery maintenance

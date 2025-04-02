@@ -25,7 +25,7 @@ jobs:
 
       - name: Install Libraries
         run: |
-          arduino-cli lib install WiFiManager@2.0.17 ArduinoJson@7.3.1 MBusinoLib@0.9.11
+          arduino-cli lib install WiFiManager@2.0.17 ArduinoJson@7.3.1
           # ElegantOTA@3.1.5
 
       - name: Compile Sketch

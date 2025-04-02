@@ -1,9 +1,30 @@
+// MIT License
+//
+// Copyright (c) 2024 Marko Lauke
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 /**
  * TODOs:
- * - fix: min capacity calculation "flicker" => use rounded avg 
- * - battery system data update every day
+ * - battery system data update every day or from time to time
  * - feat: skip updateSwitch if not set to Auto
- * - feat: wait or delay reset/restart and response send to server
+ * - feat: wait or delay an reset/restart request, make sure response is send
  * - feat: suspend/sleep for a while (or double the amount of sleep) 
  *      - if switch is off and will stay off
  *      - if boilder temp. is alread yreached
@@ -29,7 +50,7 @@ static volatile bool doUpdateFlag = false;
 static systemDataStruct systemData;
 static configStruct config;
 static bool saveConfigFile = false;
-static SoftwareSerial mbusIo(PIN_MBUS_RX, PIN_MBUS_TX);
+static SoftwareSerial LPB_Serial(PIN_LPB_RX, PIN_LPB_TX, false);
 
 int stdOffset = 3600;  // 1h utc offset Europe/Berlin
 int dstOffset = 3600;  // 1h suummer time offset
@@ -46,6 +67,10 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(GPIO_ID_PIN(PIN_SSR), OUTPUT);
+  pinMode(GPIO_ID_PIN(PIN_LPB_RX), INPUT);
+  pinMode(GPIO_ID_PIN(PIN_LPB_TX), OUTPUT);
+
+  LPB_Serial.begin(LPB_BAUDRATE);
 
   toggleSwitch(false);
 
@@ -379,8 +404,8 @@ void handleAPI() {
     saveConfig();
 
   } else if (server.hasArg("boiler")) {
-    config.boiler_T_max = server.arg("bs_t_max").toInt();
-    config.boiler_T_nom = server.arg("bs_t_nom").toInt();
+    config.boiler_T_max = MIN(85, MAX(0, server.arg("bs_t_max").toInt()));
+    config.boiler_T_nom = MIN(85, MAX(0, server.arg("bs_t_nom").toInt()));
     saveConfig();
 
   } else if (server.hasArg("sonnen")) {
@@ -392,11 +417,11 @@ void handleAPI() {
     saveConfig();
 
   } else if (server.hasArg("location")) {
-    config.lon = server.arg("lc_lon").toDouble();
-    config.lat = server.arg("lc_lat").toDouble();
-    config.kWp = server.arg("lc_kWp").toDouble();
-    config.az = server.arg("lc_az").toInt();
-    config.dec = server.arg("lc_dec").toInt();
+    config.lon = MAX(0, server.arg("lc_lon").toDouble());
+    config.lat = MAX(0, server.arg("lc_lat").toDouble());
+    config.kWp = MAX(0, server.arg("lc_kWp").toDouble());
+    config.az = MIN(360, MAX(0, server.arg("lc_az").toInt()));
+    config.dec = MIN(90, MAX(0, server.arg("lc_dec").toInt()));
     systemData.pv_forecast_ts = 0;  // force fetch new data
     saveConfig();
 
@@ -505,6 +530,8 @@ void loop() {
 
     updateSwitch(validData);
 
+    LPB_Serial.print(systemData.cons_W);
+
     Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, validData);
 
     doUpdateFlag = false;
@@ -594,12 +621,16 @@ bool updateSystemData() {
   if (fetchData(SONNEN_API_STATUS, json)) {
 
     systemData.usoc = json["USOC"].as<uint8_t>();
+    systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
     systemData.prod_W = json["Production_W"].as<uint16_t>();
     systemData.cons_W = json["Consumption_W"].as<uint16_t>();
     systemData.cons_avg_W = json["Consumption_Avg"].as<uint16_t>();
     systemData.dischargeNotAllowed = json["dischargeNotAllowed"].as<bool>();
     systemData.charge = json["BatteryCharging"].as<short>() - json["BatteryDischarging"].as<short>();
+
+    systemData.cons_W_rnd = (systemData.cons_W + 50) / 100 * 100;
+    systemData.cons_W_norm = (systemData.switchEnabled && systemData.cons_W_rnd > config.loadPower_W) ? systemData.cons_W_rnd - config.loadPower_W : systemData.cons_W_rnd;  // consumption without load
 
     struct tm time;
     strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
@@ -620,13 +651,14 @@ bool updateSwitch(bool validData) {
   static uint8_t inverterLatencyCnt = 0;
 
   bool desiredState = validData
-                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
-                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                              // if surplus (waste) exceeds load
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)                                                             // if load enabled and still grid feed in
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));                                       // forecast battery capacity and be aware of discharge allowed
+                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
+                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                  // if surplus (waste) exceeds load
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)                                                                 // if load enabled and still grid feed in
+                          || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > (config.loadPower_W >> 1))
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));  // forecast battery capacity and be aware of discharge allowed
 
-  if (desiredState) {                                                                                            // on?
-    if (systemData.switchEnabled) {                                                                              // already on?
+  if (desiredState) {                                                                                   // on?
+    if (systemData.switchEnabled) {                                                                     // already on?
       inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
       desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
       if (!desiredState) {
@@ -639,7 +671,7 @@ bool updateSwitch(bool validData) {
 
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1);  // combine with mode
 
-  Serial.printf("ts: %s %u usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  Serial.printf("ts: %s %u usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   toggleSwitch(systemData.switchEnabled);
 
@@ -701,12 +733,10 @@ bool batteryCapacityTargetFulfilled() {
     return false;  // no solar forecast data, assume battery will become empty
   }
 
-  uint32_t cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;                                                                              // current battery capacity
-  uint16_t cons_W = (systemData.switchEnabled && systemData.cons_W > config.loadPower_W) ? systemData.cons_W - config.loadPower_W : systemData.cons_W;  // consumption without load
-
   uint32_t ts = systemData.ts - (systemData.ts % 3600);  // start timestamp of last full hour
 
   bool foundPvData = false;
+  uint32_t cap_bat_Wh = systemData.cap_bat_Wh;
 
   for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
@@ -725,7 +755,7 @@ bool batteryCapacityTargetFulfilled() {
           return true;
         }
         // cumulate battery capacity upon production forecast
-        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, (uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData.inv_max_w, (int)wh - cons_W)));
+        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, (uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData.inv_max_w, (int)wh - systemData.cons_W_norm)));
         Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
         ts = systemData.pv_forecast_wh_h[i][0];
