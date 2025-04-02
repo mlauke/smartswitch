@@ -19,17 +19,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-/**
- * TODOs:
- * - battery system data update every day or from time to time
- * - feat: skip updateSwitch if not set to Auto
- * - feat: wait or delay an reset/restart request, make sure response is send
- * - feat: suspend/sleep for a while (or double the amount of sleep) 
- *      - if switch is off and will stay off
- *      - if boilder temp. is alread yreached
- * - feat: measure consumption avg per hour and week day and save to config for better long term approximation
- */
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
@@ -131,6 +120,8 @@ void setup() {
   Serial.println("HTTP server started");
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
+
+  ESP.wdtEnable(20000);
 }
 
 void timerCallback() {
@@ -148,6 +139,7 @@ void onOTAProgress(size_t current, size_t final) {
 
 void onOTABegin() {
   timer.detach();
+  ESP.wdtDisable();
 }
 
 void onOTAEnd(bool success) {
@@ -537,7 +529,8 @@ void loop() {
     doUpdateFlag = false;
   }
   server.handleClient();
-  //ElegantOTA.loop();
+
+  ESP.wdtFeed();
 }
 
 void buildInLED(bool onOff) {

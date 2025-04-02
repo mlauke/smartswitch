@@ -30,5 +30,14 @@ Rth = (RqJC Junction to case) + (Rkühlkörper) = 1°C/W + Rheatsink => Rheatsin
 
 
 ## TODO
-- build an GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power
--
+- software
+  - battery system data update every day or from time to time
+  - feat: skip updateSwitch if not set to Auto
+  - feat: wait or delay on reset/restart requests, make sure response is send
+  - feat: suspend/sleep for a while (or double the amount of sleep)
+    - if switch is off and will stay off
+    - if boilder temp. is alread yreached
+  - feat: measure consumption avg per hour and week day and save to config for better long term approximation
+- hardware
+  - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power
+  -
