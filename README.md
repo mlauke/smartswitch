@@ -31,6 +31,7 @@ Rth = (RqJC Junction to case) + (Rkühlkörper) = 1°C/W + Rheatsink => Rheatsin
 
 ## TODO
 - software
+  - FE update config data if stale
   - battery system data update every day or from time to time
   - feat: skip updateSwitch if not set to Auto
   - feat: wait or delay on reset/restart requests, make sure response is send
@@ -38,6 +39,7 @@ Rth = (RqJC Junction to case) + (Rkühlkörper) = 1°C/W + Rheatsink => Rheatsin
     - if switch is off and will stay off
     - if boilder temp. is alread yreached
   - feat: measure consumption avg per hour and week day and save to config for better long term approximation
+  - feat: calibrate load automatically
 - hardware
   - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power
   -
