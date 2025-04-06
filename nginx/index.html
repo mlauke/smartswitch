@@ -54,7 +54,7 @@
       <legend>Boiler</legend>
       <div class="fg">
         <label for="bs_t_cur">T (C°):</label>
-        <input id="bs_t_cur" name="bs_t_cur" readonly disabled>
+        <input id="bs_t_cur" name="bs_t_cur" readonly>
       </div>
       <div class="fg">
         <label for="bs_t_max">T<sub>max</sub> (C°):</label>
@@ -104,7 +104,7 @@
       <legend>PV Location</legend>
       <div class="fg">
         <label for="loc">Location:</label>
-        <input id="loc" name="loc" readonly disabled></span>
+        <input id="loc" name="loc" readonly></input>
       </div>
       <div class="fg">
         <label for="lc_lat">Latitude:</label>
@@ -145,11 +145,14 @@
   <form action="api/update" method="post">
     <fieldset>
       <legend>Network</legend>
-      <div>
+      <div class="fg">
         <label for="hostname">Hostname:</label>
         <input id="hostname" name="hostname">
       </div>
-      <button type="submit">Update</button>
+      <div class="fg">
+        <div></div>
+        <button type="submit">Update</button>
+      </div>
     </fieldset>
   </form>
   <form action="/api/update" method="post">

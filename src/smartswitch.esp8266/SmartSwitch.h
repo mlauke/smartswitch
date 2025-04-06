@@ -49,7 +49,7 @@
 
 #define PIN_LPB_TX 5  // GPIO5 (D1)
 #define PIN_LPB_RX 4  // GPIO4 (D2)
-#define PIN_SSR 0     // GPIO6 (D3)
+#define PIN_SSR 13    // GPIO13 (D7)
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"

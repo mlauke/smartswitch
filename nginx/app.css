@@ -51,6 +51,10 @@ fieldset {
 }
 button {
   padding: 4px;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 input[type="radio"] {
@@ -128,10 +132,10 @@ label {
 }
 
 input {
-  flex: 1;
   padding: 6px;
   border: 1px solid #ccc;
   border-radius: 5px;
+  font-size: 16px;
 }
 
 .container {
