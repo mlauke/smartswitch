@@ -49,6 +49,7 @@ fieldset {
   margin: 0 0 8px 0;
   border-radius: 5px;
 }
+
 button {
   padding: 4px;
   border-radius: 5px;
@@ -107,6 +108,10 @@ button {
   display: grid;
   grid-template-columns: 30% 70%;
   align-items: center;
+
+  .value {
+    padding: 6px;
+  }
 }
 
 span.switch {

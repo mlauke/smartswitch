@@ -22,6 +22,7 @@
 #include "SmartSwitch.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
+#include "LPB.h"
 
 // echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
    echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
@@ -39,10 +40,11 @@ static volatile bool doUpdateFlag = false;
 static systemDataStruct systemData;
 static configStruct config;
 static bool saveConfigFile = false;
-static SoftwareSerial LPB_Serial(PIN_LPB_RX, PIN_LPB_TX, false);
 
 int stdOffset = 3600;  // 1h utc offset Europe/Berlin
 int dstOffset = 3600;  // 1h suummer time offset
+
+LPB* lpb;
 
 void saveConfigCallback() {
   saveConfigFile = true;
@@ -56,10 +58,8 @@ void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(GPIO_ID_PIN(PIN_SSR), OUTPUT);
-  pinMode(GPIO_ID_PIN(PIN_LPB_RX), INPUT);
-  pinMode(GPIO_ID_PIN(PIN_LPB_TX), OUTPUT);
 
-  LPB_Serial.begin(LPB_BAUDRATE);
+  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, 2, 0);
 
   toggleSwitch(false);
 
@@ -119,6 +119,9 @@ void setup() {
   server.keepAlive(false);
   Serial.println("HTTP server started");
 
+  lpb->enableInterface();
+  lpb->GetDevId();
+
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
   ESP.wdtEnable(20000);
@@ -140,12 +143,12 @@ void onOTAProgress(size_t current, size_t final) {
 void onOTABegin() {
   timer.detach();
   ESP.wdtDisable();
+  lpb->disableInterface();
 }
 
 void onOTAEnd(bool success) {
-  // Log when OTA has finished
   if (success) {
-    Serial.println("OTA update finished successfully!");
+    Serial.println("OTA update finished successfully!");  // Log when OTA has finished
     return;
   }
   Serial.println("There was an error during OTA update!");
@@ -173,8 +176,8 @@ void configDefaults() {  // init config struct with default values
   config.mode = 0;  //initial set to off
   config.update_startup = false;
 
-  config.boiler_T_max = 65;
-  config.boiler_T_nom = 50;
+  //  config.boiler_T_max = 65;
+  //config.boiler_T_nom = 50;
 }
 
 bool updateSolarForecast() {
@@ -292,8 +295,8 @@ void jsonToConfig(JsonDocument& data) {
   setConfigStr(config, location, data["loc"]);
   setConfigStr(config, tz, data["tz"]);
 
-  config.boiler_T_max = data["bs_t_max"].as<uint8_t>();
-  config.boiler_T_nom = data["bs_t_nom"].as<uint8_t>();
+  //  config.boiler_T_max = data["bs_t_max"].as<uint8_t>();
+  //config.boiler_T_nom = data["bs_t_nom"].as<uint8_t>();
 }
 
 void configToJson(JsonDocument& data) {
@@ -319,8 +322,8 @@ void configToJson(JsonDocument& data) {
   data["loc"] = config.location;
   data["tz"] = config.tz;
 
-  data["bs_t_max"] = config.boiler_T_max;
-  data["bs_t_nom"] = config.boiler_T_nom;
+  //  data["bs_t_max"] = config.boiler_T_max;
+  //data["bs_t_nom"] = config.boiler_T_nom;
 }
 
 void sendJson(String from, JsonDocument& json) {
@@ -364,7 +367,18 @@ void handleStatus() {
   data["usoc"] = systemData.usoc;
   data["chrg"] = systemData.charge;
   data["switch"] = systemData.switchEnabled;
+
+  char devid[40] = "unknown";
+  device_map* device = lpb->getDestDevice();
+  if(device != NULL){
+    snprintf(devid, sizeof(devid), "%s (%d/%d) - %d", device->name, device->dev_fam, device->dev_var, device->dev_id);
+  }
+  data["bs_devid"] = devid;
+
   data["bs_t_cur"] = systemData.boiler_T_cur;
+  data["bs_t_max"] = systemData.boiler_T_max;
+  data["bs_t_min"] = systemData.boiler_T_min;
+  data["bs_t_nom"] = systemData.boiler_T_nom;
 
   JsonArray errors = data["errors"].to<JsonArray>();
   addLog(errors, systemData.error_bt);
@@ -396,9 +410,9 @@ void handleAPI() {
     saveConfig();
 
   } else if (server.hasArg("boiler")) {
-    config.boiler_T_max = MIN(85, MAX(0, server.arg("bs_t_max").toInt()));
-    config.boiler_T_nom = MIN(85, MAX(0, server.arg("bs_t_nom").toInt()));
-    saveConfig();
+    //    config.boiler_T_max = MIN(85, MAX(0, server.arg("bs_t_max").toInt()));
+    //  config.boiler_T_nom = MIN(85, MAX(0, server.arg("bs_t_nom").toInt()));
+    //saveConfig();
 
   } else if (server.hasArg("sonnen")) {
     setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
@@ -496,6 +510,14 @@ void putBatteryError(String event) {
   putLog(systemData.error_bt, event.c_str());
 }
 
+void putBoilerError(String event) {
+  putLog(systemData.error_bs, event.c_str());
+}
+
+void clearBoilerError() {
+  systemData.error_bs.msg.clear();
+}
+
 void putLog(logEntry& log, const char* event) {
   log.msg.clear();
   log.msg.concat(event);
@@ -511,6 +533,25 @@ void putEvent(String event) {
   putEvent(event.c_str());
 }
 
+bool updateBoilerData() {
+  static long lastUpdate = 0;
+
+  long ms = millis();
+  if (lastUpdate == 0 || ms > lastUpdate + 10000) {
+    lastUpdate = ms;
+    if (lpb->update()) {
+      systemData.boiler_T_cur = lpb->getBoilerTemperature();
+      systemData.boiler_T_nom = lpb->getBoilerTemperatureNom();
+      systemData.boiler_T_min = lpb->getBoilerTemperatureMin();
+      systemData.boiler_T_max = lpb->getBoilerTemperatureMax();
+    } else {
+      putBoilerError("Could not update boiler data");
+      return false;
+    }
+  }
+  return true;  // no new data, so still ok
+}
+
 // main loop
 void loop() {
   if (doUpdateFlag) {
@@ -518,11 +559,9 @@ void loop() {
     uint32_t heap = ESP.getFreeHeap();
 
     bool validData =
-      ensureConnected() && updateSystemData() && updateSolarForecast();
+      ensureConnected() && updateSystemData() && updateSolarForecast() ; // && updateBoilerData();
 
     updateSwitch(validData);
-
-    LPB_Serial.print(systemData.cons_W);
 
     Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, validData);
 
@@ -644,11 +683,14 @@ bool updateSwitch(bool validData) {
   static uint8_t inverterLatencyCnt = 0;
 
   bool desiredState = validData
+                      //                      && ((systemData.switchEnabled)
+                      //                        || (!systemData.switchEnabled));
                       && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
                       && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                  // if surplus (waste) exceeds load
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W > 0)                                                                 // if load enabled and still grid feed in
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                // if load enabled and still grid feed in
                           || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > (config.loadPower_W >> 1))
                           || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));  // forecast battery capacity and be aware of discharge allowed
+
 
   if (desiredState) {                                                                                   // on?
     if (systemData.switchEnabled) {                                                                     // already on?

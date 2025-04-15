@@ -53,16 +53,24 @@
     <fieldset>
       <legend>Boiler</legend>
       <div class="fg">
-        <label for="bs_t_cur">T (C°):</label>
+        <div>Device:</div>
+        <div class="value" name="bs_devid" readonly></div>
+      </div>
+      <div class="fg">
+        <label for="bs_t_cur">T (°C):</label>
         <input id="bs_t_cur" name="bs_t_cur" readonly>
       </div>
       <div class="fg">
-        <label for="bs_t_max">T<sub>max</sub> (C°):</label>
-        <input id="bs_t_max" name="bs_t_max" maxlength="4">
+        <label for="bs_t_nom">T<sub>nom</sub> (°C):</label>
+        <input id="bs_t_nom" name="bs_t_nom" maxlength="4">
       </div>
       <div class="fg">
-        <label for="bs_t_nom">T<sub>min</sub> (C°):</label>
-        <input id="bs_t_nom" name="bs_t_nom" maxlength="4">
+        <label for="bs_t_min">T<sub>min</sub> (°C):</label>
+        <input id="bs_t_min" name="bs_t_min">
+      </div>
+      <div class="fg">
+        <label for="bs_t_max">T<sub>max</sub> (°C):</label>
+        <input id="bs_t_max" name="bs_t_max">
       </div>
       <div class="fg">
         <div></div>
@@ -103,8 +111,8 @@
     <fieldset>
       <legend>PV Location</legend>
       <div class="fg">
-        <label for="loc">Location:</label>
-        <input id="loc" name="loc" readonly></input>
+        <div>Location:</div>
+        <div class="value" name="loc" readonly></div>
       </div>
       <div class="fg">
         <label for="lc_lat">Latitude:</label>

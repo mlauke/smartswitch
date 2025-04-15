@@ -10,17 +10,15 @@
 ## Software
 - smartswitch.esp8266.ino
 
-## LPB
-to control access the
-
-## Sample Hardware
+## Hardware
 - Heater - https://www.austria-email.at/produkte/zubehoer/elektro-einbauheizung/reu-18-33/
 - Hot Water Tank - https://www.austria-email.at/produkte/indirekt-beheizte-speicher/standspeicher/standspeicher-hr/hr-160/
-- sonnen battery https://sonnen.de/stromspeicher/sonnenbatterie-10/
+- Sonnen Battery https://sonnen.de/stromspeicher/sonnenbatterie-10/
 - esp8266 module
 - ArduiBox housing
 - DIN Rail Power supply
 - AC mains Triac cicuit to drive a 1NO Relay (Schütz)
+- Boiler with Siemens RVD250 attached with Local Process Bus
 
 ## Thoughts
 Pmax = (Tj,max - Tamb,max) / Rth
@@ -32,6 +30,7 @@ Rth = (RqJC Junction to case) + (Rkühlkörper) = 1°C/W + Rheatsink => Rheatsin
 ## TODO
 - software
   - FE update config data if stale
+  - fix: flicker if bat is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
   - battery system data update every day or from time to time
   - feat: skip updateSwitch if not set to Auto
   - feat: wait or delay on reset/restart requests, make sure response is send

@@ -24,7 +24,6 @@
 #define SMARTSWITCH_H
 
 #include <ArduinoJson.h>
-#include <SoftwareSerial.h>
 #include <LittleFS.h>
 #include <Ticker.h>
 #include <WiFiClient.h>
@@ -49,6 +48,7 @@
 
 #define PIN_LPB_TX 5  // GPIO5 (D1)
 #define PIN_LPB_RX 4  // GPIO4 (D2)
+
 #define PIN_SSR 13    // GPIO13 (D7)
 
 #define SONNEN_API_URI "api/v2"
@@ -64,7 +64,7 @@
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 #define URL_SOLAR_FORECAST_DEV "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
-#define SYSTEM_UPDATE_INTERVAL_MS 2000  //update intervall millis
+#define SYSTEM_UPDATE_INTERVAL_MS 10000  //update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
 
 #define CFG_SZ_HOSTNAME 32
@@ -91,9 +91,6 @@ typedef struct {
   char sonnenHostname[CFG_SZ_SONNENHOST];
   char sonnenApiToken[CFG_SZ_SONNENTOKEN];
 
-  uint8_t boiler_T_nom;
-  uint8_t boiler_T_max;
-
   uint16_t loadPower_W;
   uint16_t cap_bat_min_Wh;  // battery min capacity - custom min capacity
   uint16_t gridMin_W;
@@ -119,7 +116,10 @@ typedef struct {
   uint16_t dstOffset;
 
   bool switchEnabled = false;
-  uint8_t boiler_T_cur;
+  float boiler_T_cur;
+  float boiler_T_nom;
+  float boiler_T_min;
+  float boiler_T_max;
 
   int inv_max_w = -1;        // inverter power max
   uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
