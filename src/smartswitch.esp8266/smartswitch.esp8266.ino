@@ -370,7 +370,7 @@ void handleStatus() {
 
   char devid[40] = "unknown";
   device_map* device = lpb->getDestDevice();
-  if(device != NULL){
+  if (device != NULL) {
     snprintf(devid, sizeof(devid), "%s (%d/%d) - %d", device->name, device->dev_fam, device->dev_var, device->dev_id);
   }
   data["bs_devid"] = devid;
@@ -472,13 +472,17 @@ void handleGithubUpdate() {
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (!gh_updater.checkUpdate(config.release_tag)) {
-    server.send(404, "text/plain", "No Update found");
+    if (server.client().connected()) {
+      server.send(404, "text/plain", "No Update found");
+    }
     return;
   }
 
   char buffer[256];
   snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
-  server.send(200, "text/html;charset=utf-8", buffer);
+  if (server.client().connected()) {
+    server.send(200, "text/html;charset=utf-8", buffer);
+  }
   DEBUG(buffer);
 
   if (gh_updater.doUpdate()) {
@@ -559,7 +563,9 @@ void loop() {
     uint32_t heap = ESP.getFreeHeap();
 
     bool validData =
-      ensureConnected() && updateSystemData() && updateSolarForecast() ; // && updateBoilerData();
+      ensureConnected() && updateSystemData() && updateSolarForecast();
+
+    updateBoilerData();
 
     updateSwitch(validData);
 
