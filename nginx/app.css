@@ -148,6 +148,7 @@ input {
   grid-template-columns: 75% 25%;
   align-items: center;
   gap: 4px;
+  justify-items: center;
 }
 
 .battery-container {
@@ -174,6 +175,12 @@ input {
   display: none;
   color: #d1050c;
   overflow-wrap: anywhere;
+  ul{
+    padding: 4px;
+  }
+  li{
+    list-style: none;
+  }
 }
 
 .events {
