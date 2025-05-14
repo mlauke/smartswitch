@@ -47,7 +47,7 @@ function fetchStatus() {
       }
       const errors = json["errors"];
       if (errors !== undefined) {
-        renderLog(document.getElementById("errorLog"), errors, "span");
+        renderLog(document.getElementById("errorLog"), errors, "li");
         document.getElementById("errors").style.display = errors.length ? "block" : "none";
       }
     }

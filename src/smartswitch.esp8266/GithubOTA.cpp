@@ -44,7 +44,7 @@ bool GithubOTA::checkUpdate(const char* current_release_tag) {
       Serial.printf("expected: [%s], Type: [%s]\n", update_filename, update_type);
 
       if (strcmp(asset_type, update_type) == 0 && strcmp(asset_name, update_filename) == 0) {
-        download_url = asset_url;
+        download_url = String(asset_url);
 
         Serial.println("Update URL: " + download_url);
 

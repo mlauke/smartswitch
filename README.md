@@ -39,6 +39,7 @@ Rth = (RqJC Junction to case) + (Rkühlkörper) = 1°C/W + Rheatsink => Rheatsin
     - if boilder temp. is alread yreached
   - feat: measure consumption avg per hour and week day and save to config for better long term approximation
   - feat: calibrate load automatically
+  - feat: below cap min but Production increases and remaining capacity is enough to drive load - but be aware that cap_min is never reached at this time
 - hardware
   - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power
   -

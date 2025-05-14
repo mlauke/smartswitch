@@ -9,9 +9,11 @@
 
 <body>
   <h1>Sonnen SmartSwitch <span class="release" name="release_tag"></span></h1>
-  <fieldset id="errors" class="errors" style="display: none;">
+  <fieldset id="errors" class="errors">
     <legend>Error</legend>
-    <div id="errorLog"></div>
+    <div>
+      <ul id="errorLog"></ul>
+    </div>
   </fieldset>
   <fieldset>
     <legend>Status</legend>
@@ -51,30 +53,26 @@
   </form>
   <form action="/api/update" method="post">
     <fieldset>
-      <legend>Boiler</legend>
+      <legend>Hot Water System</legend>
       <div class="fg">
         <div>Device:</div>
-        <div class="value" name="bs_devid" readonly></div>
+        <div class="value" name="bs_devid"></div>
       </div>
       <div class="fg">
-        <label for="bs_t_cur">T (°C):</label>
-        <input id="bs_t_cur" name="bs_t_cur" readonly>
+        <div>T<sub>cur</sub> (°C):</div>
+        <div class="value" name="bs_t_cur"></div>
       </div>
       <div class="fg">
-        <label for="bs_t_nom">T<sub>nom</sub> (°C):</label>
-        <input id="bs_t_nom" name="bs_t_nom" maxlength="4">
+        <div>T<sub>nom</sub> (°C):</div>
+        <div class="value" name="bs_t_nom"></div>
       </div>
       <div class="fg">
-        <label for="bs_t_min">T<sub>min</sub> (°C):</label>
-        <input id="bs_t_min" name="bs_t_min">
+        <div>T<sub>min</sub> (°C):</div>
+        <div class="value" name="bs_t_min"></div>
       </div>
       <div class="fg">
-        <label for="bs_t_max">T<sub>max</sub> (°C):</label>
-        <input id="bs_t_max" name="bs_t_max">
-      </div>
-      <div class="fg">
-        <div></div>
-        <button type="submit" name="boiler" value="Update">Update</button>
+        <div>T<sub>max</sub> (°C):</div>
+        <div class="value" name="bs_t_max"></div>
       </div>
     </fieldset>
   </form>

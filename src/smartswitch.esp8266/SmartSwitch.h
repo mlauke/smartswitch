@@ -35,6 +35,8 @@
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 
+#define CONFIGFILE "/config.json"
+
 //#define DEBUG_ENABLED
 #ifdef DEBUG_ENABLED
 #define DEBUG(...) Serial.printf(__VA_ARGS__)

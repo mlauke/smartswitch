@@ -51,7 +51,7 @@ void saveConfigCallback() {
 }
 
 #define HOSTNAME "smartswitch"
-#define RELEASE_TAG "v000"
+#define RELEASE_TAG "-"
 
 void setup() {
   Serial.begin(SERIAL_BAUDRATE);
@@ -95,6 +95,10 @@ void setup() {
     }
   }
 
+  if (config.update_startup) {
+    handleGithubUpdate();
+  }
+
   WiFi.hostname(config.hostname);
   MDNS.begin(config.hostname);
 
@@ -111,9 +115,6 @@ void setup() {
 
   ESPhttpUpdate.onStart(onOTABegin);
   ESPhttpUpdate.onProgress(onOTAProgress);
-  if (config.update_startup) {
-    handleGithubUpdate();
-  }
 
   server.begin();  // Actually start the server
   server.keepAlive(false);
@@ -472,7 +473,7 @@ void handleGithubUpdate() {
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (!gh_updater.checkUpdate(config.release_tag)) {
-    if (server.client().connected()) {
+    if (server.client() && server.client().connected()) {
       server.send(404, "text/plain", "No Update found");
     }
     return;
@@ -480,7 +481,7 @@ void handleGithubUpdate() {
 
   char buffer[256];
   snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
-  if (server.client().connected()) {
+  if (server.client() && server.client().connected()) {
     server.send(200, "text/html;charset=utf-8", buffer);
   }
   DEBUG(buffer);
@@ -691,11 +692,11 @@ bool updateSwitch(bool validData) {
   bool desiredState = validData
                       //                      && ((systemData.switchEnabled)
                       //                        || (!systemData.switchEnabled));
-                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
-                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                  // if surplus (waste) exceeds load
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                // if load enabled and still grid feed in
-                          || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > (config.loadPower_W >> 1))
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));  // forecast battery capacity and be aware of discharge allowed
+                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)           // aware of max system power (production + max inverter power)
+                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                           // if surplus (waste) exceeds load
+                          || (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                         // if load enabled and still grid feed in
+                          || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > (config.loadPower_W >> 1))  // if we load
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));                                                    // forecast battery capacity and be aware of discharge allowed
 
 
   if (desiredState) {                                                                                   // on?
@@ -825,8 +826,12 @@ bool loadConfig() {
   }
 
   JsonDocument json;
-  deserializeJson(json, f);
+  DeserializationError error = deserializeJson(json, f);
   f.close();
+
+  if (error) {
+    return false;
+  }
 
   Serial.println("Config loaded:");
   serializeJsonPretty(json, Serial);

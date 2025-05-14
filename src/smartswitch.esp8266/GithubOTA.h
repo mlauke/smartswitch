@@ -7,7 +7,6 @@
 #define UPDATE_URL      "/repos/mlauke/smartswitch/releases/latest"
 #define UPDATE_TYPE     "application/gzip"
 #define UPDATE_FILENAME "smartswitch.esp8266.ino.bin.gz"
-#define CONFIGFILE      "/config.bin"
 
 class GithubOTA
 {
