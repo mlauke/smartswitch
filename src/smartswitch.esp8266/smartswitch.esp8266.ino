@@ -191,7 +191,7 @@ bool updateSolarForecast() {
 
     String solarUrl = strstr(config.hostname, "-dev") == NULL ? URL_SOLAR_FORECAST : URL_SOLAR_FORECAST_DEV;
     char url[128];
-    snprintf(url, sizeof(url), URL_SOLAR_FORECAST, config.lat, config.lon, config.az, config.dec, config.kWp);
+    snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
     if (restClient.fetch(String(url), doc)) {
 

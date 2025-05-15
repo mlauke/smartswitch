@@ -148,12 +148,12 @@ input {
   grid-template-columns: 75% 25%;
   align-items: center;
   gap: 4px;
-  justify-items: center;
 }
 
 .battery-container {
   text-align: center;
   font-family: Arial, sans-serif;
+  justify-self: center;
 }
 
 .battery {
