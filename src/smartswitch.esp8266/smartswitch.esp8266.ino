@@ -184,7 +184,7 @@ void configDefaults() {  // init config struct with default values
 bool updateSolarForecast() {
 
   long ms = millis();
-  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL) < ms)) {
+  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL_MS) < ms)) {
 
     RestClient restClient;
     JsonDocument doc;
@@ -200,7 +200,7 @@ bool updateSolarForecast() {
       for (JsonPair entry : doc["result"].as<JsonObject>()) {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
-        Serial.printf("%u %u ", ts, wh);
+        //Serial.printf("%u %u \n", ts, wh);
         if (i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0])) {
           systemData.pv_forecast_wh_h[i][0] = ts;
           systemData.pv_forecast_wh_h[i][1] = wh;
@@ -542,15 +542,20 @@ bool updateBoilerData() {
   static long lastUpdate = 0;
 
   long ms = millis();
-  if (lastUpdate == 0 || ms > lastUpdate + 10000) {
+  if (lastUpdate == 0 || ms > lastUpdate + BOILER_UPDATE_INTERVAL_MS) {
     lastUpdate = ms;
     if (lpb->update()) {
-      systemData.boiler_T_cur = lpb->getBoilerTemperature();
-      systemData.boiler_T_nom = lpb->getBoilerTemperatureNom();
-      systemData.boiler_T_min = lpb->getBoilerTemperatureMin();
-      systemData.boiler_T_max = lpb->getBoilerTemperatureMax();
+
+      boilder_t boilerData;
+
+      lpb->getBoilerData(&boilerData);
+
+      systemData.boiler_T_cur = boilerData.t_cur;
+      systemData.boiler_T_nom = boilerData.t_nom;
+      systemData.boiler_T_min = boilerData.t_min;
+      systemData.boiler_T_max = boilerData.t_max;
     } else {
-      putBoilerError("Could not update boiler data");
+      putBoilerError("Could not update boiler data.");
       return false;
     }
   }
@@ -564,9 +569,7 @@ void loop() {
     uint32_t heap = ESP.getFreeHeap();
 
     bool validData =
-      ensureConnected() && updateSystemData() && updateSolarForecast();
-
-    updateBoilerData();
+      ensureConnected() && updateSystemData() && updateSolarForecast() && updateBoilerData();
 
     updateSwitch(validData);
 
@@ -689,15 +692,22 @@ bool updateSwitch(bool validData) {
 
   static uint8_t inverterLatencyCnt = 0;
 
-  bool desiredState = validData
-                      //                      && ((systemData.switchEnabled)
-                      //                        || (!systemData.switchEnabled));
-                      && (systemData.prod_W + systemData.inv_max_w - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)           // aware of max system power (production + max inverter power)
-                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                           // if surplus (waste) exceeds load
-                          || (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                         // if load enabled and still grid feed in
-                          || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > (config.loadPower_W >> 1))  // if we load
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));                                                    // forecast battery capacity and be aware of discharge allowed
+  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;
+  float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
+  bool desiredState = validData
+                      && ((systemData.switchEnabled && systemData.boiler_T_cur < temp_off)
+                          || (!systemData.switchEnabled && systemData.boiler_T_cur < temp_on))
+                      && (systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
+                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
+                          //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
+                          || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));                                                                                        // forecast battery capacity and be aware of discharge allowed
+
+
+  if (systemData.switchEnabled != desiredState) {
+    putEvent(String("switch ") + (desiredState ? "on" : "off") + " - ");
+  }
 
   if (desiredState) {                                                                                   // on?
     if (systemData.switchEnabled) {                                                                     // already on?
@@ -806,9 +816,9 @@ bool batteryCapacityTargetFulfilled() {
     }
   }
 
-  uint16_t hysterese_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
-  putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysterese_Wh + "Wh (hys) at " + toLocalDate(ts));
-  return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysterese_Wh));
+  uint16_t hysteresis_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
+  putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysteresis_Wh + "Wh (hys) at " + toLocalDate(ts));
+  return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysteresis_Wh));
 }
 
 bool loadConfig() {

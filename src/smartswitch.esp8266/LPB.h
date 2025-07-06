@@ -43,6 +43,14 @@ typedef struct {
   char name[18];
 } device_map;
 
+
+typedef struct {
+  float t_cur;
+  float t_nom;
+  float t_min;
+  float t_max;
+} boilder_t;
+
 class LPB {
 public:
   LPB(uint8_t rx, uint8_t tx, uint8_t addr = 0x42, uint8_t d_addr = 0x00);
@@ -59,17 +67,11 @@ public:
   bool GetMessage(byte* msg);
   void print(byte* msg);
 
-  float getBoilerTemperature();
-  float getBoilerTemperatureNom();
-  float getBoilerTemperatureMin();
-  float getBoilerTemperatureMax();
+  boilder_t * getBoilerData(boilder_t *);
 
 private:
-  float bs_T_cur;
-  float bs_T_nom;
-  float bs_T_max;
-  float bs_T_min;
 
+  boilder_t boilderData;
 
   uint8_t getBusAddr();
   uint8_t getBusDest();

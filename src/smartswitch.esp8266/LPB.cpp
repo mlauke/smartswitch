@@ -199,18 +199,14 @@ float LPB::getTemperature(float line, float* r) {
   return NAN;
 }
 
-// TODO
-float LPB::getBoilerTemperature() {
-  return bs_T_cur;
-}
-float LPB::getBoilerTemperatureMax() {
-  return bs_T_max;
-}
-float LPB::getBoilerTemperatureMin() {
-  return bs_T_min;
-}
-float LPB::getBoilerTemperatureNom() {
-  return bs_T_nom;
+boilder_t* LPB::getBoilerData(boilder_t *p){
+
+  p->t_cur = boilderData.t_cur;
+  p->t_max = boilderData.t_max;
+  p->t_min = boilderData.t_min;
+  p->t_nom = boilderData.t_nom;
+
+  return p;
 }
 
 bool LPB::update() {
@@ -219,10 +215,10 @@ bool LPB::update() {
     return false;
   }
 
-  if (getTemperature(8310, &bs_T_cur) == NAN
-      || getTemperature(1610, &bs_T_nom) == NAN
-      || getTemperature(1612, &bs_T_min) == NAN
-      || getTemperature(1645, &bs_T_max) == NAN) {
+  if (getTemperature(8310, &boilderData.t_cur) == NAN
+      || getTemperature(1610, &boilderData.t_nom) == NAN
+      || getTemperature(1612, &boilderData.t_min) == NAN
+      || getTemperature(1645, &boilderData.t_max) == NAN) {
     return false;
   }
   return true;
