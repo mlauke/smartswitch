@@ -199,7 +199,7 @@ float LPB::getTemperature(float line, float* r) {
   return NAN;
 }
 
-boilder_t* LPB::getBoilerData(boilder_t *p){
+boilder_t* LPB::getBoilerData(boilder_t* p) {
 
   p->t_cur = boilderData.t_cur;
   p->t_max = boilderData.t_max;
@@ -281,6 +281,7 @@ bool LPB::GetDevId() {
               dev_lookup[i].dev_oc = (msg[13 + offset] << 8) + msg[14 + offset];
               dev_lookup[i].dev_serial = (msg[15 + offset] << 24) + (msg[16 + offset] << 16) + (msg[17 + offset] << 8) + (msg[18 + offset]);
               dev_lookup[i].name[0] = '\0';
+              dev_lookup[i].name[17] = '\0';
               break;
             }
           }
@@ -289,6 +290,7 @@ bool LPB::GetDevId() {
       }
       for (uint i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
         if (dev_lookup[i].dev_id == 0xFF) break;
+
         destAddr = dev_lookup[i].dev_id;
         if (Send(TYPE_QUR, 0x053D0001, msg, tx_msg, NULL, 0, true) == BUS_OK) {
           printTelegram(tx_msg, -1);

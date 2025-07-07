@@ -121,7 +121,11 @@ void setup() {
   Serial.println("HTTP server started");
 
   lpb->enableInterface();
-  lpb->GetDevId();
+
+  uint8_t retry = 0;
+  while (!lpb->GetDevId() && ++retry <= 3) {
+    putBoilerError(String("No device found, retry ") + retry);
+  }
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
@@ -372,7 +376,7 @@ void handleStatus() {
   char devid[40] = "unknown";
   device_map* device = lpb->getDestDevice();
   if (device != NULL) {
-    snprintf(devid, sizeof(devid), "%s (%d/%d) - %d", device->name, device->dev_fam, device->dev_var, device->dev_id);
+    snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
   data["bs_devid"] = devid;
 
@@ -554,6 +558,8 @@ bool updateBoilerData() {
       systemData.boiler_T_nom = boilerData.t_nom;
       systemData.boiler_T_min = boilerData.t_min;
       systemData.boiler_T_max = boilerData.t_max;
+
+      clearBoilerError();
     } else {
       putBoilerError("Could not update boiler data.");
       return false;
@@ -632,6 +638,8 @@ bool fetchData(String uri, JsonDocument& doc) {
     if (!r) {
       putBatteryError(restClient.lastError());
     }
+  } else {
+    putBatteryError("Sonnen Battery not properly configured!");
   }
   return r;
 }
@@ -692,6 +700,7 @@ bool updateSwitch(bool validData) {
 
   static uint8_t inverterLatencyCnt = 0;
 
+  uint16_t hysteresis_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
   float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
@@ -701,12 +710,12 @@ bool updateSwitch(bool validData) {
                       && (systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
                       && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
                           //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
-                          || (systemData.cap_bat_Wh > config.cap_bat_min_Wh && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled()));                                                                                        // forecast battery capacity and be aware of discharge allowed
+                          || (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
+                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)));                                                                                             // forecast battery capacity and be aware of discharge allowed
 
 
   if (systemData.switchEnabled != desiredState) {
-    putEvent(String("switch ") + (desiredState ? "on" : "off") + " - ");
+    putEvent(String("switch ") + (desiredState ? "on" : "off") + ": ");
   }
 
   if (desiredState) {                                                                                   // on?
@@ -779,7 +788,7 @@ static char* toDate(uint32_t utc_ts, uint16_t offset) {
   return tsfmt;
 }
 
-bool batteryCapacityTargetFulfilled() {
+bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh) {
 
   if (systemData.pv_forecast_wh_h[0][0] == 0) {
     return false;  // no solar forecast data, assume battery will become empty
@@ -816,7 +825,6 @@ bool batteryCapacityTargetFulfilled() {
     }
   }
 
-  uint16_t hysteresis_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
   putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysteresis_Wh + "Wh (hys) at " + toLocalDate(ts));
   return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysteresis_Wh));
 }

@@ -59,20 +59,20 @@
         <div class="value" name="bs_devid"></div>
       </div>
       <div class="fg">
-        <div>T<sub>cur</sub> (°C):</div>
-        <div class="value" name="bs_t_cur"></div>
+        <div>T<sub>current</sub></div>
+        <div class="value"><span name="bs_t_cur"></span> °C</div>
       </div>
       <div class="fg">
-        <div>T<sub>nom</sub> (°C):</div>
-        <div class="value" name="bs_t_nom"></div>
+        <div>T<sub>nominal</sub></div>
+        <div class="value"><span name="bs_t_nom"></span> °C</div>
       </div>
       <div class="fg">
-        <div>T<sub>min</sub> (°C):</div>
-        <div class="value" name="bs_t_min"></div>
+        <div>T<sub>min</sub></div>
+        <div class="value"><span name="bs_t_min"></span> °C</div>
       </div>
       <div class="fg">
-        <div>T<sub>max</sub> (°C):</div>
-        <div class="value" name="bs_t_max"></div>
+        <div>T<sub>max</sub></div>
+        <div class="value"><span name="bs_t_max"></span> °C</div>
       </div>
     </fieldset>
   </form>
@@ -141,8 +141,7 @@
   <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
     <fieldset>
       <legend>Software Update</legend>
-      Release: <span name="release_tag"></span><br />
-      Git Release: <a href="/api/update?update">Update Check</a><br />
+      Git Release: <span name="release_tag"></span> - <a href="/api/update?update">Update Check</a><br />
       Update-Check on Startup:
       <input type="radio" name="update_startup" value="0">Off
       <input type="radio" name="update_startup" value="1">On
