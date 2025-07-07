@@ -54,8 +54,10 @@ void saveConfigCallback() {
 #define RELEASE_TAG "-"
 
 void setup() {
-  Serial.begin(SERIAL_BAUDRATE);
+  configDefaults();
+  systemDefaults();
 
+  Serial.begin(SERIAL_BAUDRATE);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(GPIO_ID_PIN(PIN_SSR), OUTPUT);
 
@@ -65,8 +67,10 @@ void setup() {
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
-  configDefaults();
-  systemDefaults();
+  WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
+  wifiManager.addParameter(&custom_hostname);
+  wifiManager.autoConnect("SmartSwitchAP");
+  wifiManager.setConfigPortalTimeout(10);
 
   Serial.println("Mounting FS...");
   if (LittleFS.begin()) {
@@ -80,11 +84,6 @@ void setup() {
 
     saveConfig();
   }
-
-  WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
-  wifiManager.addParameter(&custom_hostname);
-  wifiManager.autoConnect("SmartSwitchAP");
-  wifiManager.setConfigPortalTimeout(8);
 
   if (saveConfigFile) {
     String lcHostname = String(custom_hostname.getValue());
@@ -531,7 +530,7 @@ void putLog(logEntry& log, const char* event) {
   log.msg.clear();
   log.msg.concat(event);
   log.ts = systemData.ts;
-  Serial.printf("log() %u %s\n", systemData.ts, event);
+  Serial.printf("log ts=%u: %s\n", systemData.ts, event);
 }
 
 void putEvent(const char* event) {
