@@ -23,26 +23,39 @@
 #ifndef SMARTSWITCH_H
 #define SMARTSWITCH_H
 
+#include <stdint.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Ticker.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
+//#include <ESPAsyncWebServer.h>
+
+#include "debug.h"
+
+#ifdef ESP32
+#include <ESPmDNS.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Arduino.h>
+#include <esp_task_wdt.h>
+
+#define LED_BUILTIN GPIO_NUM_5
+
+#elif defined(ESP8266)
+
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
 
-#define CONFIGFILE "/config.json"
+#define LED_BUILTIN 2
 
-//#define DEBUG_ENABLED
-#ifdef DEBUG_ENABLED
-#define DEBUG(...) Serial.printf(__VA_ARGS__)
-#else
-#define DEBUG(...)
 #endif
+
+#define CONFIGFILE "/config.json"
 
 #define SERIAL_BAUDRATE 115200
 #define LPB_BAUDRATE 4800
@@ -51,7 +64,7 @@
 #define PIN_LPB_TX 5  // GPIO5 (D1)
 #define PIN_LPB_RX 4  // GPIO4 (D2)
 
-#define PIN_SSR 13    // GPIO13 (D7)
+#define PIN_SSR 13  // GPIO13 (D7)
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"

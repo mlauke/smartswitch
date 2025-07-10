@@ -109,13 +109,10 @@ function closeLog() {
   logOverlay !== null && logOverlay.classList.remove("active");
 }
 
-fetchData("/api/data");
-fetchStatus();
-
 document.querySelectorAll("input[type='radio']").forEach(radio => {
   radio.addEventListener("change", (event) => {
     const form = radio.closest("form");
-    let formData = new FormData(form);
+    const formData = new FormData(form);
     fetch("/api/update", {
       method: "POST",
       headers: {
@@ -125,3 +122,6 @@ document.querySelectorAll("input[type='radio']").forEach(radio => {
     });
   });
 });
+
+fetchData("/api/data");
+fetchStatus();

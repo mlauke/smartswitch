@@ -15,7 +15,7 @@ public:
 
   GithubOTA(const char * , const char * , const char * , const char * );
   bool checkUpdate(const char *);
-  bool doUpdate();
+  bool doUpdate(void (*fnOTABegin)(void));
   String getUpdateError();
 
 protected:

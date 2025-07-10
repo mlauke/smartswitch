@@ -1,6 +1,4 @@
-#include <cmath>
 #include "LPB.h"
-#include <SoftwareSerial.h>
 
 #define printlnToDebug(format) \
   { \
@@ -110,24 +108,36 @@ LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) {
   offset = 4;
   pl_start = 13;
 
-  for (uint i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
     dev_lookup[i].dev_fam = 0xFF;
     dev_lookup[i].dev_var = 0xFF;
     dev_lookup[i].dev_id = 0xFF;
     dev_lookup[i].dev_oc = 0xFF;
     dev_lookup[i].name[0] = '\0';
+    dev_lookup[i].name[17] = '\0';
   }
 }
 
 void LPB::enableInterface() {
+
+#ifdef ESP32
+  serial = new HardwareSerial(2);  // UART2
+  ((HardwareSerial*)serial)->begin(LPB_BAUDRATE, SERIAL_8N1, rx_pin, tx_pin, false);
+#elif defined(ESP8266)
   serial = new SoftwareSerial();
   ((SoftwareSerial*)serial)->begin(LPB_BAUDRATE, SWSERIAL_8O1, rx_pin, tx_pin, false);
-  Serial.println("enableInterface()");
+#endif
+  Serial.println("LPB interface enabled.");
 }
 
 void LPB::disableInterface() {
+#ifdef ESP32
+  ((HardwareSerial*)serial)->flush();
+  ((HardwareSerial*)serial)->end();
+#elif defined(ESP8266)
   ((SoftwareSerial*)serial)->flush();
   ((SoftwareSerial*)serial)->end();
+#endif
 }
 
 
@@ -152,7 +162,7 @@ float LPB::toFIXPOINT(byte* msg, cmd_t cmd) {
     data_len = msg[getLen_idx()] - 7;  // for yet unknow telegram types 0x12 to 0x15
   }
 
-  Serial.printf("dval len %d %d %.8x\n", data_len, cmd.type, cmd.flags);
+  Serial.printf("dval len %d %d 0x%08x\n", data_len, cmd.type, cmd.flags);
   if (data_len == 3 || data_len == 5) {
     if (msg[getPl_start()] == 0 || (cmd.flags & FL_SPECIAL_INF)) {
 
@@ -241,7 +251,7 @@ uint8_t LPB::getPl_start() {
 }
 
 device_map* LPB::getDestDevice() {
-  for (uint i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
     if (dev_lookup[i].dev_id == getBusDest()) {
       return &dev_lookup[i];
     }
@@ -269,7 +279,7 @@ bool LPB::GetDevId() {
           if (msg[4 + offset] != TYPE_INF || msg[2] != getBusAddr()) {
             break;
           }
-          for (uint i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+          for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
             if (dev_lookup[i].dev_id == msg[3]) {  // dest
               //                found = true;
               break;
@@ -288,7 +298,7 @@ bool LPB::GetDevId() {
         }
         delay(1);
       }
-      for (uint i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+      for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
         if (dev_lookup[i].dev_id == 0xFF) break;
 
         destAddr = dev_lookup[i].dev_id;
@@ -313,7 +323,7 @@ bool LPB::GetDevId() {
     }
     destAddr = save_destAddr;
   }
-  for (uint i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
     if (dev_lookup[i].dev_id == getBusDest()) {
       my_dev_fam = dev_lookup[i].dev_fam;
       my_dev_var = dev_lookup[i].dev_var;

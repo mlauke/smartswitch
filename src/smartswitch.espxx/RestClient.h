@@ -1,7 +1,17 @@
 #ifndef _RESTCLIENT_H
 #define _RESTCLIENT_H
 
-#include "SmartSwitch.h"
+#include <ArduinoJson.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+
+#ifdef ESP32
+  #include <HTTPClient.h>
+#elif defined(ESP8266)
+  #include <ESP8266HTTPClient.h>
+#endif
+
+#include "debug.h"
 
 #define REQUEST_TIMEOUT 8000
 
@@ -15,22 +25,9 @@ public:
   int lastResponseCode();
   bool fetch(String url, JsonDocument& doc, String hName = "", String hValue = "");
 
-protected:
-  WiFiClientSecure mWiFiClientSecure;
-  WiFiClient mWiFiClient;
-
 private:
   String _lastError;
   int _lastResponseCode;
-
-  WiFiClient& getClient(String url) {
-
-    if (url.startsWith("https")) {
-      mWiFiClientSecure.setInsecure();
-      return (WiFiClient&)mWiFiClientSecure;
-    }
-    return mWiFiClient;
-  }
 };
 
 #endif

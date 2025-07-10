@@ -19,9 +19,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-
-#include "ESP8266HTTPClient.h"
 #include "RestClient.h"
+#include "WiFiUtil.h"
 
 RestClient::RestClient() {
 }
@@ -38,9 +37,13 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
 
   HTTPClient http;
 
+  WiFiClient* wifiClient = newWiFiClient(url);
+
   DEBUG("url: '%s' - hdr: '%s' : '%s'\n", url.c_str(), hName.c_str(), hValue.c_str());
 
-  bool res = http.begin(getClient(url), url);
+  _lastError.clear();
+
+  bool res = http.begin(*wifiClient, url);
   if (res) {
 
     http.setTimeout(REQUEST_TIMEOUT);
@@ -52,20 +55,22 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
     http.addHeader("accept", "application/json", true, true);
 
     _lastResponseCode = http.GET();
-    if ((res = _lastResponseCode == 200)) {
+    if ((res = _lastResponseCode == HTTP_CODE_OK)) {
       DeserializationError error = deserializeJson(doc, http.getString());
       if (error) {
-        _lastError = "json error: " + url + " - " + String(error.c_str());
+        _lastError.concat("json error: " + url + " - " + error.c_str());
         Serial.println(_lastError);
         Serial.println(http.getString());
       }
       res = error == DeserializationError::Ok;
     } else {
-      _lastError = url + " code: " + _lastResponseCode + " " + http.errorToString(_lastResponseCode);
+      _lastError.concat(url + " code: " + _lastResponseCode + " " + http.errorToString(_lastResponseCode));
       Serial.println(_lastError);
     }
   }
   http.end();
+
+  free(wifiClient);
 
   return res;
 }

@@ -33,8 +33,14 @@
 #include "app_icon.h"
 #include "index_html.h"
 
-static WiFiManager wifiManager;
+#ifdef ESP32
+static WebServer server(WEBSERVER_PORT);
+#elif defined(ESP8266)
 static ESP8266WebServer server(WEBSERVER_PORT);
+#endif
+
+static LPB* lpb;
+static WiFiManager wifiManager;
 static Ticker timer;
 static volatile bool doUpdateFlag = false;
 static systemDataStruct systemData;
@@ -44,7 +50,6 @@ static bool saveConfigFile = false;
 int stdOffset = 3600;  // 1h utc offset Europe/Berlin
 int dstOffset = 3600;  // 1h suummer time offset
 
-LPB* lpb;
 
 void saveConfigCallback() {
   saveConfigFile = true;
@@ -59,7 +64,7 @@ void setup() {
 
   Serial.begin(SERIAL_BAUDRATE);
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(GPIO_ID_PIN(PIN_SSR), OUTPUT);
+  pinMode(PIN_SSR, OUTPUT);
 
   lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, 2, 0);
 
@@ -98,7 +103,7 @@ void setup() {
     handleGithubUpdate();
   }
 
-  WiFi.hostname(config.hostname);
+  WiFi.setHostname(config.hostname);
   MDNS.begin(config.hostname);
 
   server.on("/", handleRoot);
@@ -112,42 +117,36 @@ void setup() {
 
   updateLocation();
 
-  ESPhttpUpdate.onStart(onOTABegin);
-  ESPhttpUpdate.onProgress(onOTAProgress);
-
   server.begin();  // Actually start the server
-  server.keepAlive(false);
+  //server.keepAlive(false);
   Serial.println("HTTP server started");
 
   lpb->enableInterface();
 
   uint8_t retry = 0;
-  while (!lpb->GetDevId() && ++retry <= 3) {
+  while (!lpb->GetDevId() && retry++ < 3) {
     putBoilerError(String("No device found, retry ") + retry);
   }
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
+#ifdef ESP32
+  //esp_task_wdt_init({ 20000, 0, true });
+#elif defined(ESP8266)
   ESP.wdtEnable(20000);
+#endif
 }
 
 void timerCallback() {
   doUpdateFlag = true;
 }
 
-void onOTAProgress(size_t current, size_t final) {
-  static long ota_progress_millis = 0;
-  // Log every 1 second
-  if (millis() - ota_progress_millis > 1000) {
-    ota_progress_millis = millis();
-    Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
-  }
-}
-
 void onOTABegin() {
   timer.detach();
-  ESP.wdtDisable();
   lpb->disableInterface();
+#if defined(ESP8266)
+  ESP.wdtDisable();
+#endif
 }
 
 void onOTAEnd(bool success) {
@@ -164,7 +163,12 @@ void systemDefaults() {
 }
 
 void configDefaults() {  // init config struct with default values
+
+#ifdef ESP32
+  setConfigStr(config, hostname, WiFi.getHostname());
+#elif defined(ESP8266)
   setConfigStr(config, hostname, WiFi.hostname().c_str());
+#endif
   setConfigStr(config, release_tag, RELEASE_TAG);
   config.sonnenHostname[0] = '\0';
   config.sonnenApiToken[0] = '\0';
@@ -203,7 +207,6 @@ bool updateSolarForecast() {
       for (JsonPair entry : doc["result"].as<JsonObject>()) {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
-        //Serial.printf("%u %u \n", ts, wh);
         if (i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0])) {
           systemData.pv_forecast_wh_h[i][0] = ts;
           systemData.pv_forecast_wh_h[i][1] = wh;
@@ -220,7 +223,7 @@ bool updateSolarForecast() {
     }
     systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
   }
-  return true;
+  return true;  //always true, if there are no forecast the calculation may detect that there is enough surplus to be able to switch the load on
 }
 
 void updateLocation() {
@@ -455,7 +458,6 @@ void handleAPI() {
 
   server.sendHeader("location", "/");
   server.send(303);
-  server.client().flush();
 
   if (doRestart) {
     restart();
@@ -473,6 +475,7 @@ void restart() {
 }
 
 void handleGithubUpdate() {
+
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (!gh_updater.checkUpdate(config.release_tag)) {
@@ -489,7 +492,7 @@ void handleGithubUpdate() {
   }
   DEBUG(buffer);
 
-  if (gh_updater.doUpdate()) {
+  if (gh_updater.doUpdate(onOTABegin)) {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig()) {
       Serial.println("Error saving config");
@@ -530,7 +533,7 @@ void putLog(logEntry& log, const char* event) {
   log.msg.clear();
   log.msg.concat(event);
   log.ts = systemData.ts;
-  Serial.printf("log ts=%u: %s\n", systemData.ts, event);
+  Serial.printf("log %u: %s\n", systemData.ts, event);
 }
 
 void putEvent(const char* event) {
@@ -584,20 +587,24 @@ void loop() {
   }
   server.handleClient();
 
+#ifdef ESP32
+  //esp_task_wdt_reset();
+#elif defined(ESP8266)
   ESP.wdtFeed();
+#endif
 }
 
 void buildInLED(bool onOff) {
-  short s = ((onOff ^ 0x1) & 0x01);
+  short s = onOff ? 0 : 1;
   digitalWrite(LED_BUILTIN, s);
 }
 
 void statusLED(int status) {
   int d = 1000 - (100 * (status % 10));
   for (int i = 0; i < status; i++) {
-    digitalWrite(LED_BUILTIN, LOW);
+    buildInLED(true);
     delay(d);
-    digitalWrite(LED_BUILTIN, HIGH);
+    buildInLED(false);
     delay(d);
   }
 }
@@ -613,12 +620,12 @@ bool ensureConnected() {
     }
     Serial.println();
 
-    status = WiFi.status();  // refresh
+    status = WiFi.status();
     statusLED(status);
-    if (status == WL_WRONG_PASSWORD) {
-      Serial.printf("wrong password: status: %d\n", status);
-    } else if (status == WL_CONNECTED) {
+    if (status == WL_CONNECTED) {
       Serial.printf("Connected. IP address: %s status: %d\n", WiFi.localIP().toString().c_str(), status);
+    } else {
+      Serial.printf("Wifi Error: %d\n", status);
     }
   }
   return status == WL_CONNECTED;
@@ -630,7 +637,7 @@ bool fetchData(String uri, JsonDocument& doc) {
 
   RestClient restClient;
 
-  if (config.sonnenHostname && strlen(config.sonnenHostname) && config.sonnenApiToken && strlen(config.sonnenApiToken)) {
+  if (strlen(config.sonnenHostname) && strlen(config.sonnenApiToken)) {
     char url[128];
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
     r = restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
@@ -731,7 +738,7 @@ bool updateSwitch(bool validData) {
 
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1);  // combine with mode
 
-  Serial.printf("ts: %s %u usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   toggleSwitch(systemData.switchEnabled);
 
@@ -739,7 +746,7 @@ bool updateSwitch(bool validData) {
 }
 
 void toggleSwitch(bool switchEnabled) {
-  digitalWrite(GPIO_ID_PIN(PIN_SSR), switchEnabled ? HIGH : LOW);
+  digitalWrite(PIN_SSR, switchEnabled ? HIGH : LOW);
   buildInLED(switchEnabled);
 }
 
@@ -770,7 +777,7 @@ bool isDST(struct tm* timeinfo) {
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
-static char* toLocalDate(uint32 utc_ts) {
+static char* toLocalDate(uint32_t utc_ts) {
   return toDate(utc_ts, (stdOffset + systemData.dstOffset));
 }
 

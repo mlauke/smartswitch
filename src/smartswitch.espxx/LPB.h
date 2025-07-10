@@ -15,12 +15,20 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <Stream.h>
+#include <Arduino.h>
 #include "LPB_defs.h"
 #include "LPB_LANG_de.h"
 
-typedef uint8_t byte;
-typedef uint16_t word;
+#ifdef ESP32
+  #include <HardwareSerial.h>
+#elif defined(ESP8266)
+  #include <SoftwareSerial.h>
+#endif
 
+#include <cmath>
+
+typedef uint8_t byte;
+// typedef uint16_t word;
 
 typedef struct {
   uint32_t cmd;          // the command or fieldID
@@ -52,61 +60,62 @@ typedef struct {
 } boilder_t;
 
 class LPB {
-public:
-  LPB(uint8_t rx, uint8_t tx, uint8_t addr = 0x42, uint8_t d_addr = 0x00);
+  public:
 
-  void enableInterface();
-  bool GetDevId();
+    LPB(uint8_t rx, uint8_t tx, uint8_t addr = 0x42, uint8_t d_addr = 0x00);
 
-  device_map* getDestDevice();
+    void enableInterface();
+    bool GetDevId();
 
-  void disableInterface();
-  bool update();
+    device_map* getDestDevice();
 
-  int8_t Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* param = NULL, byte param_len = 0, bool wait_for_reply = true);
-  bool GetMessage(byte* msg);
-  void print(byte* msg);
+    void disableInterface();
+    bool update();
 
-  boilder_t * getBoilerData(boilder_t *);
+    int8_t Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* param = NULL, byte param_len = 0, bool wait_for_reply = true);
+    bool GetMessage(byte* msg);
+    void print(byte* msg);
 
-private:
+    boilder_t* getBoilerData(boilder_t*);
 
-  boilder_t boilderData;
+  private:
 
-  uint8_t getBusAddr();
-  uint8_t getBusDest();
-  uint8_t getPl_start();
-  uint8_t getLen_idx();
-  uint8_t offset;
-  uint8_t myAddr;
-  uint8_t destAddr;
-  uint8_t len_idx;
-  uint8_t pl_start;
-  uint8_t rx_pin;
-  uint8_t tx_pin;
+    boilder_t boilderData;
 
-  uint8_t my_dev_fam = 0;
-  uint8_t my_dev_var = 0;
-  uint16_t my_dev_oc = 0;
-  uint32_t my_dev_serial = 0;
+    uint8_t getBusAddr();
+    uint8_t getBusDest();
+    uint8_t getPl_start();
+    uint8_t getLen_idx();
+    uint8_t offset;
+    uint8_t myAddr;
+    uint8_t destAddr;
+    uint8_t len_idx;
+    uint8_t pl_start;
+    uint8_t rx_pin;
+    uint8_t tx_pin;
 
-  device_map dev_lookup[10];
+    uint8_t my_dev_fam = 0;
+    uint8_t my_dev_var = 0;
+    uint16_t my_dev_oc = 0;
+    uint32_t my_dev_serial = 0;
 
-  inline int8_t _send(byte* msg);
-  uint16_t CRC(byte* buffer, uint8_t length);
-  uint16_t CRC_LPB(byte* buffer, uint8_t length);
-  uint16_t _crc_xmodem_update(uint16_t crc, uint8_t data);
-  uint8_t readByte();
-  bool rx_pin_read();
-  int findLine(float line);
-  uint16_t query(float line, byte* rx_msg);  // line (ProgNr)
+    device_map dev_lookup[10];
 
-  float getTemperature(float line, float* r);
+    inline int8_t _send(byte* msg);
+    uint16_t CRC(byte* buffer, uint8_t length);
+    uint16_t CRC_LPB(byte* buffer, uint8_t length);
+    uint16_t _crc_xmodem_update(uint16_t crc, uint8_t data);
+    uint8_t readByte();
+    bool rx_pin_read();
+    int findLine(float line);
+    uint16_t query(float line, byte* rx_msg);  // line (ProgNr)
 
-  void printTelegram(byte* msg, float query_line);
-  float toFIXPOINT(byte* msg, cmd_t cmd);
+    float getTemperature(float line, float* r);
 
-  Stream* serial;  // Bus interface. Point to Software or HarwareSerial
+    void printTelegram(byte* msg, float query_line);
+    float toFIXPOINT(byte* msg, cmd_t cmd);
+
+    Stream* serial;  // Bus interface. Point to Software or HarwareSerial
 };
 
 #define DEFAULT_FLAG FL_SW_CTL_RONLY
