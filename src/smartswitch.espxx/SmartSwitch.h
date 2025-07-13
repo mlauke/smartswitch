@@ -30,7 +30,6 @@
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
-//#include <ESPAsyncWebServer.h>
 
 #include "debug.h"
 
@@ -58,20 +57,24 @@
 #define CONFIGFILE "/config.json"
 
 #define SERIAL_BAUDRATE 115200
-#define LPB_BAUDRATE 4800
 #define WEBSERVER_PORT 80
+
+#define LPB_BAUDRATE 4800
+#define LPB_ADDR_SELF 2
+#define LPB_ADDR_DEST 0
 
 #define PIN_LPB_TX 5  // GPIO5 (D1)
 #define PIN_LPB_RX 4  // GPIO4 (D2)
-
-#define PIN_SSR 13  // GPIO13 (D7)
+#define PIN_SSR 13    // GPIO13 (D7)
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
 #define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_STATUS "status"
-#define SONNEN_INVERTER_LATENCY_MS 5000  // assume latency until battery inverter compensates the load
+#define SONNEN_INVERTER_LATENCY_MS 5000  // battery inverter latency until load is compensated - sonnen battery 10 specific
 #define SONNEN_INVERTER_LATENCY_COUNT MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
+
+#define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
@@ -133,7 +136,8 @@ typedef struct {
   uint16_t tm_yday;  // day of year
   uint16_t dstOffset;
 
-  bool switchEnabled = false;
+  bool switchEnabled = false;  // state of the load switch
+
   float boiler_T_cur;
   float boiler_T_nom;
   float boiler_T_min;
@@ -157,6 +161,8 @@ typedef struct {
 
   logEntry events[16];  // event buffer
   uint8_t eventIx = 0;
+
+  uint8_t skipUpdateCountSysten;  // skip update on error count
 
   logEntry error_bs;  // last boiler system error
   logEntry error_bt;  // last battery error

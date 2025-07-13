@@ -6,6 +6,27 @@
     writelnToDebug(); \
   }
 
+
+LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) {
+  rx_pin = rx;
+  tx_pin = tx;
+  myAddr = addr;
+  destAddr = d_addr;
+
+  len_idx = 1;
+  offset = 4;
+  pl_start = 13;
+
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+    dev_lookup[i].dev_fam = 0xFF;
+    dev_lookup[i].dev_var = 0xFF;
+    dev_lookup[i].dev_id = 0xFF;
+    dev_lookup[i].dev_oc = 0xFF;
+    dev_lookup[i].name[0] = '\0';
+    dev_lookup[i].name[17] = '\0';
+  }
+}
+
 void printToDebug(const char* format) {
   Serial.print(format);
 }
@@ -98,26 +119,6 @@ const char* printError(uint16_t error) {
   return errormsgptr;
 }
 
-LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) {
-  rx_pin = rx;
-  tx_pin = tx;
-  myAddr = addr;
-  destAddr = d_addr;
-
-  len_idx = 1;
-  offset = 4;
-  pl_start = 13;
-
-  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
-    dev_lookup[i].dev_fam = 0xFF;
-    dev_lookup[i].dev_var = 0xFF;
-    dev_lookup[i].dev_id = 0xFF;
-    dev_lookup[i].dev_oc = 0xFF;
-    dev_lookup[i].name[0] = '\0';
-    dev_lookup[i].name[17] = '\0';
-  }
-}
-
 void LPB::enableInterface() {
 
 #ifdef ESP32
@@ -131,13 +132,15 @@ void LPB::enableInterface() {
 }
 
 void LPB::disableInterface() {
+  if (serial) {
 #ifdef ESP32
-  ((HardwareSerial*)serial)->flush();
-  ((HardwareSerial*)serial)->end();
+    ((HardwareSerial*)serial)->flush();
+    ((HardwareSerial*)serial)->end();
 #elif defined(ESP8266)
-  ((SoftwareSerial*)serial)->flush();
-  ((SoftwareSerial*)serial)->end();
+    ((SoftwareSerial*)serial)->flush();
+    ((SoftwareSerial*)serial)->end();
 #endif
+  }
 }
 
 

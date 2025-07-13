@@ -59,14 +59,16 @@ void saveConfigCallback() {
 #define RELEASE_TAG "-"
 
 void setup() {
+
+  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
+
   configDefaults();
   systemDefaults();
 
   Serial.begin(SERIAL_BAUDRATE);
+
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(PIN_SSR, OUTPUT);
-
-  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, 2, 0);
 
   toggleSwitch(false);
 
@@ -99,12 +101,21 @@ void setup() {
     }
   }
 
+  WiFi.setHostname(config.hostname);
+  MDNS.begin(config.hostname);
+
+  timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
+
+#ifdef ESP32
+  //esp_task_wdt_init({ 20000, 0, true });
+#elif defined(ESP8266)
+  ESP.wdtEnable(20000);
+  server.keepAlive(false);
+#endif
+
   if (config.update_startup) {
     handleGithubUpdate();
   }
-
-  WiFi.setHostname(config.hostname);
-  MDNS.begin(config.hostname);
 
   server.on("/", handleRoot);
   server.on("/favicon.ico", handleFavicon);
@@ -115,26 +126,16 @@ void setup() {
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
 
-  updateLocation();
-
   server.begin();  // Actually start the server
-  //server.keepAlive(false);
   Serial.println("HTTP server started");
 
   lpb->enableInterface();
-
   uint8_t retry = 0;
-  while (!lpb->GetDevId() && retry++ < 3) {
+  while (!lpb->GetDevId() && retry++ < 2) {
     putBoilerError(String("No device found, retry ") + retry);
   }
 
-  timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
-
-#ifdef ESP32
-  //esp_task_wdt_init({ 20000, 0, true });
-#elif defined(ESP8266)
-  ESP.wdtEnable(20000);
-#endif
+  updateLocation();
 }
 
 void timerCallback() {
@@ -142,11 +143,15 @@ void timerCallback() {
 }
 
 void onOTABegin() {
-  timer.detach();
+  Serial.println("onOTABegin() >");
+  server.close();
+  if (timer.active())
+    timer.detach();
   lpb->disableInterface();
 #if defined(ESP8266)
   ESP.wdtDisable();
 #endif
+  Serial.println("onOTABegin() <");
 }
 
 void onOTAEnd(bool success) {
@@ -160,6 +165,8 @@ void onOTAEnd(bool success) {
 void systemDefaults() {
   systemData.pv_forecast_ts = 0;
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
+  systemData.eventIx = 0;
+  systemData.skipUpdateCountSysten = 0;
 }
 
 void configDefaults() {  // init config struct with default values
@@ -417,9 +424,7 @@ void handleAPI() {
     saveConfig();
 
   } else if (server.hasArg("boiler")) {
-    //    config.boiler_T_max = MIN(85, MAX(0, server.arg("bs_t_max").toInt()));
-    //  config.boiler_T_nom = MIN(85, MAX(0, server.arg("bs_t_nom").toInt()));
-    //saveConfig();
+    // ?
 
   } else if (server.hasArg("sonnen")) {
     setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
@@ -428,6 +433,7 @@ void handleAPI() {
     config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
     config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
     saveConfig();
+    systemData.skipUpdateCountSysten = 0;
 
   } else if (server.hasArg("location")) {
     config.lon = MAX(0, server.arg("lc_lon").toDouble());
@@ -478,6 +484,8 @@ void handleGithubUpdate() {
 
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
+  ensureConnected();
+
   if (!gh_updater.checkUpdate(config.release_tag)) {
     if (server.client() && server.client().connected()) {
       server.send(404, "text/plain", "No Update found");
@@ -492,17 +500,22 @@ void handleGithubUpdate() {
   }
   DEBUG(buffer);
 
-  if (gh_updater.doUpdate(onOTABegin)) {
+  Serial.setDebugOutput(true);
+
+  if (gh_updater.doUpdate(&onOTABegin)) {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig()) {
       Serial.println("Error saving config");
       putEvent("Error saving config");
-      return;
+    } else {
+      Serial.println("config saved.");
+      restart();
     }
-    Serial.println("config saved.");
-    restart();
+  } else {
+    putEvent(gh_updater.getUpdateError());
   }
-  putEvent(gh_updater.getUpdateError());
+
+  Serial.setDebugOutput(false);
 }
 
 void clearLocationError() {
@@ -652,29 +665,35 @@ bool fetchData(String uri, JsonDocument& doc) {
 
 bool updateSystemData() {
 
+  static uint8_t errorLoopBackoff = 1;
+
   JsonDocument json;
 
+  if (systemData.skipUpdateCountSysten > 0) {
+    systemData.skipUpdateCountSysten--;
+    return false;
+  }
+
+  bool ok = true;
+
   if (systemData.inv_max_w == -1) {
-    if (fetchData(SONNEN_API_CONFIGURATIONS, json)) {
+    if ((ok &= fetchData(SONNEN_API_CONFIGURATIONS, json))) {
       systemData.inv_max_w = json["IC_InverterMaxPower_w"].as<int>();
+      Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
     } else {
       Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
-      return false;
     }
-    Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
   }
-
   if (systemData.cap_bat_max_Wh == 0) {
-    if (fetchData(SONNEN_API_LATEST_DATA, json)) {
+    if ((ok &= fetchData(SONNEN_API_LATEST_DATA, json))) {
       systemData.cap_bat_max_Wh = json["FullChargeCapacity"].as<uint16_t>();
+      Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
     } else {
       Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_LATEST_DATA);
-      return false;
     }
-    Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
   }
 
-  if (fetchData(SONNEN_API_STATUS, json)) {
+  if ((ok &= fetchData(SONNEN_API_STATUS, json))) {
 
     systemData.usoc = json["USOC"].as<uint8_t>();
     systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
@@ -697,43 +716,61 @@ bool updateSystemData() {
     systemData.tm_yday = time.tm_yday;
 
     clearBatteryError();
-    return true;
   }
-  return false;
+
+  if (ok) {
+    errorLoopBackoff = 1;  // reset back off on success
+  } else {                 // crash loop back off
+    systemData.skipUpdateCountSysten = errorLoopBackoff;
+    if (errorLoopBackoff != (1 << 7)) {
+      errorLoopBackoff <<= 1;
+    }
+  }
+
+  return ok;
 }
 
 bool updateSwitch(bool validData) {
 
   static uint8_t inverterLatencyCnt = 0;
+  static uint8_t stableOnCnt = 0;
 
-  uint16_t hysteresis_Wh = config.loadPower_W / 12;  // Wh if load is switched on for 5min
-  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;
+  uint16_t constraint = 0;
+
+  uint16_t hysteresis_Wh = config.loadPower_W / 12;                                // Wh if load is switched on for 5min
+  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;  // ~0.5 °C "delay"
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
-  bool desiredState = validData
-                      && ((systemData.switchEnabled && systemData.boiler_T_cur < temp_off)
-                          || (!systemData.switchEnabled && systemData.boiler_T_cur < temp_on))
-                      && (systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
-                      && ((!systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
+  bool desiredState = (++constraint && validData)
+                      && ((++constraint && systemData.switchEnabled && systemData.boiler_T_cur < temp_off)
+                          || (++constraint && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on))
+                      && (++constraint && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
+                      && ((++constraint && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
                           //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
-                          || (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
-                          || (systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)));                                                                                             // forecast battery capacity and be aware of discharge allowed
+                          //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
+                          || (++constraint && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)));  // forecast battery capacity and be aware of discharge allowed
 
 
-  if (systemData.switchEnabled != desiredState) {
-    putEvent(String("switch ") + (desiredState ? "on" : "off") + ": ");
+  if (desiredState) {  // on?
+    if (stableOnCnt == SYSTEM_ON_COUNT) {
+      if (systemData.switchEnabled) {                                                                     // already on?
+        inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
+        desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
+        if (!desiredState) {
+          putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
+        }
+      } else {  // off, but on desired, reset latency counter
+        inverterLatencyCnt = 0;
+      }
+    } else {
+      stableOnCnt++;
+    }
+  } else {
+    stableOnCnt = 0;
   }
 
-  if (desiredState) {                                                                                   // on?
-    if (systemData.switchEnabled) {                                                                     // already on?
-      inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
-      desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
-      if (!desiredState) {
-        putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
-      }
-    } else {  // off, but on desired, reset latency counter
-      inverterLatencyCnt = 0;
-    }
+  if (systemData.switchEnabled != desiredState) {
+    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + ")");
   }
 
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1);  // combine with mode

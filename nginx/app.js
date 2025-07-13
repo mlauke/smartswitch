@@ -15,15 +15,16 @@ async function fetchData(uri, cb) {
         } else if (e instanceof HTMLInputElement) {
           e.value = data[key];
         } else {
+          const dv = "data-value";
           var v = data[key];
           if (typeof (v) === "boolean") {
             e.textContent = v ? "On" : "Off";
-            e.setAttribute("data-value", v);
+            e.setAttribute(dv, v);
           } else if (Array.isArray(v) && v.length) {
             e.textContent = toLogEntry(v[0]);
           } else {
-            if (e.hasAttribute("data-value")) {
-              e.setAttribute("data-value", v);
+            if (e.hasAttribute(dv)) {
+              e.setAttribute(dv, v);
             } else {
               e.textContent = v;
             }

@@ -57,7 +57,7 @@ bool GithubOTA::checkUpdate(const char* current_release_tag) {
       }
     }
   }
-  Serial.println("no update asset found");
+  Serial.println("No update asset found");
   return false;
 }
 
@@ -132,12 +132,14 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void)) {
   } else {
     Serial.println("Failed to download firmware. HTTP code: " + String(httpCode));
   }
-
   http.end();
+
 #elif defined(ESP8266)
-  ESPhttpUpdate.onStart(fnOTABegin);
+
+  //ESPhttpUpdate.onStart(fnOTABegin);
   ESPhttpUpdate.onProgress(onOTAProgress);
   ESPhttpUpdate.setLedPin(LED_BUILTIN, HIGH);
+  ESPhttpUpdate.setClientTimeout(10000);
   ESPhttpUpdate.rebootOnUpdate(false);  // restart from outside
   ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
@@ -147,7 +149,7 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void)) {
   }
 #endif
 
-  free(updateClient);
+  delete updateClient;
 
   return success;
 }

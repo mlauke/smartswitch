@@ -70,7 +70,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
   }
   http.end();
 
-  free(wifiClient);
+  delete wifiClient;
 
   return res;
 }
