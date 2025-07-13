@@ -190,12 +190,11 @@ void configDefaults() {  // init config struct with default values
   config.gridMin_W = GRID_PURCHASE_THRESHOLD_W;
   config.mode = 0;  //initial set to off
   config.update_startup = false;
-
-  //  config.boiler_T_max = 65;
-  //config.boiler_T_nom = 50;
 }
 
 bool updateSolarForecast() {
+
+  static bool lastResult = false;
 
   long ms = millis();
   if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL_MS) < ms)) {
@@ -207,7 +206,7 @@ bool updateSolarForecast() {
     char url[128];
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
-    if (restClient.fetch(String(url), doc)) {
+    if ((lastResult = restClient.fetch(String(url), doc))) {
 
       serializeJsonPretty(doc, Serial);
       uint8_t i = 0;
@@ -230,7 +229,7 @@ bool updateSolarForecast() {
     }
     systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
   }
-  return true;  //always true, if there are no forecast the calculation may detect that there is enough surplus to be able to switch the load on
+  return lastResult;
 }
 
 void updateLocation() {
@@ -558,12 +557,14 @@ void putEvent(String event) {
 }
 
 bool updateBoilerData() {
+
   static long lastUpdate = 0;
+  static long lastResult = false;
 
   long ms = millis();
   if (lastUpdate == 0 || ms > lastUpdate + BOILER_UPDATE_INTERVAL_MS) {
     lastUpdate = ms;
-    if (lpb->update()) {
+    if ((lastResult = lpb->update())) {
 
       boilder_t boilerData;
 
@@ -577,10 +578,9 @@ bool updateBoilerData() {
       clearBoilerError();
     } else {
       putBoilerError("Could not update boiler data.");
-      return false;
     }
   }
-  return true;  // no new data, so still ok
+  return lastResult;  // no new data, so still ok
 }
 
 // main loop
@@ -735,7 +735,7 @@ bool updateSwitch(bool validData) {
   static uint8_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 
-  uint16_t constraint = 0;
+  uint8_t constraint = 0;
 
   uint16_t hysteresis_Wh = config.loadPower_W / 12;                                // Wh if load is switched on for 5min
   float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;  // ~0.5 °C "delay"
