@@ -136,7 +136,7 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void)) {
 
 #elif defined(ESP8266)
 
-  //ESPhttpUpdate.onStart(fnOTABegin);
+  ESPhttpUpdate.onStart(fnOTABegin);
   ESPhttpUpdate.onProgress(onOTAProgress);
   ESPhttpUpdate.setLedPin(LED_BUILTIN, HIGH);
   ESPhttpUpdate.setClientTimeout(10000);
