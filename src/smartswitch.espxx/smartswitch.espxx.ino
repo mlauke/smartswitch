@@ -379,6 +379,7 @@ void handleStatus() {
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
   data["chrg"] = systemData.charge;
+  data["pac_total_w"] = systemData.pac_total_W;
   data["switch"] = systemData.switchEnabled;
 
   char devid[40] = "unknown";
@@ -702,6 +703,7 @@ bool updateSystemData() {
     systemData.cons_W = json["Consumption_W"].as<uint16_t>();
     systemData.cons_avg_W = json["Consumption_Avg"].as<uint16_t>();
     systemData.dischargeNotAllowed = json["dischargeNotAllowed"].as<bool>();
+    systemData.pac_total_W = json["Pac_total_W"].as<int16_t>();
     systemData.charge = json["BatteryCharging"].as<short>() - json["BatteryDischarging"].as<short>();
 
     systemData.cons_W_rnd = (systemData.cons_W + 50) / 100 * 100;
@@ -741,14 +743,14 @@ bool updateSwitch(bool validData) {
   float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;  // ~0.5 °C "delay"
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
-  bool desiredState = (++constraint && validData)
-                      && ((++constraint && systemData.switchEnabled && systemData.boiler_T_cur < temp_off)
-                          || (++constraint && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on))
-                      && (++constraint && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
-                      && ((++constraint && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
+  bool desiredState = (constraint = 1) && validData
+                      && (((constraint = 2) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off)
+                          || ((constraint = 3) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on))
+                      && ((constraint = 4) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
+                      && (((constraint = 5) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
                           //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
                           //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
-                          || (++constraint && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)));  // forecast battery capacity and be aware of discharge allowed
+                          || ((constraint = 8) && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)));  // forecast battery capacity and be aware of discharge allowed
 
 
   if (desiredState) {  // on?

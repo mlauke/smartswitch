@@ -19,6 +19,8 @@
 }
 
 .overlay-content {
+
+  font-size:medium;
   background: white;
   padding: 20px;
   border-radius: 10px;
@@ -32,7 +34,6 @@
 
   button {
     padding: 10px 15px;
-    font-size: 16px;
     border: none;
     cursor: pointer;
     margin-top: 10px;
@@ -53,7 +54,7 @@ fieldset {
 button {
   padding: 4px;
   border-radius: 5px;
-  font-size: 16px;
+  font-size: 1rem;
   cursor: pointer;
   transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -65,6 +66,7 @@ input[type="radio"] {
 }
 
 body {
+  font-size:medium;
   background: #ffffff;
   color: #333;
   display: grid;
@@ -106,11 +108,13 @@ button {
 
 .fg {
   display: grid;
-  grid-template-columns: 30% 70%;
+  grid-template-columns: 40% 60%;
   align-items: center;
 
   .value {
-    padding: 6px;
+    padding: 0 0 4px 4px;
+    font-size: large;
+    justify-self:auto;
   }
 }
 
@@ -140,7 +144,7 @@ input {
   padding: 6px;
   border: 1px solid #ccc;
   border-radius: 5px;
-  font-size: 16px;
+  font-size: large;
 }
 
 .container {

@@ -19,18 +19,32 @@
     <legend>Status</legend>
     <div class="container">
       <div>
-        <div>Switch: <span class="switch" name="switch" data-value="false"></span></div>
-        <div>Production: <span name="prod"></span> W</div>
-        <div>Consumption: <span name="cons_w"></span> W</div>
-        <div>Consumption (avg): <span name="cons_avg_w"></span> W</div>
-        <div>Battery Load: <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg"
-            class="arrow-down">▼</span></div>
-        <div>Grid: <span name="grid"></span> W</div>
-        <div>Events (<a href="javascript:showLog();">Log</a>): <span class="events" name="events"></span></div>
-        <div id="overlay" class="overlay">
-          <div class="overlay-content">
-            <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
-            <ul id="eventLog" class="eventLog"></ul>
+        <div class="fg">
+          <div>Switch:</div>
+          <div class="value">
+            <span class="switch" name="switch" data-value="false"></span>
+          </div>
+        </div>
+        <div class="fg">
+          <div>Production:</div>
+          <div class="value"><span name="prod"></span> W</div>
+        </div>
+        <div class="fg">
+          <div>Consumption:</div>
+          <div class="value"><span name="cons_w"></span> W</div>
+        </div>
+        <div class="fg">
+          <div>Cons. (avg):</div>
+          <div class="value"><span name="cons_avg_w"></span> W</div>
+        </div>
+        <div class="fg">
+          <div>Grid:</div>
+          <div class="value"><span name="grid"></span> W</div>
+        </div>
+        <div class="fg">
+          <div>Battery Load:</div>
+          <div class="value"><span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg"
+            class="arrow-down">▼</span>
           </div>
         </div>
       </div>
@@ -41,8 +55,20 @@
           <span class="charge-lvl" id="charge-lvl">0%</span>
         </div>
       </div>
+    </div>
   </fieldset>
-  </div>
+  <fieldset>
+    <legend>Events (<a href="javascript:showLog();">Log</a>)</legend>
+    <div class="fgs">
+      <div class="events" name="events"></div>
+      <div id="overlay" class="overlay">
+        <div class="overlay-content">
+          <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
+          <ul id="eventLog" class="eventLog"></ul>
+        </div>
+      </div>
+    </div>
+  </fieldset>
   <form>
     <fieldset>
       <legend>Mode</legend>
@@ -51,7 +77,7 @@
       <label><input type="radio" name="mode" value="2">Auto</label><br />
     </fieldset>
   </form>
-  <form action="/api/update" method="post">
+  <form>
     <fieldset>
       <legend>Hot Water System</legend>
       <div class="fg">
