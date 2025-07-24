@@ -43,6 +43,7 @@ jobs:
 
       - name: Rename firmware files
         run: |
+          cd smartswitch.espxx
           mv .pio/build/esp8266/firmware.bin .pio/build/smartswitch.esp8266.ino.bin
           mv .pio/build/esp32/firmware.bin .pio/build/smartswitch.esp32.ino.bin
           gzip -9 -k .pio/build/smartswitch.esp8266.ino.bin
@@ -53,8 +54,8 @@ jobs:
         with:
           name: smartswitch-artifacts
           path: |
-            .pio/build/smartswitch.esp8266.ino.bin.gz
-            .pio/build/smartswitch.esp32.ino.bin.gz
+            smartswitch.espxx/.pio/build/smartswitch.esp8266.ino.bin.gz
+            smartswitch.espxx/.pio/build/smartswitch.esp32.ino.bin.gz
           retention-days: 1 # delete after build
 
   release:
