@@ -5,6 +5,8 @@
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
+#include "WiFiUtil.h"
+
 #ifdef ESP32
   #include <HTTPClient.h>
 #elif defined(ESP8266)

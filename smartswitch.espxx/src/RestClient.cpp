@@ -19,11 +19,9 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include "RestClient.h"
-#include "WiFiUtil.h"
+#include <RestClient.h>
 
-RestClient::RestClient() {
-}
+RestClient::RestClient() {}
 
 String RestClient::lastError() {
   return _lastError;
@@ -69,6 +67,8 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
     }
   }
   http.end();
+
+  wifiClient->stop();
 
   delete wifiClient;
 

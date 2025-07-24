@@ -4,7 +4,7 @@
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
-static WiFiClient* newWiFiClient(String url) {
+inline WiFiClient* newWiFiClient(String url) {
 
   WiFiClient* wifiClient;
 

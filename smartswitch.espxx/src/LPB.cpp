@@ -1,4 +1,4 @@
-#include "LPB.h"
+#include <LPB.h>
 
 #define printlnToDebug(format) \
   { \
@@ -64,7 +64,7 @@ void LPB::printTelegram(byte* msg, float line) {
   printFmtToDebug("%4.1f", line);
   printToDebug(" - ");
   /*
-  int i = findLine(line);  
+  int i = findLine(line);
   printToDebug(cmdtbl[i].desc);
   */
   Serial.println();
@@ -212,17 +212,7 @@ float LPB::getTemperature(float line, float* r) {
   return NAN;
 }
 
-boilder_t* LPB::getBoilerData(boilder_t* p) {
-
-  p->t_cur = boilderData.t_cur;
-  p->t_max = boilderData.t_max;
-  p->t_min = boilderData.t_min;
-  p->t_nom = boilderData.t_nom;
-
-  return p;
-}
-
-bool LPB::update() {
+bool LPB::update(boilder_t* p) {
 
   if (dev_lookup[0].dev_id == 0xFF) {
     return false;
@@ -234,6 +224,11 @@ bool LPB::update() {
       || getTemperature(1645, &boilderData.t_max) == NAN) {
     return false;
   }
+  p->t_cur = boilderData.t_cur;
+  p->t_max = boilderData.t_max;
+  p->t_min = boilderData.t_min;
+  p->t_nom = boilderData.t_nom;
+
   return true;
 }
 
@@ -326,6 +321,7 @@ bool LPB::GetDevId() {
     }
     destAddr = save_destAddr;
   }
+  // get first device
   for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
     if (dev_lookup[i].dev_id == getBusDest()) {
       my_dev_fam = dev_lookup[i].dev_fam;
@@ -612,7 +608,7 @@ bool LPB::GetMessage(byte* msg) {
         msg[i++] = read;
         /*
 #if DEBUG_LL
-        if(read<16){  
+        if(read<16){
           Serial.print("0");
         }
         Serial.print(read, HEX);
@@ -715,7 +711,7 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* p
       if (rx_msg[2] == myAddr && ((type == 0x12 && msg_type == 0x13) || (type = 0x14 && msg_type == 0x15))) {
         return BUS_OK;
       }
-      /* Activate for LPB systems with truncated error messages (no commandID in return telegram) 
+      /* Activate for LPB systems with truncated error messages (no commandID in return telegram)
 */
       if (rx_msg[2] == myAddr && rx_msg[8] == 0x08) {  // TYPE_ERR
         return false;

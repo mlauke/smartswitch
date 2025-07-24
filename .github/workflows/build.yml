@@ -12,36 +12,49 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out repository code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v2.0.0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Install platform
+      - name: Install PlatformIO
         run: |
-          arduino-cli core update-index
-          arduino-cli core install esp8266:esp8266 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          python -m pip install --upgrade pip
+          pip install platformio
 
-      - name: Install Libraries
+      - name: Cache PlatformIO packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio/.cache
+            ~/.platformio/packages
+          key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Build ESP32 and ESP8266 firmware
         run: |
-          arduino-cli lib install WiFiManager@2.0.17 ArduinoJson@7.4.2 ESPAsyncWebServer@3.1.0 AsyncTCP@1.1.4 ESPAsyncTCP@1.2.4
-          # ElegantOTA@3.1.5
+          cd smartswitch.espxx
+          pio run -e esp32
+          pio run -e esp8266
 
-      - name: Compile Sketch 8266
-        run: arduino-cli compile -e --fqbn esp8266:esp8266:d1_mini_clone:xtal=80,vt=flash,exception=disabled,stacksmash=disabled,ssl=all,mmu=4816,non32xfer=fast,FlashMode=dout,FlashFreq=40,eesz=4M1M --warnings all src/smartswitch.espxx
+      - name: Rename firmware files
+        run: |
+          mv .pio/build/esp8266/firmware.bin .pio/build/smartswitch.esp8266.ino.bin
+          mv .pio/build/esp32/firmware.bin .pio/build/smartswitch.esp32.ino.bin
+          gzip -9 -k .pio/build/smartswitch.esp8266.ino.bin
+          gzip -9 -k .pio/build/smartswitch.esp32.ino.bin
 
-      - name: Compress artifact 8266
-        run: gzip -9 -k src/smartswitch.espxx/build/esp8266.esp8266.d1_mini_clone/smartswitch.espxx.ino.bin
-
-      - name: Rename file 8266
-        run: mv src/smartswitch.espxx/build/esp8266.esp8266.d1_mini_clone/smartswitch.espxx.ino.bin.gz src/smartswitch.espxx/build/esp8266.esp8266.d1_mini_clone/smartswitch.esp8266.ino.bin.gz
-
-      - name: Upload artifact 8266
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: smartswitch-binary
-          path: src/smartswitch.espxx/build/esp8266.esp8266.d1_mini_clone/smartswitch.esp8266.ino.bin.gz
+          name: smartswitch-artifacts
+          path: |
+            .pio/build/smartswitch.esp8266.ino.bin.gz
+            .pio/build/smartswitch.esp32.ino.bin.gz
           retention-days: 1 # delete after build
 
   release:
@@ -55,7 +68,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: smartswitch-binary
+          name: smartswitch-artifacts
           path: .
 
       - name: Create Release
@@ -70,3 +83,4 @@ jobs:
           artifactContentType: "application/gzip"
           artifacts: |
             smartswitch.esp8266.ino.bin.gz
+            smartswitch.esp32.ino.bin.gz

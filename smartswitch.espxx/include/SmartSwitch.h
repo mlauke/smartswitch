@@ -31,6 +31,18 @@
 #include <WiFiClientSecure.h>
 #include <WiFiManager.h>
 
+// echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
+   echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
+   echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
+#include "GithubOTA.h"
+#include "RestClient.h"
+#include "LPB.h"
+
+#include "app_js.h"
+#include "app_css.h"
+#include "app_icon.h"
+#include "index_html.h"
+
 #include "debug.h"
 
 #ifdef ESP32
@@ -40,7 +52,9 @@
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 
-#define LED_BUILTIN GPIO_NUM_5
+#define PIN_LPB_RX GPIO_NUM_16
+#define PIN_LPB_TX GPIO_NUM_17
+#define PIN_SSR GPIO_NUM_21
 
 #elif defined(ESP8266)
 
@@ -51,9 +65,14 @@
 #include <ESP8266httpUpdate.h>
 
 #define LED_BUILTIN 2
+#define PIN_LPB_TX 5  // GPIO5 (D1)
+#define PIN_LPB_RX 4  // GPIO4 (D2)
+#define PIN_SSR 13    // GPIO13 (D7)
 
 #endif
 
+#define HOSTNAME "smartswitch"
+#define RELEASE_TAG "-"
 #define CONFIGFILE "/config.json"
 
 #define SERIAL_BAUDRATE 115200
@@ -62,10 +81,6 @@
 #define LPB_BAUDRATE 4800
 #define LPB_ADDR_SELF 2
 #define LPB_ADDR_DEST 0
-
-#define PIN_LPB_TX 5  // GPIO5 (D1)
-#define PIN_LPB_RX 4  // GPIO4 (D2)
-#define PIN_SSR 13    // GPIO13 (D7)
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"

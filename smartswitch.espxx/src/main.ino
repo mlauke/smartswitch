@@ -19,19 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include "SmartSwitch.h"
-#include "GithubOTA.h"
-#include "RestClient.h"
-#include "LPB.h"
-
-// echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
-   echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
-   echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
-
-#include "app_js.h"
-#include "app_css.h"
-#include "app_icon.h"
-#include "index_html.h"
+#include <SmartSwitch.h>
 
 #ifdef ESP32
 static WebServer server(WEBSERVER_PORT);
@@ -55,9 +43,6 @@ void saveConfigCallback() {
   saveConfigFile = true;
 }
 
-#define HOSTNAME "smartswitch"
-#define RELEASE_TAG "-"
-
 void setup() {
 
   lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
@@ -76,8 +61,11 @@ void setup() {
 
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
   wifiManager.addParameter(&custom_hostname);
-  wifiManager.autoConnect("SmartSwitchAP");
   wifiManager.setConfigPortalTimeout(10);
+  if (!wifiManager.autoConnect("SmartSwitchAP")) {
+    Serial.println("Failed to connect, restarting...");
+    restart();
+  }
 
   Serial.println("Mounting FS...");
   if (LittleFS.begin()) {
@@ -182,7 +170,8 @@ void configDefaults() {  // init config struct with default values
   config.lon = 0.0;
   config.lat = 0.0;
   config.az = 0;    // default azimuth to 0 (south)
-  config.dec = 30;  //default panel declination
+  config.dec = 30;  // default panel declination
+  config.kWp = 1.0; // default kWp
   setConfigStr(config, tz, "Europe/Berlin");
   config.location[0] = '\0';
   config.loadPower_W = 1000;  //initial assume 1kW
@@ -565,11 +554,9 @@ bool updateBoilerData() {
   long ms = millis();
   if (lastUpdate == 0 || ms > lastUpdate + BOILER_UPDATE_INTERVAL_MS) {
     lastUpdate = ms;
-    if ((lastResult = lpb->update())) {
 
-      boilder_t boilerData;
-
-      lpb->getBoilerData(&boilerData);
+    boilder_t boilerData;
+    if ((lastResult = lpb->update(&boilerData))) {
 
       systemData.boiler_T_cur = boilerData.t_cur;
       systemData.boiler_T_nom = boilerData.t_nom;
@@ -591,7 +578,10 @@ void loop() {
     uint32_t heap = ESP.getFreeHeap();
 
     bool validData =
-      ensureConnected() && updateSystemData() && updateSolarForecast() && updateBoilerData();
+      ensureConnected()
+      && updateSystemData()
+      && updateSolarForecast()
+      && updateBoilerData();
 
     updateSwitch(validData);
 
@@ -609,8 +599,7 @@ void loop() {
 }
 
 void buildInLED(bool onOff) {
-  short s = onOff ? 0 : 1;
-  digitalWrite(LED_BUILTIN, s);
+  digitalWrite(LED_BUILTIN, onOff ? HIGH : LOW);
 }
 
 void statusLED(int status) {
@@ -722,8 +711,8 @@ bool updateSystemData() {
 
   if (ok) {
     errorLoopBackoff = 1;  // reset back off on success
-  } else {                 // crash loop back off
-    systemData.skipUpdateCountSysten = errorLoopBackoff;
+  } else {
+    systemData.skipUpdateCountSysten = errorLoopBackoff;  // crash loop back off
     if (errorLoopBackoff != (1 << 7)) {
       errorLoopBackoff <<= 1;
     }
@@ -732,7 +721,18 @@ bool updateSystemData() {
   return ok;
 }
 
-bool updateSwitch(bool validData) {
+const String EVENTS[] = {
+  "invalid data",
+  "load overflow - consumption exceeds system capacity",
+  "surplus greater load",
+  "battery capacity",
+  "boiler temperature reached",
+};
+
+//putEvent("min capacity at " + String(toLocalDate(ts)));
+//putEvent("max capacity at " + String(toLocalDate(ts)));
+
+void updateSwitch(bool validData) {
 
   static uint8_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
@@ -744,14 +744,13 @@ bool updateSwitch(bool validData) {
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
   bool desiredState = (constraint = 1) && validData
-                      && (((constraint = 2) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off)
-                          || ((constraint = 3) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on))
-                      && ((constraint = 4) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
-                      && (((constraint = 5) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
+                      && ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
+                      && (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
                           //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
                           //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
-                          || ((constraint = 8) && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)));  // forecast battery capacity and be aware of discharge allowed
-
+                          || ((constraint = 4) && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)))  // forecast battery capacity and be aware of discharge allowed
+                      && (((constraint = 5) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on)
+                          || ((constraint = 6) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
   if (desiredState) {  // on?
     if (stableOnCnt == SYSTEM_ON_COUNT) {
@@ -766,6 +765,7 @@ bool updateSwitch(bool validData) {
       }
     } else {
       stableOnCnt++;
+      Serial.println(String("stable count ") + stableOnCnt);
     }
   } else {
     stableOnCnt = 0;
@@ -780,8 +780,6 @@ bool updateSwitch(bool validData) {
   Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   toggleSwitch(systemData.switchEnabled);
-
-  return true;
 }
 
 void toggleSwitch(bool switchEnabled) {
@@ -853,11 +851,8 @@ bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh) {
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
 
         if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
-          putEvent("min capacity at " + String(toLocalDate(ts)));
           return false;
-        }
-        if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
-          putEvent("max capacity at " + String(toLocalDate(ts)));
+        } else if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
           return true;
         }
         // cumulate battery capacity upon production forecast

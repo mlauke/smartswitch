@@ -1,3 +1,25 @@
+// MIT License
+//
+// Copyright (c) 2024 Marko Lauke
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <WiFiClientSecure.h>
@@ -9,8 +31,8 @@
 #include <ESP8266httpUpdate.h>
 #endif
 
-#include "GithubOTA.h"
-#include "WiFiUtil.h"
+#include <GithubOTA.h>
+#include <WiFiUtil.h>
 
 GithubOTA::GithubOTA(const char* host, const char* url, const char* type, const char* filename) {
   update_host = host;
@@ -32,7 +54,7 @@ bool GithubOTA::checkUpdate(const char* current_release_tag) {
       return false;
     }
 
-    release_tag = String(doc["tag_name"]);
+    release_tag = doc["tag_name"].as<String>();
 
     Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, doc["prerelease"].as<bool>());
 
@@ -103,7 +125,7 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void)) {
 
     bool canBegin = Update.begin(contentLength);
     if (canBegin) {
-      
+
       fnOTABegin();
 
       Serial.println("Begin OTA...");
@@ -114,12 +136,12 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void)) {
       } else {
         Serial.println("Written only : " + String(written) + "/" + String(contentLength) + ". Retry?");
       }
-      
+
       if (Update.end()) {
         Serial.println("OTA done!");
         if (Update.isFinished()) {
           Serial.println("Update successfully completed.");
-          success = true;          
+          success = true;
         } else {
           Serial.println("Update not finished? Something went wrong!");
         }
