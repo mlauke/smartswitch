@@ -55,7 +55,7 @@ jobs:
           name: smartswitch-artifacts
           path: |
             smartswitch.espxx/.pio/build/smartswitch.esp8266.ino.bin.gz
-            smartswitch.espxx/.pio/build/smartswitch.esp32.ino.bin.gz
+            smartswitch.espxx/.pio/build/smartswitch.esp32.ino.bin
           retention-days: 1 # delete after build
 
   release:

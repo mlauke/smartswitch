@@ -8,7 +8,7 @@
 #define UPDATE_TYPE "application/gzip"
 
 #ifdef ESP32
-#define UPDATE_FILENAME "smartswitch.esp32.ino.bin.gz"
+#define UPDATE_FILENAME "smartswitch.esp32.ino.bin"
 #elif defined(ESP8266)
 #define UPDATE_FILENAME "smartswitch.esp8266.ino.bin.gz"
 #endif
@@ -29,6 +29,7 @@ protected:
   const char *update_url;
 
   String download_url;
+  String updateError;
 };
 
 

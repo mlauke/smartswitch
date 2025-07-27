@@ -27,7 +27,7 @@ static WebServer server(WEBSERVER_PORT);
 static ESP8266WebServer server(WEBSERVER_PORT);
 #endif
 
-static LPB* lpb;
+static LPB *lpb;
 static WiFiManager wifiManager;
 static Ticker timer;
 static volatile bool doUpdateFlag = false;
@@ -35,16 +35,35 @@ static systemDataStruct systemData;
 static configStruct config;
 static bool saveConfigFile = false;
 
-int stdOffset = 3600;  // 1h utc offset Europe/Berlin
-int dstOffset = 3600;  // 1h suummer time offset
+int stdOffset = 3600; // 1h utc offset Europe/Berlin
+int dstOffset = 3600; // 1h suummer time offset
 
+static char tsfmt[20];
+static char *toDate(uint32_t utc_ts, uint16_t offset)
+{
+  time_t time = (time_t)(utc_ts + offset);
+  tm *timeinfo = gmtime(&time);
+  strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", timeinfo);
+  return tsfmt;
+}
 
-void saveConfigCallback() {
+static char *toDate(uint32_t utc_ts)
+{
+  return toDate(utc_ts, 0);
+}
+
+static char *toLocalDate(uint32_t utc_ts)
+{
+  return toDate(utc_ts, (stdOffset + systemData.dstOffset));
+}
+
+void saveConfigCallback()
+{
   saveConfigFile = true;
 }
 
-void setup() {
-
+void setup()
+{
   lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
 
   configDefaults();
@@ -62,17 +81,22 @@ void setup() {
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
   wifiManager.addParameter(&custom_hostname);
   wifiManager.setConfigPortalTimeout(10);
-  if (!wifiManager.autoConnect("SmartSwitchAP")) {
+  if (!wifiManager.autoConnect("SmartSwitchAP"))
+  {
     Serial.println("Failed to connect, restarting...");
     restart();
   }
 
   Serial.println("Mounting FS...");
-  if (LittleFS.begin()) {
-    if (!loadConfig()) {
+  if (LittleFS.begin())
+  {
+    if (!loadConfig())
+    {
       Serial.println("Error loading config");
     }
-  } else {
+  }
+  else
+  {
     Serial.println("Failed to mount FS. Attempting to format.");
     LittleFS.format();
     Serial.println("format done.");
@@ -80,11 +104,13 @@ void setup() {
     saveConfig();
   }
 
-  if (saveConfigFile) {
+  if (saveConfigFile)
+  {
     String lcHostname = String(custom_hostname.getValue());
     lcHostname.toLowerCase();
     setConfigStr(config, hostname, lcHostname.c_str());
-    if (!saveConfig()) {
+    if (!saveConfig())
+    {
       Serial.println("Error saving config");
     }
   }
@@ -95,13 +121,14 @@ void setup() {
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
 #ifdef ESP32
-  //esp_task_wdt_init({ 20000, 0, true });
+  // esp_task_wdt_init({ 20000, 0, true });
 #elif defined(ESP8266)
   ESP.wdtEnable(20000);
   server.keepAlive(false);
 #endif
 
-  if (config.update_startup) {
+  if (config.update_startup)
+  {
     handleGithubUpdate();
   }
 
@@ -114,24 +141,26 @@ void setup() {
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
 
-  server.begin();  // Actually start the server
+  server.begin(); // Actually start the server
   Serial.println("HTTP server started");
 
   lpb->enableInterface();
   uint8_t retry = 0;
-  while (!lpb->GetDevId() && retry++ < 2) {
-    putBoilerError(String("No device found, retry ") + retry);
+  while (!lpb->GetDevId() && retry++ < 2)
+  {
+    putBoilerError(String("LPB: No device found after ") + retry + " retries!");
   }
 
   updateLocation();
 }
 
-void timerCallback() {
+void timerCallback()
+{
   doUpdateFlag = true;
 }
 
-void onOTABegin() {
-  Serial.println("onOTABegin() >");
+void onOTABegin()
+{
   server.close();
   if (timer.active())
     timer.detach();
@@ -139,25 +168,28 @@ void onOTABegin() {
 #if defined(ESP8266)
   ESP.wdtDisable();
 #endif
-  Serial.println("onOTABegin() <");
 }
 
-void onOTAEnd(bool success) {
-  if (success) {
-    Serial.println("OTA update finished successfully!");  // Log when OTA has finished
+void onOTAEnd(bool success)
+{
+  if (success)
+  {
+    Serial.println("OTA update finished successfully!"); // Log when OTA has finished
     return;
   }
   Serial.println("There was an error during OTA update!");
 }
 
-void systemDefaults() {
+void systemDefaults()
+{
   systemData.pv_forecast_ts = 0;
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   systemData.eventIx = 0;
   systemData.skipUpdateCountSysten = 0;
 }
 
-void configDefaults() {  // init config struct with default values
+void configDefaults()
+{ // init config struct with default values
 
 #ifdef ESP32
   setConfigStr(config, hostname, WiFi.getHostname());
@@ -174,19 +206,21 @@ void configDefaults() {  // init config struct with default values
   config.kWp = 1.0; // default kWp
   setConfigStr(config, tz, "Europe/Berlin");
   config.location[0] = '\0';
-  config.loadPower_W = 1000;  //initial assume 1kW
+  config.loadPower_W = 1000; // initial assume 1kW
   config.cap_bat_min_Wh = 500;
   config.gridMin_W = GRID_PURCHASE_THRESHOLD_W;
-  config.mode = 0;  //initial set to off
+  config.mode = 0; // initial set to off
   config.update_startup = false;
 }
 
-bool updateSolarForecast() {
+bool updateSolarForecast()
+{
 
   static bool lastResult = false;
 
   long ms = millis();
-  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL_MS) < ms)) {
+  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL_MS) < ms))
+  {
 
     RestClient restClient;
     JsonDocument doc;
@@ -195,25 +229,32 @@ bool updateSolarForecast() {
     char url[128];
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
-    if ((lastResult = restClient.fetch(String(url), doc))) {
+    if ((lastResult = restClient.fetch(String(url), doc)))
+    {
 
       serializeJsonPretty(doc, Serial);
       uint8_t i = 0;
-      for (JsonPair entry : doc["result"].as<JsonObject>()) {
+      for (JsonPair entry : doc["result"].as<JsonObject>())
+      {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
-        if (i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0])) {
+        if (i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]))
+        {
           systemData.pv_forecast_wh_h[i][0] = ts;
           systemData.pv_forecast_wh_h[i][1] = wh;
           i++;
-        } else {
+        }
+        else
+        {
           putEvent("WARN: overflow " + i);
         }
       }
-      setConfigStr(config, location, doc["message"]["info"]["place"].as<const char*>());
+      setConfigStr(config, location, doc["message"]["info"]["place"].as<const char *>());
 
       clearLocationError();
-    } else {
+    }
+    else
+    {
       putLocationError("WARN solar forecast " + restClient.lastError());
     }
     systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
@@ -221,60 +262,70 @@ bool updateSolarForecast() {
   return lastResult;
 }
 
-void updateLocation() {
+void updateLocation()
+{
 
-  if (config.lat == 0.0 && config.lon == 0.0) {
+  if (config.lat == 0.0 && config.lon == 0.0)
+  {
 
     RestClient restClient;
     JsonDocument doc;
 
-    if ((saveConfigFile = restClient.fetch(URL_LOCATION, doc))) {
+    if ((saveConfigFile = restClient.fetch(URL_LOCATION, doc)))
+    {
       config.lon = doc["lon"].as<double>();
       config.lat = doc["lat"].as<double>();
-      snprintf(config.location, CFG_SZ_LOCATION, "%s %s", doc["zip"].as<const char*>(), doc["city"].as<const char*>());
+      snprintf(config.location, CFG_SZ_LOCATION, "%s %s", doc["zip"].as<const char *>(), doc["city"].as<const char *>());
       setConfigStr(config, tz, doc["timezone"]);
       Serial.printf("Location: %f/%f - tz: %s loc: %s\n", config.lon, config.lat, config.tz, config.location);
     }
   }
 }
 
-void cacheControlHeader(bool cache) {
+void cacheControlHeader(bool cache)
+{
   if (cache)
     server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
   else
     server.sendHeader("cache-control", "no-cache");
 }
 
-void commonHeader() {
-  //server.sendHeader("last-modified", "");
+void commonHeader()
+{
+  // server.sendHeader("last-modified", "");
   server.sendHeader("connection", "close");
   server.sendHeader("content-encoding", "gzip");
 }
 
-void handleFavicon() {
+void handleFavicon()
+{
   cacheControlHeader(true);
   server.send_P(200, "image/x-icon", app_icon, sizeof(app_icon));
 }
 
-void handleAppJs() {
+void handleAppJs()
+{
   commonHeader();
   cacheControlHeader(true);
   server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
-void handleAppCss() {
+void handleAppCss()
+{
   commonHeader();
   cacheControlHeader(true);
   server.send_P(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
 }
 
-void handleRoot() {
+void handleRoot()
+{
   commonHeader();
   cacheControlHeader(false);
   server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
 }
 
-void jsonToConfig(JsonDocument& data) {
+void jsonToConfig(JsonDocument &data)
+{
   config.mode = data["mode"].as<uint8_t>();
   setConfigStr(config, release_tag, data["release_tag"]);
 
@@ -298,10 +349,11 @@ void jsonToConfig(JsonDocument& data) {
   setConfigStr(config, tz, data["tz"]);
 
   //  config.boiler_T_max = data["bs_t_max"].as<uint8_t>();
-  //config.boiler_T_nom = data["bs_t_nom"].as<uint8_t>();
+  // config.boiler_T_nom = data["bs_t_nom"].as<uint8_t>();
 }
 
-void configToJson(JsonDocument& data) {
+void configToJson(JsonDocument &data)
+{
   data["mode"] = config.mode;
   data["release_tag"] = config.release_tag;
 
@@ -325,10 +377,11 @@ void configToJson(JsonDocument& data) {
   data["tz"] = config.tz;
 
   //  data["bs_t_max"] = config.boiler_T_max;
-  //data["bs_t_nom"] = config.boiler_T_nom;
+  // data["bs_t_nom"] = config.boiler_T_nom;
 }
 
-void sendJson(String from, JsonDocument& json) {
+void sendJson(String from, JsonDocument &json)
+{
 
   String jsonString;
 
@@ -339,7 +392,8 @@ void sendJson(String from, JsonDocument& json) {
   server.send(200, "application/json", jsonString);
 }
 
-void handleData() {
+void handleData()
+{
 
   JsonDocument data;
 
@@ -349,16 +403,19 @@ void handleData() {
   sendJson("data", data);
 }
 
-void addLog(JsonArray& array, logEntry& log) {
-  if (!log.msg.isEmpty()) {
+void addLog(JsonArray &array, logEntry &log)
+{
+  if (!log.msg.isEmpty())
+  {
     JsonObject e = array.add<JsonObject>();
     e["ts"] = log.ts;
     e["msg"] = log.msg;
   }
 }
 
-///api/status
-void handleStatus() {
+/// api/status
+void handleStatus()
+{
 
   JsonDocument data;
 
@@ -372,8 +429,9 @@ void handleStatus() {
   data["switch"] = systemData.switchEnabled;
 
   char devid[40] = "unknown";
-  device_map* device = lpb->getDestDevice();
-  if (device != NULL) {
+  device_map *device = lpb->getDestDevice();
+  if (device != NULL)
+  {
     snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
   data["bs_devid"] = devid;
@@ -390,7 +448,8 @@ void handleStatus() {
 
   JsonArray events = data["events"].to<JsonArray>();
   int i = sizeof(systemData.events) / sizeof(systemData.events[0]);
-  while (i-- > 0) {
+  while (i-- > 0)
+  {
     logEntry log = systemData.events[(systemData.eventIx + i) % 8];
     addLog(events, log);
   }
@@ -398,24 +457,29 @@ void handleStatus() {
   sendJson("status", data);
 }
 
-void handleAPI() {
+void handleAPI()
+{
 
   bool doRestart = false;
 
-  if (server.hasArg("mode")) {
+  if (server.hasArg("mode"))
+  {
     config.mode = server.arg("mode").toInt() & 3;
     Serial.printf("Mode: %d\n", config.mode);
     saveConfig();
-
-  } else if (server.hasArg("update_startup")) {
+  }
+  else if (server.hasArg("update_startup"))
+  {
     config.update_startup = server.arg("update_startup").toInt();
     Serial.printf("Enabled: %d\n", config.update_startup);
     saveConfig();
-
-  } else if (server.hasArg("boiler")) {
+  }
+  else if (server.hasArg("boiler"))
+  {
     // ?
-
-  } else if (server.hasArg("sonnen")) {
+  }
+  else if (server.hasArg("sonnen"))
+  {
     setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
     setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
     config.gridMin_W = MAX(50, MAX(0, server.arg("sn_grdmin").toInt()));
@@ -423,30 +487,37 @@ void handleAPI() {
     config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
     saveConfig();
     systemData.skipUpdateCountSysten = 0;
-
-  } else if (server.hasArg("location")) {
+  }
+  else if (server.hasArg("location"))
+  {
     config.lon = MAX(0, server.arg("lc_lon").toDouble());
     config.lat = MAX(0, server.arg("lc_lat").toDouble());
     config.kWp = MAX(0, server.arg("lc_kWp").toDouble());
     config.az = MIN(360, MAX(0, server.arg("lc_az").toInt()));
     config.dec = MIN(90, MAX(0, server.arg("lc_dec").toInt()));
-    systemData.pv_forecast_ts = 0;  // force fetch new data
+    systemData.pv_forecast_ts = 0; // force fetch new data
     saveConfig();
-
-  } else if (server.hasArg("hostname")) {
+  }
+  else if (server.hasArg("hostname"))
+  {
     setConfigStr(config, hostname, server.arg("hostname").c_str());
     doRestart = saveConfig();
-
-  } else if (server.hasArg("restart")) {
+  }
+  else if (server.hasArg("restart"))
+  {
     doRestart = saveConfig();
-
-  } else if (server.hasArg("reset")) {
-    if (server.arg("reset").toInt()) {
+  }
+  else if (server.hasArg("reset"))
+  {
+    if (server.arg("reset").toInt())
+    {
       configDefaults();
-      wifiManager.resetSettings();  // reset wifi settings
+      wifiManager.resetSettings(); // reset wifi settings
       doRestart = saveConfig();
     }
-  } else if (server.hasArg("update")) {
+  }
+  else if (server.hasArg("update"))
+  {
     handleGithubUpdate();
     return;
   }
@@ -454,29 +525,35 @@ void handleAPI() {
   server.sendHeader("location", "/");
   server.send(303);
 
-  if (doRestart) {
+  if (doRestart)
+  {
     restart();
   }
 }
 
-void handleNotFound() {
-  server.send(404, "text/plain", "404: Not found");  // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
+void handleNotFound()
+{
+  server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
 
-void restart() {
+void restart()
+{
   server.close();
   LittleFS.end();
   ESP.restart();
 }
 
-void handleGithubUpdate() {
+void handleGithubUpdate()
+{
 
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   ensureConnected();
 
-  if (!gh_updater.checkUpdate(config.release_tag)) {
-    if (server.client() && server.client().connected()) {
+  if (!gh_updater.checkUpdate(config.release_tag))
+  {
+    if (server.client() && server.client().connected())
+    {
       server.send(404, "text/plain", "No Update found");
     }
     return;
@@ -484,79 +561,98 @@ void handleGithubUpdate() {
 
   char buffer[256];
   snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
-  if (server.client() && server.client().connected()) {
+  if (server.client() && server.client().connected())
+  {
     server.send(200, "text/html;charset=utf-8", buffer);
   }
   DEBUG(buffer);
 
   Serial.setDebugOutput(true);
 
-  if (gh_updater.doUpdate(&onOTABegin)) {
+  if (gh_updater.doUpdate(&onOTABegin))
+  {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
-    if (!saveConfig()) {
+    if (!saveConfig())
+    {
       Serial.println("Error saving config");
       putEvent("Error saving config");
-    } else {
+    }
+    else
+    {
       Serial.println("config saved.");
       restart();
     }
-  } else {
+  }
+  else
+  {
     putEvent(gh_updater.getUpdateError());
   }
 
   Serial.setDebugOutput(false);
 }
 
-void clearLocationError() {
+void clearLocationError()
+{
   systemData.error_lc.msg.clear();
 }
 
-void putLocationError(String event) {
+void putLocationError(String event)
+{
   putLog(systemData.error_lc, event.c_str());
 }
 
-void clearBatteryError() {
+void clearBatteryError()
+{
   systemData.error_bt.msg.clear();
 }
 
-void putBatteryError(String event) {
+void putBatteryError(String event)
+{
   putLog(systemData.error_bt, event.c_str());
 }
 
-void putBoilerError(String event) {
+void putBoilerError(String event)
+{
   putLog(systemData.error_bs, event.c_str());
 }
 
-void clearBoilerError() {
+void clearBoilerError()
+{
   systemData.error_bs.msg.clear();
 }
 
-void putLog(logEntry& log, const char* event) {
+void putLog(logEntry &log, const char *event)
+{
   log.msg.clear();
   log.msg.concat(event);
   log.ts = systemData.ts;
   Serial.printf("log %u: %s\n", systemData.ts, event);
 }
 
-void putEvent(const char* event) {
+void putEvent(const char *event)
+{
   putLog(systemData.events[systemData.eventIx++ % 8], event);
 }
 
-void putEvent(String event) {
+void putEvent(String event)
+{
   putEvent(event.c_str());
 }
 
-bool updateBoilerData() {
+bool updateBoilerData()
+{
 
   static long lastUpdate = 0;
   static long lastResult = false;
 
   long ms = millis();
-  if (lastUpdate == 0 || ms > lastUpdate + BOILER_UPDATE_INTERVAL_MS) {
+  if (lastUpdate == 0 || ms > lastUpdate + BOILER_UPDATE_INTERVAL_MS)
+  {
     lastUpdate = ms;
 
     boilder_t boilerData;
-    if ((lastResult = lpb->update(&boilerData))) {
+    if ((lastResult = lpb->update(&boilerData)))
+    {
 
       systemData.boiler_T_cur = boilerData.t_cur;
       systemData.boiler_T_nom = boilerData.t_nom;
@@ -564,24 +660,25 @@ bool updateBoilerData() {
       systemData.boiler_T_max = boilerData.t_max;
 
       clearBoilerError();
-    } else {
+    }
+    else
+    {
       putBoilerError("Could not update boiler data.");
     }
   }
-  return lastResult;  // no new data, so still ok
+  return lastResult; // no new data, so still ok
 }
 
 // main loop
-void loop() {
-  if (doUpdateFlag) {
+void loop()
+{
+  if (doUpdateFlag)
+  {
 
     uint32_t heap = ESP.getFreeHeap();
 
     bool validData =
-      ensureConnected()
-      && updateSystemData()
-      && updateSolarForecast()
-      && updateBoilerData();
+        ensureConnected() && updateSystemData() && updateSolarForecast() && updateBoilerData();
 
     updateSwitch(validData);
 
@@ -592,19 +689,22 @@ void loop() {
   server.handleClient();
 
 #ifdef ESP32
-  //esp_task_wdt_reset();
+  // esp_task_wdt_reset();
 #elif defined(ESP8266)
   ESP.wdtFeed();
 #endif
 }
 
-void buildInLED(bool onOff) {
+void buildInLED(bool onOff)
+{
   digitalWrite(LED_BUILTIN, onOff ? HIGH : LOW);
 }
 
-void statusLED(int status) {
+void statusLED(int status)
+{
   int d = 1000 - (100 * (status % 10));
-  for (int i = 0; i < status; i++) {
+  for (int i = 0; i < status; i++)
+  {
     buildInLED(true);
     delay(d);
     buildInLED(false);
@@ -612,11 +712,14 @@ void statusLED(int status) {
   }
 }
 
-bool ensureConnected() {
+bool ensureConnected()
+{
   wl_status_t status = WiFi.status();
-  if (status != WL_CONNECTED) {
+  if (status != WL_CONNECTED)
+  {
     Serial.print("Connecting");
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++)
+    {
       statusLED(0);
       Serial.print(".");
       delay(500);
@@ -625,65 +728,84 @@ bool ensureConnected() {
 
     status = WiFi.status();
     statusLED(status);
-    if (status == WL_CONNECTED) {
+    if (status == WL_CONNECTED)
+    {
       Serial.printf("Connected. IP address: %s status: %d\n", WiFi.localIP().toString().c_str(), status);
-    } else {
+    }
+    else
+    {
       Serial.printf("Wifi Error: %d\n", status);
     }
   }
   return status == WL_CONNECTED;
 }
 
-bool fetchData(String uri, JsonDocument& doc) {
+bool fetchData(String uri, JsonDocument &doc)
+{
 
   bool r = false;
 
   RestClient restClient;
 
-  if (strlen(config.sonnenHostname) && strlen(config.sonnenApiToken)) {
+  if (strlen(config.sonnenHostname) && strlen(config.sonnenApiToken))
+  {
     char url[128];
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
     r = restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
-    if (!r) {
+    if (!r)
+    {
       putBatteryError(restClient.lastError());
     }
-  } else {
+  }
+  else
+  {
     putBatteryError("Sonnen Battery not properly configured!");
   }
   return r;
 }
 
-bool updateSystemData() {
+bool updateSystemData()
+{
 
   static uint8_t errorLoopBackoff = 1;
 
   JsonDocument json;
 
-  if (systemData.skipUpdateCountSysten > 0) {
+  if (systemData.skipUpdateCountSysten > 0)
+  {
     systemData.skipUpdateCountSysten--;
     return false;
   }
 
   bool ok = true;
 
-  if (systemData.inv_max_w == -1) {
-    if ((ok &= fetchData(SONNEN_API_CONFIGURATIONS, json))) {
+  if (systemData.inv_max_w == -1)
+  {
+    if ((ok &= fetchData(SONNEN_API_CONFIGURATIONS, json)))
+    {
       systemData.inv_max_w = json["IC_InverterMaxPower_w"].as<int>();
       Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
-    } else {
+    }
+    else
+    {
       Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
     }
   }
-  if (systemData.cap_bat_max_Wh == 0) {
-    if ((ok &= fetchData(SONNEN_API_LATEST_DATA, json))) {
+  if (systemData.cap_bat_max_Wh == 0)
+  {
+    if ((ok &= fetchData(SONNEN_API_LATEST_DATA, json)))
+    {
       systemData.cap_bat_max_Wh = json["FullChargeCapacity"].as<uint16_t>();
       Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
-    } else {
+    }
+    else
+    {
       Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_LATEST_DATA);
     }
   }
 
-  if ((ok &= fetchData(SONNEN_API_STATUS, json))) {
+  if ((ok &= fetchData(SONNEN_API_STATUS, json)))
+  {
 
     systemData.usoc = json["USOC"].as<uint8_t>();
     systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
@@ -696,10 +818,10 @@ bool updateSystemData() {
     systemData.charge = json["BatteryCharging"].as<short>() - json["BatteryDischarging"].as<short>();
 
     systemData.cons_W_rnd = (systemData.cons_W + 50) / 100 * 100;
-    systemData.cons_W_norm = (systemData.switchEnabled && systemData.cons_W_rnd > config.loadPower_W) ? systemData.cons_W_rnd - config.loadPower_W : systemData.cons_W_rnd;  // consumption without load
+    systemData.cons_W_norm = (systemData.switchEnabled && systemData.cons_W_rnd > config.loadPower_W) ? systemData.cons_W_rnd - config.loadPower_W : systemData.cons_W_rnd; // consumption without load
 
     struct tm time;
-    strptime(json["Timestamp"].as<const char*>(), "%Y-%m-%d %H:%M:%S", &time);
+    strptime(json["Timestamp"].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
 
     systemData.dstOffset = isDST(&time) ? dstOffset : 0;
 
@@ -709,11 +831,15 @@ bool updateSystemData() {
     clearBatteryError();
   }
 
-  if (ok) {
-    errorLoopBackoff = 1;  // reset back off on success
-  } else {
-    systemData.skipUpdateCountSysten = errorLoopBackoff;  // crash loop back off
-    if (errorLoopBackoff != (1 << 7)) {
+  if (ok)
+  {
+    errorLoopBackoff = 1; // reset back off on success
+  }
+  else
+  {
+    systemData.skipUpdateCountSysten = errorLoopBackoff; // crash loop back off
+    if (errorLoopBackoff != (1 << 7))
+    {
       errorLoopBackoff <<= 1;
     }
   }
@@ -722,79 +848,91 @@ bool updateSystemData() {
 }
 
 const String EVENTS[] = {
-  "invalid data",
-  "load overflow - consumption exceeds system capacity",
-  "surplus greater load",
-  "battery capacity",
-  "boiler temperature reached",
+    "invalid data",
+    "load overflow - consumption exceeds system capacity",
+    "surplus greater load",
+    "battery capacity",
+    "boiler temperature reached",
 };
 
-//putEvent("min capacity at " + String(toLocalDate(ts)));
-//putEvent("max capacity at " + String(toLocalDate(ts)));
+// putEvent("min capacity at " + String(toLocalDate(ts)));
+// putEvent("max capacity at " + String(toLocalDate(ts)));
 
-void updateSwitch(bool validData) {
+void updateSwitch(bool validData)
+{
 
   static uint8_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 
   uint8_t constraint = 0;
 
-  uint16_t hysteresis_Wh = config.loadPower_W / 12;                                // Wh if load is switched on for 5min
-  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5;  // ~0.5 °C "delay"
+  uint16_t hysteresis_Wh = config.loadPower_W / 12;                               // Wh if load is switched on for 5min
+  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5; // ~0.5 °C "delay"
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
-  bool desiredState = (constraint = 1) && validData
-                      && ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0)  // aware of max system power (production + max inverter power)
-                      && (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                         // if surplus (waste) exceeds load
-                          //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
-                          //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
-                          || ((constraint = 4) && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)))  // forecast battery capacity and be aware of discharge allowed
-                      && (((constraint = 5) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on)
-                          || ((constraint = 6) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
+  bool desiredState = (constraint = 1) && validData && ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_rnd - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0) // aware of max system power (production + max inverter power)
+                      && (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                                                      // if surplus (waste) exceeds load
+                                                                                                                                                                                                                                               //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
+                                                                                                                                                                                                                                               //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
+                          || ((constraint = 4) && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)))                                                                                                   // forecast battery capacity and be aware of discharge allowed
+                      && (((constraint = 5) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) || ((constraint = 6) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
-  if (desiredState) {  // on?
-    if (stableOnCnt == SYSTEM_ON_COUNT) {
-      if (systemData.switchEnabled) {                                                                     // already on?
-        inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0;  // grid purchase active? (negative grid feed in denotes purchase)
+  if (desiredState)
+  { // on?
+    if (stableOnCnt == SYSTEM_ON_COUNT)
+    {
+      if (systemData.switchEnabled)
+      {                                                                                                  // already on?
+        inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
         desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
-        if (!desiredState) {
+        if (!desiredState)
+        {
           putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
         }
-      } else {  // off, but on desired, reset latency counter
+      }
+      else
+      { // off, but on desired, reset latency counter
         inverterLatencyCnt = 0;
       }
-    } else {
+    }
+    else
+    {
       stableOnCnt++;
       Serial.println(String("stable count ") + stableOnCnt);
     }
-  } else {
+  }
+  else
+  {
     stableOnCnt = 0;
   }
 
-  if (systemData.switchEnabled != desiredState) {
+  if (systemData.switchEnabled != desiredState)
+  {
     putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + ")");
   }
 
-  systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1);  // combine with mode
+  systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
 
   Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
   toggleSwitch(systemData.switchEnabled);
 }
 
-void toggleSwitch(bool switchEnabled) {
+void toggleSwitch(bool switchEnabled)
+{
   digitalWrite(PIN_SSR, switchEnabled ? HIGH : LOW);
   buildInLED(switchEnabled);
 }
 
-bool isDST(struct tm* timeinfo) {
+bool isDST(struct tm *timeinfo)
+{
   int year = timeinfo->tm_year + 1900;
 
   struct tm lastMarchSunday;
   lastMarchSunday.tm_min = 0;
   lastMarchSunday.tm_sec = 0;
   lastMarchSunday.tm_year = year - 1900;
-  lastMarchSunday.tm_mon = 2;  // März
+  lastMarchSunday.tm_mon = 2; // März
   lastMarchSunday.tm_mday = 31;
   lastMarchSunday.tm_hour = 2;
   mktime(&lastMarchSunday);
@@ -814,45 +952,36 @@ bool isDST(struct tm* timeinfo) {
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
-static char* toLocalDate(uint32_t utc_ts) {
-  return toDate(utc_ts, (stdOffset + systemData.dstOffset));
-}
+bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh)
+{
 
-static char* toDate(uint32_t utc_ts) {
-  return toDate(utc_ts, 0);
-}
-
-static char tsfmt[20];
-
-static char* toDate(uint32_t utc_ts, uint16_t offset) {
-  time_t time = (time_t)(utc_ts + offset);
-  tm* timeinfo = gmtime(&time);
-  strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", timeinfo);
-  return tsfmt;
-}
-
-bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh) {
-
-  if (systemData.pv_forecast_wh_h[0][0] == 0) {
-    return false;  // no solar forecast data, assume battery will become empty
+  if (systemData.pv_forecast_wh_h[0][0] == 0)
+  {
+    return false; // no solar forecast data, assume battery will become empty
   }
 
-  uint32_t ts = systemData.ts - (systemData.ts % 3600);  // start timestamp of last full hour
+  uint32_t ts = systemData.ts - (systemData.ts % 3600); // start timestamp of last full hour
 
   bool foundPvData = false;
   uint32_t cap_bat_Wh = systemData.cap_bat_Wh;
 
-  for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
+  for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
+  {
 
-    if ((foundPvData = systemData.pv_forecast_wh_h[i][0] == ts)) {  // seek to pv forecast upon system ts
+    if ((foundPvData = systemData.pv_forecast_wh_h[i][0] == ts))
+    { // seek to pv forecast upon system ts
 
-      uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600;  // remaining pv production in this hour
+      uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
 
-      for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++) {
+      for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
+      {
 
-        if (cap_bat_Wh < config.cap_bat_min_Wh) {  // capacity below expected min capacity
+        if (cap_bat_Wh < config.cap_bat_min_Wh)
+        { // capacity below expected min capacity
           return false;
-        } else if (cap_bat_Wh == systemData.cap_bat_max_Wh) {
+        }
+        else if (cap_bat_Wh == systemData.cap_bat_max_Wh)
+        {
           return true;
         }
         // cumulate battery capacity upon production forecast
@@ -869,15 +998,18 @@ bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh) {
   return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysteresis_Wh));
 }
 
-bool loadConfig() {
-  if (!LittleFS.exists(CONFIGFILE)) {
+bool loadConfig()
+{
+  if (!LittleFS.exists(CONFIGFILE))
+  {
     Serial.println("Config file not found");
 
     return false;
   }
 
   File f = LittleFS.open(CONFIGFILE, "r");
-  if (!f) {
+  if (!f)
+  {
     Serial.printf("Could not open config file %s\n", CONFIGFILE);
 
     return false;
@@ -887,7 +1019,8 @@ bool loadConfig() {
   DeserializationError error = deserializeJson(json, f);
   f.close();
 
-  if (error) {
+  if (error)
+  {
     return false;
   }
 
@@ -899,9 +1032,11 @@ bool loadConfig() {
   return true;
 }
 
-bool saveConfig() {
+bool saveConfig()
+{
   File f = LittleFS.open(CONFIGFILE, "w");
-  if (!f) {
+  if (!f)
+  {
     Serial.printf("Could not open config file %s for writing\n", CONFIGFILE);
     return false;
   }

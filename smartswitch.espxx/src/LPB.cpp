@@ -141,6 +141,7 @@ void LPB::disableInterface() {
     ((SoftwareSerial*)serial)->end();
 #endif
   }
+  serial = NULL;
 }
 
 

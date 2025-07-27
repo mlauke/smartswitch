@@ -46,6 +46,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
 
     http.setTimeout(REQUEST_TIMEOUT);
     http.setReuse(false);
+    http.setFollowRedirects(followRedirects_t::HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.setUserAgent("SmartSwitch");
     if (hName.length() != 0 && hValue.length() != 0) {
       http.addHeader(hName, hValue);

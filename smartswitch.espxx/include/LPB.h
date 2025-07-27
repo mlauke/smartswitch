@@ -113,7 +113,7 @@ private:
   void printTelegram(byte* msg, float query_line);
   float toFIXPOINT(byte* msg, cmd_t cmd);
 
-  Stream* serial;  // Bus interface. Point to Software or HarwareSerial
+  Stream* serial = NULL;  // Bus interface. Point to Software or HarwareSerial
 };
 
 #define DEFAULT_FLAG FL_SW_CTL_RONLY
