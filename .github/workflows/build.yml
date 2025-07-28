@@ -84,4 +84,4 @@ jobs:
           artifactContentType: "application/gzip"
           artifacts: |
             smartswitch.esp8266.ino.bin.gz
-            smartswitch.esp32.ino.bin.gz
+            smartswitch.esp32.ino.bin
