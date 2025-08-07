@@ -136,7 +136,6 @@ void setup()
   server.on("/favicon.ico", handleFavicon);
   server.on("/app.js", handleAppJs);
   server.on("/app.css", handleAppCss);
-  server.on("/api/data", handleData);
   server.on("/api/status", handleStatus);
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
@@ -347,9 +346,6 @@ void jsonToConfig(JsonDocument &data)
 
   setConfigStr(config, location, data["loc"]);
   setConfigStr(config, tz, data["tz"]);
-
-  //  config.boiler_T_max = data["bs_t_max"].as<uint8_t>();
-  // config.boiler_T_nom = data["bs_t_nom"].as<uint8_t>();
 }
 
 void configToJson(JsonDocument &data)
@@ -375,14 +371,10 @@ void configToJson(JsonDocument &data)
 
   data["loc"] = config.location;
   data["tz"] = config.tz;
-
-  //  data["bs_t_max"] = config.boiler_T_max;
-  // data["bs_t_nom"] = config.boiler_T_nom;
 }
 
 void sendJson(String from, JsonDocument &json)
 {
-
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
@@ -390,17 +382,6 @@ void sendJson(String from, JsonDocument &json)
 
   cacheControlHeader(false);
   server.send(200, "application/json", jsonString);
-}
-
-void handleData()
-{
-
-  JsonDocument data;
-
-  configToJson(data);
-  data["sn_cap_max"] = systemData.cap_bat_max_Wh;
-
-  sendJson("data", data);
 }
 
 void addLog(JsonArray &array, logEntry &log)
@@ -419,6 +400,8 @@ void handleStatus()
 
   JsonDocument data;
 
+  configToJson(data);
+
   data["cons_w"] = systemData.cons_W;
   data["cons_avg_w"] = systemData.cons_avg_W;
   data["prod"] = systemData.prod_W;
@@ -427,6 +410,7 @@ void handleStatus()
   data["chrg"] = systemData.charge;
   data["pac_total_w"] = systemData.pac_total_W;
   data["switch"] = systemData.switchEnabled;
+  data["sn_cap_max"] = systemData.cap_bat_max_Wh;
 
   char devid[40] = "unknown";
   device_map *device = lpb->getDestDevice();
@@ -435,7 +419,6 @@ void handleStatus()
     snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
   data["bs_devid"] = devid;
-
   data["bs_t_cur"] = systemData.boiler_T_cur;
   data["bs_t_max"] = systemData.boiler_T_max;
   data["bs_t_min"] = systemData.boiler_T_min;
@@ -548,8 +531,6 @@ void handleGithubUpdate()
 
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
-  ensureConnected();
-
   if (!gh_updater.checkUpdate(config.release_tag))
   {
     if (server.client() && server.client().connected())
@@ -574,8 +555,7 @@ void handleGithubUpdate()
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig())
     {
-      Serial.println("Error saving config");
-      putEvent("Error saving config");
+      putEvent("error saving config with release tag.");
     }
     else
     {
@@ -676,13 +656,14 @@ void loop()
   {
 
     uint32_t heap = ESP.getFreeHeap();
+    uint32_t cpuFreq = ESP.getCpuFreqMHz();
 
     bool validData =
         ensureConnected() && updateSystemData() && updateSolarForecast() && updateBoilerData();
 
     updateSwitch(validData);
 
-    Serial.printf("ESP Heap %uk/%uk valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, validData);
+    Serial.printf("ESP Heap %uk/%uk CPU: %u valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
 
     doUpdateFlag = false;
   }
@@ -697,7 +678,11 @@ void loop()
 
 void buildInLED(bool onOff)
 {
+#ifdef ESP32
   digitalWrite(LED_BUILTIN, onOff ? HIGH : LOW);
+#else
+  digitalWrite(LED_BUILTIN, onOff ? LOW : HIGH);
+#endif
 }
 
 void statusLED(int status)
@@ -718,23 +703,30 @@ bool ensureConnected()
   if (status != WL_CONNECTED)
   {
     Serial.print("Connecting");
-    for (int i = 0; i < 8; i++)
+    for (int retry = 1; retry <= 8; retry++)
     {
       statusLED(0);
       Serial.print(".");
       delay(500);
-    }
-    Serial.println();
 
-    status = WiFi.status();
-    statusLED(status);
-    if (status == WL_CONNECTED)
-    {
-      Serial.printf("Connected. IP address: %s status: %d\n", WiFi.localIP().toString().c_str(), status);
+      status = WiFi.status();
+      if (status == WL_CONNECTED)
+      {
+        Serial.printf("Connected. IP address: %s status: %d\n", WiFi.localIP().toString().c_str(), status);
+        break;
+      }
+      else
+      {
+        Serial.printf("Wifi not connected, status: %d\n", status);
+        if (status == WL_IDLE_STATUS)
+        {
+          WiFi.disconnect();
+          status = WiFi.begin();
+        }
+      }
     }
-    else
-    {
-      Serial.printf("Wifi Error: %d\n", status);
+    if(status != WL_CONNECTED){
+      restart();
     }
   }
   return status == WL_CONNECTED;

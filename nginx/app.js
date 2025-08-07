@@ -1,4 +1,4 @@
-async function fetchData(uri, cb) {
+async function fetchAPI(uri, cb) {
 
   var response;
   var data;
@@ -39,7 +39,7 @@ async function fetchData(uri, cb) {
 }
 
 function fetchStatus() {
-  fetchData("/api/status", function (response, json) {
+  fetchAPI("/api/status", function (response, json) {
     if (response !== undefined && response.ok && json !== undefined) {
       updateBattery();
       const events = json["events"];
@@ -124,5 +124,4 @@ document.querySelectorAll("input[type='radio']").forEach(radio => {
   });
 });
 
-fetchData("/api/data");
 fetchStatus();
