@@ -71,14 +71,6 @@
   </fieldset>
   <form>
     <fieldset>
-      <legend>Mode</legend>
-      <label><input type="radio" name="mode" value="0">Off</label><br />
-      <label><input type="radio" name="mode" value="1">On</label><br />
-      <label><input type="radio" name="mode" value="2">Auto</label><br />
-    </fieldset>
-  </form>
-  <form>
-    <fieldset>
       <legend>Hot Water System</legend>
       <div class="fg">
         <div>Device:</div>
@@ -102,6 +94,36 @@
       </div>
     </fieldset>
   </form>
+  <form>
+    <fieldset>
+      <legend>Mode</legend>
+      <div>
+        <input id="mode0" type="radio" name="mode" value="0">
+        <label for="mode0">Off</label>
+      </div>
+      <div>
+        <input id="mode1" type="radio" name="mode" value="1">
+        <label for="mode1">On</label>
+      </div>
+      <div>
+        <input id="mode2" type="radio" name="mode" value="2">
+        <label for="mode2">Auto</label>
+      </div>
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post">
+    <fieldset>
+      <legend>Load</legend>
+      <div class="fg">
+        <label for="sn_loadpower">Load (W):</label>
+        <input id="sn_loadpower" name="sn_loadpower" maxlength="4">
+      </div>
+      <div class="fg">
+        <div></div>
+        <button type="submit" name="calibrate" value="calibrate">Calibrate</button>
+      </div>
+    </fieldset>
+  </form>
   <form action="/api/update" method="post">
     <fieldset>
       <legend>Sonnen Battery</legend>
@@ -112,10 +134,6 @@
       <div class="fg">
         <label for="sn_token">Token:</label>
         <input id="sn_token" type="password" name="sn_token" maxlength="36">
-      </div>
-      <div class="fg">
-        <label for="sn_loadpower">Load (W):</label>
-        <input id="sn_loadpower" name="sn_loadpower" maxlength="4">
       </div>
       <div class="fg">
         <label for="sn_cap_min">Capacity min (0..<span name="sn_cap_max"></span> Wh):</label>
@@ -147,15 +165,15 @@
         <input id="lc_lon" name="lc_lon" maxlength="8">
       </div>
       <div class="fg">
-        <label for="lc_az">Azimuth (0...360):</label>
+        <label for="lc_az">Azimuth (0...360°):</label>
         <input id="lc_az" name="lc_az" size="3" maxlength="3">
       </div>
       <div class="fg">
-        <label for="lc_dec">Panel Declination (0...90):</label>
+        <label for="lc_dec">Panel Declination (0...90°):</label>
         <input id="lc_dec" name="lc_dec" size="2" maxlength="2">
       </div>
       <div class="fg">
-        <label for="lc_kWp">kWp:</label>
+        <label for="lc_kWp">kWp (kW peak):</label>
         <input id="lc_kWp" name="lc_kWp">
       </div>
       <div class="fg">

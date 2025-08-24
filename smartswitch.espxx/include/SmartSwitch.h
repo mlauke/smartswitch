@@ -162,7 +162,7 @@ typedef struct {
   uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
   uint16_t prod_W;           // prodcution (Watt)
   uint16_t cons_W;           // consumption (Watt)
-  uint16_t cons_W_rnd;       // consumption rounded as multiple of 100 (Watt)
+  uint16_t cons_W_nom;       // consumption rounded as multiple of 100 (Watt)
   uint16_t cons_W_norm;      // normalized consumption without load
   uint16_t cons_avg_W;       // consumption average (W)
   uint16_t cap_bat_Wh;       // current capacity
