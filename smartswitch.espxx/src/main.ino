@@ -23,7 +23,7 @@
 
 #ifdef ESP32
 static WebServer server(WEBSERVER_PORT);
-#elif defined(ESP8266)
+#elif ESP8266
 static ESP8266WebServer server(WEBSERVER_PORT);
 #endif
 
@@ -122,7 +122,7 @@ void setup()
 
 #ifdef ESP32
   // esp_task_wdt_init({ 20000, 0, true });
-#elif defined(ESP8266)
+#elif ESP8266
   ESP.wdtEnable(20000);
   server.keepAlive(false);
 #endif
@@ -145,7 +145,7 @@ void setup()
 
   lpb->enableInterface();
   uint8_t retry = 0;
-  while (!lpb->GetDevId() && retry++ < 2)
+  while (retry++ < 2 && !lpb->GetDevId())
   {
     putBoilerError(String("LPB: No device found after ") + retry + " retries!");
   }
@@ -164,7 +164,7 @@ void onOTABegin()
   if (timer.active())
     timer.detach();
   lpb->disableInterface();
-#if defined(ESP8266)
+#if ESP8266
   ESP.wdtDisable();
 #endif
 }
@@ -192,7 +192,7 @@ void configDefaults()
 
 #ifdef ESP32
   setConfigStr(config, hostname, WiFi.getHostname());
-#elif defined(ESP8266)
+#elif ESP8266
   setConfigStr(config, hostname, WiFi.hostname().c_str());
 #endif
   setConfigStr(config, release_tag, RELEASE_TAG);
@@ -543,13 +543,12 @@ void handleGithubUpdate()
     return;
   }
 
-  char buffer[256];
-  snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
   if (server.client() && server.client().connected())
   {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
     server.send(200, "text/html;charset=utf-8", buffer);
   }
-  DEBUG(buffer);
 
   Serial.setDebugOutput(true);
 
@@ -568,7 +567,7 @@ void handleGithubUpdate()
   }
   else
   {
-    putEvent(gh_updater.getUpdateError());
+    putEvent(gh_updater.getUpdateStatus());
   }
 
   Serial.setDebugOutput(false);
@@ -674,7 +673,7 @@ void loop()
 
 #ifdef ESP32
   // esp_task_wdt_reset();
-#elif defined(ESP8266)
+#elif ESP8266
   ESP.wdtFeed();
 #endif
 }

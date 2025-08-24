@@ -56,7 +56,7 @@
 #define PIN_LPB_TX GPIO_NUM_17
 #define PIN_SSR GPIO_NUM_21
 
-#elif defined(ESP8266)
+#elif ESP8266
 
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WiFi.h>

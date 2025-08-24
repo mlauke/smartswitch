@@ -20,7 +20,7 @@ public:
   GithubOTA(const char *, const char *, const char *, const char *);
   bool checkUpdate(const char *);
   bool doUpdate(void (*fnOTABegin)(void));
-  String getUpdateError();
+  String getUpdateStatus();
 
 protected:
   const char *update_type;
@@ -29,7 +29,7 @@ protected:
   const char *update_url;
 
   String download_url;
-  String updateError;
+  String updateStatus;
 };
 
 

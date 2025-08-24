@@ -47,7 +47,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
     http.setTimeout(REQUEST_TIMEOUT);
     http.setReuse(false);
     http.setFollowRedirects(followRedirects_t::HTTPC_STRICT_FOLLOW_REDIRECTS);
-    http.setUserAgent("SmartSwitch");
+    http.setUserAgent(String("SmartSwitch - "));
     if (hName.length() != 0 && hValue.length() != 0) {
       http.addHeader(hName, hValue);
     }
@@ -55,7 +55,7 @@ bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValu
 
     _lastResponseCode = http.GET();
     if ((res = _lastResponseCode == HTTP_CODE_OK)) {
-      DeserializationError error = deserializeJson(doc, http.getString());
+      DeserializationError error = deserializeJson(doc, http.getStream());
       if (error) {
         _lastError.concat("json error: " + url + " - " + error.c_str());
         Serial.println(_lastError);

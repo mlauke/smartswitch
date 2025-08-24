@@ -48,8 +48,9 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
   JsonDocument doc;
   RestClient restClient;
 
-  String url = String(update_host) + update_url;
+  updateStatus.clear();
 
+  String url = String(update_host) + update_url;
   if (restClient.fetch(url, doc))
   {
     if (!doc["tag_name"].is<const char *>())
@@ -64,6 +65,7 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
 
     if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || doc["prerelease"].as<bool>())
     {
+      Serial.println("no newer release tag found");
       return false;
     }
 
@@ -80,13 +82,17 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
       {
         download_url = String(asset_url);
 
-        Serial.println("Update URL: " + download_url);
+        Serial.println("Found Update URL: " + download_url);
 
         return true;
       }
     }
   }
-  Serial.println("No update asset found");
+  else
+  {
+    updateStatus = restClient.lastError();
+    Serial.println(updateStatus);
+  }
   return false;
 }
 
@@ -101,14 +107,16 @@ void onOTAProgress(size_t current, size_t final)
   }
 }
 
-String GithubOTA::getUpdateError()
+String GithubOTA::getUpdateStatus()
 {
-  return updateError;
+  return updateStatus;
 }
 
 bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
 {
   bool success = false;
+
+  updateStatus.clear();
 
   if (download_url.length() == 0)
   {
@@ -168,22 +176,22 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
         }
         else
         {
-          updateError = String("Update not finished? Something went wrong!");
+          updateStatus = String("Update not finished? Something went wrong!");
         }
       }
       else
       {
-        updateError = String("Error Occurred. Error #: ") + Update.getError();
+        updateStatus = String("Error Occurred. Error #: ") + Update.getError();
       }
     }
     else
     {
-      updateError = String("Not enough space to begin OTA");
+      updateStatus = String("Not enough space to begin OTA");
     }
   }
   else
   {
-    updateError = String("Failed to download firmware. HTTP code: ") + String(httpCode);
+    updateStatus = String("Failed to download firmware. HTTP code: ") + String(httpCode);
   }
   http.end();
 
@@ -199,7 +207,7 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
   success = ESPhttpUpdate.update(*updateClient, download_url) == HTTP_UPDATE_OK;
   if (!success)
   {
-    updateError = String("Update Failed: ") + ESPhttpUpdate.getLastErrorString();
+    updateStatus = String("Update Failed: ") + ESPhttpUpdate.getLastErrorString();
   }
 #endif
 
@@ -207,7 +215,7 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
 
   if (!success)
   {
-    Serial.println(updateError);
+    Serial.println(updateStatus);
   }
 
   return success;
