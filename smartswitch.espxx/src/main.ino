@@ -64,12 +64,12 @@ void saveConfigCallback()
 
 void setup()
 {
-  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
-
   configDefaults();
   systemDefaults();
 
   Serial.begin(SERIAL_BAUDRATE);
+
+  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
 
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(PIN_SSR, OUTPUT);
@@ -97,9 +97,9 @@ void setup()
   }
   else
   {
-    Serial.println("Failed to mount FS. Attempting to format.");
+    Serial.print("Failed to mount FS. Attempting to format...");
     LittleFS.format();
-    Serial.println("format done.");
+    Serial.println(" done.");
 
     saveConfig();
   }
