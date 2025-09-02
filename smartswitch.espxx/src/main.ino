@@ -228,7 +228,7 @@ bool updateSolarForecast()
     char url[128];
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
-    if ((lastResult = restClient.fetch(String(url), doc)))
+    if ((lastResult = restClient.fetch(String(url), doc, NULL)))
     {
 
       serializeJsonPretty(doc, Serial);
@@ -270,7 +270,7 @@ void updateLocation()
     RestClient restClient;
     JsonDocument doc;
 
-    if ((saveConfigFile = restClient.fetch(URL_LOCATION, doc)))
+    if ((saveConfigFile = restClient.fetch(URL_LOCATION, doc, NULL)))
     {
       config.lon = doc["lon"].as<double>();
       config.lat = doc["lat"].as<double>();
@@ -660,8 +660,10 @@ void loop()
     uint32_t heap = ESP.getFreeHeap();
     uint32_t cpuFreq = ESP.getCpuFreqMHz();
 
-    bool validData =
-        ensureConnected() && updateSystemData() && updateSolarForecast() && updateBoilerData();
+    bool validData = ensureConnected();
+    validData &=updateSystemData();
+    validData &=updateSolarForecast();
+    validData &=updateBoilerData();
 
     updateSwitch(validData);
 
@@ -746,7 +748,7 @@ bool fetchData(String uri, JsonDocument &doc)
   {
     char url[128];
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    r = restClient.fetch(String(url), doc, "auth-token", config.sonnenApiToken);
+    r = restClient.fetch(String(url), doc, NULL, "auth-token", config.sonnenApiToken);
     if (!r)
     {
       putBatteryError(restClient.lastError());

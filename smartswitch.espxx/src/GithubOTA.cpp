@@ -46,12 +46,19 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
 {
 
   JsonDocument doc;
+  JsonDocument filter;
   RestClient restClient;
 
   updateStatus.clear();
 
+  filter["tag_name"] = true;
+  filter["prerelease"] = true;
+  filter["assets"][0]["content_type"] = true;
+  filter["assets"][0]["name"] = true;
+  filter["assets"][0]["browser_download_url"] = true;
+
   String url = String(update_host) + update_url;
-  if (restClient.fetch(url, doc))
+  if (restClient.fetch(url, doc, &filter))
   {
     if (!doc["tag_name"].is<const char *>())
     {

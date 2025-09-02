@@ -23,46 +23,62 @@
 
 RestClient::RestClient() {}
 
-String RestClient::lastError() {
+String RestClient::lastError()
+{
   return _lastError;
 }
 
-int RestClient::lastResponseCode() {
+int RestClient::lastResponseCode()
+{
   return _lastResponseCode;
 }
 
-bool RestClient::fetch(String url, JsonDocument& doc, String hName, String hValue) {
+bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, String hName, String hValue)
+{
 
   HTTPClient http;
 
-  WiFiClient* wifiClient = newWiFiClient(url);
+  WiFiClient *wifiClient = newWiFiClient(url);
 
   DEBUG("url: '%s' - hdr: '%s' : '%s'\n", url.c_str(), hName.c_str(), hValue.c_str());
 
   _lastError.clear();
 
   bool res = http.begin(*wifiClient, url);
-  if (res) {
+  if (res)
+  {
 
     http.setTimeout(REQUEST_TIMEOUT);
     http.setReuse(false);
     http.setFollowRedirects(followRedirects_t::HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.setUserAgent(String("SmartSwitch - "));
-    if (hName.length() != 0 && hValue.length() != 0) {
+    if (hName.length() != 0 && hValue.length() != 0)
+    {
       http.addHeader(hName, hValue);
     }
     http.addHeader("accept", "application/json", true, true);
 
     _lastResponseCode = http.GET();
-    if ((res = _lastResponseCode == HTTP_CODE_OK)) {
-      DeserializationError error = deserializeJson(doc, http.getStream());
-      if (error) {
+    if ((res = _lastResponseCode == HTTP_CODE_OK))
+    {
+      DeserializationError error;
+      if (filter != NULL)
+      {
+        error = deserializeJson(doc, http.getString(), DeserializationOption::Filter(*filter));
+      }
+      else
+      {
+        error = deserializeJson(doc, http.getString());
+      }
+      if (error)
+      {
         _lastError.concat("json error: " + url + " - " + error.c_str());
-        Serial.println(_lastError);
-        Serial.println(http.getString());
+        Serial.println(_lastError + " " + http.getString());
       }
       res = error == DeserializationError::Ok;
-    } else {
+    }
+    else
+    {
       _lastError.concat(url + " code: " + _lastResponseCode + " " + http.errorToString(_lastResponseCode));
       Serial.println(_lastError);
     }
