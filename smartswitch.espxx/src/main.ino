@@ -27,19 +27,19 @@ static WebServer server(WEBSERVER_PORT);
 static ESP8266WebServer server(WEBSERVER_PORT);
 #endif
 
-static LPB *lpb;
-static WiFiManager wifiManager;
-static Ticker timer;
-static volatile bool doUpdateFlag = false;
-static systemDataStruct systemData;
-static configStruct config;
-static bool saveConfigFile = false;
+LPB *lpb;
+WiFiManager wifiManager;
+Ticker timer;
+volatile bool doUpdateFlag = false;
+systemDataStruct systemData;
+configStruct config;
+bool saveConfigFile = false;
 
 int stdOffset = 3600; // 1h utc offset Europe/Berlin
 int dstOffset = 3600; // 1h suummer time offset
 
-static char tsfmt[20];
-static char *toDate(uint32_t utc_ts, uint16_t offset)
+char tsfmt[20];
+char *toDate(uint32_t utc_ts, uint16_t offset)
 {
   time_t time = (time_t)(utc_ts + offset);
   tm *timeinfo = gmtime(&time);
@@ -47,12 +47,12 @@ static char *toDate(uint32_t utc_ts, uint16_t offset)
   return tsfmt;
 }
 
-static char *toDate(uint32_t utc_ts)
+char *toDate(uint32_t utc_ts)
 {
   return toDate(utc_ts, 0);
 }
 
-static char *toLocalDate(uint32_t utc_ts)
+char *toLocalDate(uint32_t utc_ts)
 {
   return toDate(utc_ts, (stdOffset + systemData.dstOffset));
 }
@@ -661,9 +661,9 @@ void loop()
     uint32_t cpuFreq = ESP.getCpuFreqMHz();
 
     bool validData = ensureConnected();
-    validData &=updateSystemData();
-    validData &=updateSolarForecast();
-    validData &=updateBoilerData();
+    validData &= updateSystemData();
+    validData &= updateSolarForecast();
+    validData &= updateBoilerData();
 
     updateSwitch(validData);
 
@@ -847,11 +847,12 @@ bool updateSystemData()
 const String CONSTRAINTS[] = {
     "",
     "invalid data",
-    "load overflow - consumption exceeds system capacity",
+    "load consumption would exceed system capacity",
     "surplus greater load",
-    "battery capacity target",
-    "boiler temperature min",
-    "boiler temperature max",
+    "battery discharge not allowed",
+    "battery capacity goal not reachable",
+    "boiler temperature min reached",
+    "boiler temperature max reached",
 };
 
 // putEvent("min capacity at " + String(toLocalDate(ts)));
@@ -875,8 +876,8 @@ void updateSwitch(bool validData)
   bool desiredState = (constraint = 1) && validData &&
                       ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_nom - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0) && // aware of max system power (production + max inverter power)
                       (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                           // if surplus (waste) exceeds load
-                       || ((constraint = 4) && systemData.dischargeNotAllowed == false && batteryCapacityTargetFulfilled(hysteresis_Wh)))                                                                        // forecast battery capacity and be aware of discharge allowed
-                      && (((constraint = 5) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) || ((constraint = 6) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
+                       || ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(hysteresis_Wh)))                                                    // forecast battery capacity and be aware of discharge allowed
+                      && (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) || ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
   if (desiredState)
   { // on?
@@ -911,7 +912,7 @@ void updateSwitch(bool validData)
   {
     putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + CONSTRAINTS[constraint] + ")");
   }
-  systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
+  systemData.switchEnabled = (desiredState == true && config.mode == 2) || (config.mode == 1); // combine with mode
 
   Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
