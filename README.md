@@ -1,45 +1,62 @@
 # Sonnen SmartSwitch
-... self-made sonnen battery controlled switch which drives a "3,3kW Heater" (Heißwasserspeicher-Einbauheizung)
+DIY sonnen battery controlled switch which drives a "3.3kW Heater" (Heißwasserspeicher-Einbauheizung)
 
 ## Features
-- accesses the local Heater system via LPB to get the hot water temparature (boilder)
-- calculates battery capacity and surplus from solar forecast and longterm consumption
-
-## Web-Interface
+- accesses the local hot water system (boiler system) via LPB to get the hot water system data - e.g. hot water temparature
+- calculate battery capacity and surplus from solar forecast to optimize the self consumption
+- local web interface to customize system parameters
 
 ## Software
-- smartswitch.esp8266.ino
+the software supports ESP8266 and ESP32 modules, which can be build for the appropriate target platform. releases can be found at https://github.com/mlauke/smartswitch/releases/
 
 ## Hardware
+the reference implementation (at my home) uses the following components
 - Heater - https://www.austria-email.at/produkte/zubehoer/elektro-einbauheizung/reu-18-33/
 - Hot Water Tank - https://www.austria-email.at/produkte/indirekt-beheizte-speicher/standspeicher/standspeicher-hr/hr-160/
 - Sonnen Battery https://sonnen.de/stromspeicher/sonnenbatterie-10/
-- esp8266 module
-- ArduiBox housing
-- DIN Rail Power supply
+- Boiler System - Siemens RVD250 attached connected to Local Process Bus (LPB)
+- ESP8266/ESP32 module
+- ArduiBox housing https://www.az-delivery.de/en/products/arduibox-nodemcu-hutschienen-montage-und-anschluss-set
+- DIN Rail Power supply +12V
 - AC mains Triac cicuit to drive a 1NO Relay (Schütz)
-- Boiler with Siemens RVD250 attached with Local Process Bus
 
-## Thoughts
+### Thoughts
+#### Why not using a TRIAC only solution?
+Although Triacs have very low Rs_on values in nowadays, they become very hot depending on the load to drive. Using a 3.3kW heater will require a big heatsink as can be seen in the calculation below.
+
+```bash
 Pmax = (Tj,max - Tamb,max) / Rth
-P_loss = 1,5V * 14,3 A = 21,45W
-Pmax = ( 140°C - 40°C ) / ( Theat °C/W ) = 22 W => Rth = ( 140°C - 40°C ) / 21,45W = 4,66°C/W
-Rth = (RqJC Junction to case) + (Rkühlkörper) = 1°C/W + Rheatsink => Rheatsink = 3,66°C/W
 
+I = P / U = 3300W / 230 V = 14,35A
+Rs_on (BTA25) = 0,16 Ohm
+P_loss = U * I = Rs_on * I * I
+P_loss = 0,16 Ohm * (14,35 A)²
+P_loss = 32,95W
 
-## TODO
-- software
-  - FE update config data if stale
+R_max = (T_max - T_env) / P_loss
+R_max = (120°C - 40°C) / 33W
+R_max = 2,42K/W
+R_heatsink = R_max - R_jc = 2,42K/W - 1,7K/W
+R_heatsink = 0,7K/W !!!
+```
+... heatsink with <=0,7K/W makes no sense since this will result in too much power wasted for heat and would "blow up" the overall system design.
+therefore we decided to use a triac as switching device for a simple NO1 relais ("Schütz") which in turn will drive the load. the NO1 relais can directly placed next to the arduino case on our din rail.
+
+#### Why not using a SSR?
+as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with controller board on a din rail inside of my houses fuse box.
+
+# TODOs
   - fix: flicker if bat is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
   - battery system data update every day or from time to time
   - feat: skip updateSwitch if not set to Auto
   - feat: wait or delay on reset/restart requests, make sure response is send
   - feat: suspend/sleep for a while (or double the amount of sleep)
     - if switch is off and will stay off
-    - if boilder temp. is alread yreached
+    - if boilder temp. is alread reached
   - feat: measure consumption avg per hour and week day and save to config for better long term approximation
   - feat: calibrate load automatically
   - feat: below cap min but Production increases and remaining capacity is enough to drive load - but be aware that cap_min is never reached at this time
+
+## Dreams
 - hardware
   - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power
-  -

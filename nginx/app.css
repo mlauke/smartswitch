@@ -260,7 +260,6 @@ input {
 
 .charge[data-lvl="medium"] {
   background: linear-gradient(to top, #ffc107, #ffd34f);
-  color: black;
 }
 
 .charge[data-lvl="low"] {

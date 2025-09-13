@@ -110,6 +110,8 @@
 #define CFG_SZ_LOCATION 64
 #define CFG_SZ_TZ 32
 
+#define SIZE_EVENT_BUFFER 16
+
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -175,7 +177,7 @@ typedef struct {
   long pv_forecast_ts;               // last update timestamp in ms since mcu start
   uint32_t pv_forecast_wh_h[49][2];  // pair of timestamp and pv production (Wh/h) for today and tomorrow
 
-  logEntry events[16];  // event buffer
+  logEntry events[SIZE_EVENT_BUFFER];  // event buffer
   uint8_t eventIx = 0;
 
   uint8_t skipUpdateCountSysten;  // skip update on error count

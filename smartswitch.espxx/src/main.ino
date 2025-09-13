@@ -430,10 +430,10 @@ void handleStatus()
   addLog(errors, systemData.error_lc);
 
   JsonArray events = data["events"].to<JsonArray>();
-  int i = sizeof(systemData.events) / sizeof(systemData.events[0]);
+  unsigned short i = SIZE_EVENT_BUFFER;
   while (i-- > 0)
   {
-    logEntry log = systemData.events[(systemData.eventIx + i) % 8];
+    logEntry log = systemData.events[(systemData.eventIx + i) % SIZE_EVENT_BUFFER];
     addLog(events, log);
   }
 
@@ -613,7 +613,7 @@ void putLog(logEntry &log, const char *event)
 
 void putEvent(const char *event)
 {
-  putLog(systemData.events[systemData.eventIx++ % 8], event);
+  putLog(systemData.events[systemData.eventIx++ % SIZE_EVENT_BUFFER], event);
 }
 
 void putEvent(String event)
@@ -850,13 +850,10 @@ const String CONSTRAINTS[] = {
     "load consumption would exceed system capacity",
     "surplus greater load",
     "battery discharge not allowed",
-    "battery capacity goal not reachable",
+    "battery min capacity reached at ",
     "boiler temperature min reached",
     "boiler temperature max reached",
 };
-
-// putEvent("min capacity at " + String(toLocalDate(ts)));
-// putEvent("max capacity at " + String(toLocalDate(ts)));
 
 void updateSwitch(bool validData)
 {
@@ -864,6 +861,7 @@ void updateSwitch(bool validData)
   static uint8_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 
+  uint32_t ts = 0;
   uint8_t constraint = 0;
 
   uint16_t hysteresis_Wh = config.loadPower_W / 12; // Wh if load is switched on for 5min
@@ -876,11 +874,11 @@ void updateSwitch(bool validData)
   bool desiredState = (constraint = 1) && validData &&
                       ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_nom - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0) && // aware of max system power (production + max inverter power)
                       (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                           // if surplus (waste) exceeds load
-                       || ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(hysteresis_Wh)))                                                    // forecast battery capacity and be aware of discharge allowed
+                       || ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(hysteresis_Wh, &ts)))                                               // forecast battery capacity and be aware of discharge allowed
                       && (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) || ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
-  if (desiredState)
-  { // on?
+  if (desiredState) // on?
+  {
     if (stableOnCnt == SYSTEM_ON_COUNT)
     {
       if (systemData.switchEnabled)
@@ -910,9 +908,9 @@ void updateSwitch(bool validData)
 
   if (config.mode == 2 && systemData.switchEnabled != desiredState)
   {
-    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + CONSTRAINTS[constraint] + ")");
+    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + CONSTRAINTS[constraint] + (ts == 0 ? "" : toLocalDate(ts)) + ")");
   }
-  systemData.switchEnabled = (desiredState == true && config.mode == 2) || (config.mode == 1); // combine with mode
+  systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
 
   Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 
@@ -953,49 +951,48 @@ bool isDST(struct tm *timeinfo)
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
-bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh)
+bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh, uint32_t *ts)
 {
+  bool foundPvData = false;
 
   if (systemData.pv_forecast_wh_h[0][0] == 0)
   {
-    return false; // no solar forecast data, assume battery will become empty
+    return foundPvData; // no solar forecast data, assume battery will become empty
   }
 
-  uint32_t ts = systemData.ts - (systemData.ts % 3600); // start timestamp of last full hour
+  *ts = systemData.ts - (systemData.ts % 3600); // start timestamp of last full hour
 
-  bool foundPvData = false;
   uint32_t cap_bat_Wh = systemData.cap_bat_Wh;
 
   for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
   {
 
-    if ((foundPvData = systemData.pv_forecast_wh_h[i][0] == ts))
+    if ((foundPvData = systemData.pv_forecast_wh_h[i][0] == *ts))
     { // seek to pv forecast upon system ts
 
-      uint32_t wh = (ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
+      uint32_t wh = (*ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
 
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
       {
 
-        if (cap_bat_Wh < config.cap_bat_min_Wh)
-        { // capacity below expected min capacity
-          return false;
-        }
-        else if (cap_bat_Wh == systemData.cap_bat_max_Wh)
+        // if (cap_bat_Wh < (config.cap_bat_min_Wh + hysteresis_Wh))
+        // { // capacity below expected min capacity
+        //   return false;
+        // }
+        if (cap_bat_Wh == systemData.cap_bat_max_Wh)
         {
           return true;
         }
         // cumulate battery capacity upon production forecast
         cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, (uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData.inv_max_w, (int)wh - systemData.cons_W_norm)));
-        Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
+        Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, *ts, toDate(*ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
 
-        ts = systemData.pv_forecast_wh_h[i][0];
+        *ts = systemData.pv_forecast_wh_h[i][0];
         wh = systemData.pv_forecast_wh_h[i][1];
       }
     }
   }
-
-  putEvent(String("capacity ") + cap_bat_Wh + "Wh " + hysteresis_Wh + "Wh (hys) at " + toLocalDate(ts));
+  Serial.println(String("capacity ") + cap_bat_Wh + "Wh " + hysteresis_Wh + "Wh (hys) at " + toLocalDate(*ts));
   return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysteresis_Wh));
 }
 
