@@ -908,7 +908,7 @@ void updateSwitch(bool validData)
 
   if (config.mode == 2 && systemData.switchEnabled != desiredState)
   {
-    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + CONSTRAINTS[constraint] + (ts == 0 ? "" : toLocalDate(ts)) + ")");
+    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + CONSTRAINTS[constraint] + (constraint == 5 ? toLocalDate(ts) : "") + ")");
   }
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
 
@@ -975,10 +975,10 @@ bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh, uint32_t *ts)
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
       {
 
-        // if (cap_bat_Wh < (config.cap_bat_min_Wh + hysteresis_Wh))
-        // { // capacity below expected min capacity
-        //   return false;
-        // }
+        if (cap_bat_Wh < config.cap_bat_min_Wh)
+        { // capacity below expected min capacity
+          return false;
+        }
         if (cap_bat_Wh == systemData.cap_bat_max_Wh)
         {
           return true;
