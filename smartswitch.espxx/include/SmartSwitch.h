@@ -141,6 +141,7 @@ typedef struct {
   char tz[CFG_SZ_TZ + 1];
   uint8_t mode;         // 0 - off, 1 - on, 2 - automatic
   bool update_startup;  // release update check on startup
+  uint16_t version;     //
 } configStruct;
 
 typedef struct {

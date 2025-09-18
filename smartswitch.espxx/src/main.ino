@@ -137,6 +137,7 @@ void setup()
   server.on("/app.js", handleAppJs);
   server.on("/app.css", handleAppCss);
   server.on("/api/status", handleStatus);
+  server.on("/api/data", handleData);
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
 
@@ -210,6 +211,8 @@ void configDefaults()
   config.gridMin_W = GRID_PURCHASE_THRESHOLD_W;
   config.mode = 0; // initial set to off
   config.update_startup = false;
+
+  config.version = 0;
 }
 
 bool updateSolarForecast()
@@ -346,6 +349,8 @@ void jsonToConfig(JsonDocument &data)
 
   setConfigStr(config, location, data["loc"]);
   setConfigStr(config, tz, data["tz"]);
+
+  config.version = data["version"].as<uint16_t>();
 }
 
 void configToJson(JsonDocument &data)
@@ -371,6 +376,8 @@ void configToJson(JsonDocument &data)
 
   data["loc"] = config.location;
   data["tz"] = config.tz;
+
+  data["version"] = config.version;
 }
 
 void sendJson(String from, JsonDocument &json)
@@ -394,13 +401,18 @@ void addLog(JsonArray &array, logEntry &log)
   }
 }
 
-/// api/status
-void handleStatus()
+void handleData()
 {
-
   JsonDocument data;
 
   configToJson(data);
+  sendJson("data", data);
+}
+
+// api/status
+void handleStatus()
+{
+  JsonDocument data;
 
   data["cons_w"] = systemData.cons_W;
   data["cons_avg_w"] = systemData.cons_avg_W;
@@ -408,7 +420,7 @@ void handleStatus()
   data["grid"] = systemData.gridFeedIn_W;
   data["usoc"] = systemData.usoc;
   data["chrg"] = systemData.charge;
-  data["pac_total_w"] = systemData.pac_total_W;
+  data["pac_total_w"] = systemData.pac_total_W * -1; // invert - positive means discharge, we invert for display
   data["switch"] = systemData.switchEnabled;
   data["sn_cap_max"] = systemData.cap_bat_max_Wh;
 
@@ -437,6 +449,8 @@ void handleStatus()
     addLog(events, log);
   }
 
+  data["version"] = config.version;
+
   sendJson("status", data);
 }
 
@@ -453,6 +467,7 @@ void handleAPI()
   }
   else if (server.hasArg("calibrate"))
   {
+    config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
   }
   else if (server.hasArg("update_startup"))
   {
@@ -469,7 +484,6 @@ void handleAPI()
     setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
     setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
     config.gridMin_W = MAX(50, MAX(0, server.arg("sn_grdmin").toInt()));
-    config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
     config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
     saveConfig();
     systemData.skipUpdateCountSysten = 0;
@@ -635,7 +649,6 @@ bool updateBoilerData()
     boilder_t boilerData;
     if ((lastResult = lpb->update(&boilerData)))
     {
-
       systemData.boiler_T_cur = boilerData.t_cur;
       systemData.boiler_T_nom = boilerData.t_nom;
       systemData.boiler_T_min = boilerData.t_min;
@@ -661,13 +674,14 @@ void loop()
     uint32_t cpuFreq = ESP.getCpuFreqMHz();
 
     bool validData = ensureConnected();
+    //    validData &= validateConfig();
     validData &= updateSystemData();
     validData &= updateSolarForecast();
     validData &= updateBoilerData();
 
     updateSwitch(validData);
 
-    Serial.printf("ESP Heap %uk/%uk CPU: %u valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
+    Serial.printf("ESP Heap %uk/%uk CPU: %u Mhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
 
     doUpdateFlag = false;
   }
@@ -737,7 +751,7 @@ bool ensureConnected()
   return status == WL_CONNECTED;
 }
 
-bool fetchData(String uri, JsonDocument &doc)
+bool fetchBatteryData(String uri, JsonDocument &doc)
 {
 
   bool r = false;
@@ -756,7 +770,7 @@ bool fetchData(String uri, JsonDocument &doc)
   }
   else
   {
-    putBatteryError("Sonnen Battery not properly configured!");
+    putBatteryError("Sonnen Battery Hostname/Token not properly configured!");
   }
   return r;
 }
@@ -778,7 +792,7 @@ bool updateSystemData()
 
   if (systemData.inv_max_w == -1)
   {
-    if ((ok &= fetchData(SONNEN_API_CONFIGURATIONS, json)))
+    if ((ok &= fetchBatteryData(SONNEN_API_CONFIGURATIONS, json)))
     {
       systemData.inv_max_w = json["IC_InverterMaxPower_w"].as<int>();
       Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
@@ -790,7 +804,7 @@ bool updateSystemData()
   }
   if (systemData.cap_bat_max_Wh == 0)
   {
-    if ((ok &= fetchData(SONNEN_API_LATEST_DATA, json)))
+    if ((ok &= fetchBatteryData(SONNEN_API_LATEST_DATA, json)))
     {
       systemData.cap_bat_max_Wh = json["FullChargeCapacity"].as<uint16_t>();
       Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
@@ -801,9 +815,8 @@ bool updateSystemData()
     }
   }
 
-  if ((ok &= fetchData(SONNEN_API_STATUS, json)))
+  if ((ok &= fetchBatteryData(SONNEN_API_STATUS, json)))
   {
-
     systemData.usoc = json["USOC"].as<uint8_t>();
     systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
     systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
@@ -824,12 +837,17 @@ bool updateSystemData()
 
     systemData.ts = mktime(&time) - stdOffset - systemData.dstOffset;
     systemData.tm_yday = time.tm_yday;
+  }
 
-    clearBatteryError();
+  // TODO wrong error category
+  if (!(ok &= config.loadPower_W > 0))
+  {
+    putBatteryError("Load not properly configured! Must be > 0!");
   }
 
   if (ok)
   {
+    clearBatteryError();
     errorLoopBackoff = 1; // reset back off on success
   }
   else
@@ -866,23 +884,28 @@ void updateSwitch(bool validData)
 
   uint16_t hysteresis_Wh = config.loadPower_W / 12; // Wh if load is switched on for 5min
 
-  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.5; // ~0.5 °C heater "afterglow"
+  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.8; // ~0.8 °C heater "afterglow"
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
 
   //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
   //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
+
   bool desiredState = (constraint = 1) && validData &&
-                      ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_nom - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0) && // aware of max system power (production + max inverter power)
-                      (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W)                                                                                           // if surplus (waste) exceeds load
-                       || ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(hysteresis_Wh, &ts)))                                               // forecast battery capacity and be aware of discharge allowed
-                      && (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) || ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
+                      // aware of max system power (production + max inverter power)
+                      ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_nom - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0) &&
+                      // if surplus ("waste") exceeds load
+                      (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) ||
+                       // forecast battery capacity and be aware of discharge allowed
+                       ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(hysteresis_Wh, &ts))) &&
+                      (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) ||
+                       ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
   if (desiredState) // on?
   {
     if (stableOnCnt == SYSTEM_ON_COUNT)
     {
-      if (systemData.switchEnabled)
-      {                                                                                                  // already on?
+      if (systemData.switchEnabled) // already on?
+      {
         inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
         desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
         if (!desiredState)
@@ -967,14 +990,13 @@ bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh, uint32_t *ts)
   for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
   {
 
-    if ((foundPvData = systemData.pv_forecast_wh_h[i][0] == *ts))
+    if ((foundPvData = (systemData.pv_forecast_wh_h[i][0] == *ts)))
     { // seek to pv forecast upon system ts
 
       uint32_t wh = (*ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
 
       for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
       {
-
         if (cap_bat_Wh < config.cap_bat_min_Wh)
         { // capacity below expected min capacity
           return false;
@@ -1038,6 +1060,9 @@ bool saveConfig()
     Serial.printf("Could not open config file %s for writing\n", CONFIGFILE);
     return false;
   }
+
+  config.version++; // update version
+
   JsonDocument json;
   configToJson(json);
   Serial.print("saveConfig() ");

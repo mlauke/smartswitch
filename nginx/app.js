@@ -1,3 +1,6 @@
+
+var systemDataVersion = -1;
+
 async function fetchAPI(uri, cb) {
 
   var response;
@@ -38,6 +41,14 @@ async function fetchAPI(uri, cb) {
   cb !== undefined && cb(response, data);
 }
 
+function fetchData() {
+  fetchAPI("/api/data", function (response, json) {
+    if (response !== undefined && response.ok && json !== undefined) {
+      systemDataVersion = json["version"];
+    }
+  });
+}
+
 function fetchStatus() {
   fetchAPI("/api/status", function (response, json) {
     if (response !== undefined && response.ok && json !== undefined) {
@@ -50,6 +61,9 @@ function fetchStatus() {
       if (errors !== undefined) {
         renderLog(document.getElementById("errorLog"), errors, "li");
         document.getElementById("errors").style.display = errors.length ? "block" : "none";
+      }
+      if (systemDataVersion !== json["version"]) {
+        fetchData();
       }
     }
     setTimeout(fetchStatus, 3000);
