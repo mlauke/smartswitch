@@ -150,6 +150,7 @@ typedef struct {
 } logEntry;
 
 typedef struct {
+  uint32_t start_ts; // start timestamp
   uint32_t ts;       // current system time, taken from battery status
   uint16_t tm_yday;  // day of year
   uint16_t dstOffset;

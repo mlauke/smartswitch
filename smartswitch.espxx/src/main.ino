@@ -182,6 +182,7 @@ void onOTAEnd(bool success)
 
 void systemDefaults()
 {
+  systemData.start_ts = 0;
   systemData.pv_forecast_ts = 0;
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   systemData.eventIx = 0;
@@ -406,6 +407,7 @@ void handleData()
   JsonDocument data;
 
   configToJson(data);
+  data["start_ts"] = toLocalDate(systemData.start_ts);
   sendJson("data", data);
 }
 
@@ -836,6 +838,9 @@ bool updateSystemData()
     systemData.dstOffset = isDST(&time) ? dstOffset : 0;
 
     systemData.ts = mktime(&time) - stdOffset - systemData.dstOffset;
+    if(systemData.start_ts == 0){
+      systemData.start_ts = systemData.ts;
+    }
     systemData.tm_yday = time.tm_yday;
   }
 
@@ -868,27 +873,23 @@ const String CONSTRAINTS[] = {
     "load consumption would exceed system capacity",
     "surplus greater load",
     "battery discharge not allowed",
-    "battery min capacity reached at ",
+    "battery min capacity reached at %s",
     "boiler temperature min reached",
     "boiler temperature max reached",
-};
+    "latency count reached %d/%d"};
 
 void updateSwitch(bool validData)
 {
-
   static uint8_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 
   uint32_t ts = 0;
   uint8_t constraint = 0;
 
-  uint16_t hysteresis_Wh = config.loadPower_W / 12; // Wh if load is switched on for 5min
+  uint16_t hysteresis_Wh = config.loadPower_W / 6; // Wh if load is switched on for 10min
 
   float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.8; // ~0.8 °C heater "afterglow"
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
-
-  //|| (systemData.switchEnabled && systemData.gridFeedIn_W >= 0)                                                                                                             // if load enabled and still grid feed in
-  //|| (systemData.cap_bat_Wh > (config.cap_bat_min_Wh + hysteresis_Wh) && MAX(0, systemData.prod_W - systemData.cons_W_norm) > ((config.loadPower_W + (int)(config.loadPower_W * 0.1)) >> 1))  // if min cap is reached, but there is production already
 
   bool desiredState = (constraint = 1) && validData &&
                       // aware of max system power (production + max inverter power)
@@ -910,7 +911,7 @@ void updateSwitch(bool validData)
         desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
         if (!desiredState)
         {
-          putEvent(String("off - latency count ") + inverterLatencyCnt + "/" + SONNEN_INVERTER_LATENCY_COUNT);
+          constraint = 8;
         }
       }
       else
@@ -931,7 +932,19 @@ void updateSwitch(bool validData)
 
   if (config.mode == 2 && systemData.switchEnabled != desiredState)
   {
-    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + CONSTRAINTS[constraint] + (constraint == 5 ? toLocalDate(ts) : "") + ")");
+    char msg[64];
+    switch (constraint)
+    {
+    case 5:
+      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), toLocalDate(ts));
+      break;
+    case 7:
+      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), inverterLatencyCnt, SONNEN_INVERTER_LATENCY_COUNT);
+      break;
+    default:
+      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str());
+    }
+    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + msg + ")");
   }
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
 

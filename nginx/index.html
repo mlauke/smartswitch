@@ -63,8 +63,8 @@
       <div class="events" name="events"></div>
       <div id="overlay" class="overlay">
         <div class="overlay-content">
-          <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
           <ul id="eventLog" class="eventLog"></ul>
+          <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
         </div>
       </div>
     </div>
@@ -206,7 +206,7 @@
   </form>
   <form action="/api/update" method="post">
     <fieldset>
-      <legend>System</legend>
+      <legend>System (Start: <span name="start_ts"></span>)</legend>
       <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
       <input type="submit" name="reset" value="Factory Reset"
         onclick="return confirm('Sure? WLAN Access Data will be erased!');">
