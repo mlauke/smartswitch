@@ -671,7 +671,7 @@ bool updateBoilerData()
 
 void calibrate(bool validData)
 {
-  static uint8 cnt = CNT_CALIBRATE_LOOP + 1;
+  static uint8_t cnt = CNT_CALIBRATE_LOOP + 1;
   static uint16_t load_on = 0;
   static uint16_t load_off = 0;
 
