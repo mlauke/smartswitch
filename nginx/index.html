@@ -43,8 +43,8 @@
         </div>
         <div class="fg">
           <div>Battery Load:</div>
-          <div class="value"><span data-value class=""><span name="pac_total_w"></span> W</span><span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg"
-            class="arrow-down">▼</span>
+          <div class="value"><span data-value class=""><span name="pac_total_w"></span> W</span><span data-value
+              name="chrg" class="arrow-up">▲</span><span data-value name="chrg" class="arrow-down">▼</span>
           </div>
         </div>
       </div>
@@ -184,11 +184,33 @@
   </form>
   <form action="api/update" method="post" onSubmit="return confirm('Sure?');">
     <fieldset>
-      <legend>Software Update</legend>
-      Git Release: <span name="release_tag"></span> - <a href="/api/update?update">Update Check</a><br />
-      Update-Check on Startup:
-      <input type="radio" name="update_startup" value="0">Off
-      <input type="radio" name="update_startup" value="1">On
+      <legend>System</legend>
+      <div class="fg">
+        <div>Start:</div>
+        <div name="start_ts"></div>
+      </div>
+      <div class="fg">
+        <div>Git Release:</div>
+        <div>
+          <span name="release_tag"></span> - <a href="/api/update?update">Update Check</a>
+        </div>
+      </div>
+      <div class="fg">
+        <div>Update-Check on Startup:</div>
+        <div>
+          <input type="radio" name="update_startup" value="0">Off
+          <input type="radio" name="update_startup" value="1">On
+        </div>
+      </div>
+      <div class="fg">
+        <div></div>
+        <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
+      </div>
+      <div class="fg">
+        <div></div>
+        <input type="submit" name="reset" value="Factory Reset"
+          onclick="return confirm('Sure? WLAN Access Data will be erased!');">
+      </div>
     </fieldset>
   </form>
   <form action="api/update" method="post">
@@ -202,14 +224,6 @@
         <div></div>
         <button type="submit">Update</button>
       </div>
-    </fieldset>
-  </form>
-  <form action="/api/update" method="post">
-    <fieldset>
-      <legend>System (Start: <span name="start_ts"></span>)</legend>
-      <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
-      <input type="submit" name="reset" value="Factory Reset"
-        onclick="return confirm('Sure? WLAN Access Data will be erased!');">
     </fieldset>
   </form>
   <script src="/app.js" defer></script>

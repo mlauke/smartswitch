@@ -110,6 +110,8 @@
 #define CFG_SZ_LOCATION 64
 #define CFG_SZ_TZ 32
 
+#define CNT_CALIBRATE_LOOP 16
+
 #define SIZE_EVENT_BUFFER 16
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

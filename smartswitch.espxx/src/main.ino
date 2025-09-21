@@ -27,13 +27,15 @@ static WebServer server(WEBSERVER_PORT);
 static ESP8266WebServer server(WEBSERVER_PORT);
 #endif
 
+volatile bool doUpdateFlag = false;
+
 LPB *lpb;
 WiFiManager wifiManager;
 Ticker timer;
-volatile bool doUpdateFlag = false;
 systemDataStruct systemData;
 configStruct config;
 bool saveConfigFile = false;
+bool calibrateLoad = false;
 
 int stdOffset = 3600; // 1h utc offset Europe/Berlin
 int dstOffset = 3600; // 1h suummer time offset
@@ -470,6 +472,7 @@ void handleAPI()
   else if (server.hasArg("calibrate"))
   {
     config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
+    calibrateLoad = true;
   }
   else if (server.hasArg("update_startup"))
   {
@@ -666,24 +669,68 @@ bool updateBoilerData()
   return lastResult; // no new data, so still ok
 }
 
+void calibrate(bool validData)
+{
+  static uint8 cnt = CNT_CALIBRATE_LOOP + 1;
+  static uint16_t load_on = 0;
+  static uint16_t load_off = 0;
+
+  if (cnt != 0)
+  {
+    bool measure = (cnt-- & 0x01) == 0;
+    if (measure)
+    {
+      load_off += systemData.cons_W_nom;
+    }
+    else
+    {
+      load_on += systemData.cons_W_nom;
+    }
+    toggleSwitch(measure);
+
+    char event[64];
+    snprintf(event, sizeof(event), "load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), load_on / (CNT_CALIBRATE_LOOP >> 1) - load_off / (CNT_CALIBRATE_LOOP >> 1));
+    putEvent(event);
+  }
+  else
+  {
+    calibrateLoad = false;
+    config.loadPower_W = load_on / (CNT_CALIBRATE_LOOP >> 1) - load_off / (CNT_CALIBRATE_LOOP >> 1);
+    char event[64];
+    snprintf(event, sizeof(event), "final load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), config.loadPower_W);
+    putEvent(event);
+
+    load_on = 0;
+    load_off = 0;
+    cnt = CNT_CALIBRATE_LOOP + 1;
+    saveConfig();
+  }
+}
+
 // main loop
 void loop()
 {
   if (doUpdateFlag)
   {
-
     uint32_t heap = ESP.getFreeHeap();
     uint32_t cpuFreq = ESP.getCpuFreqMHz();
 
     bool validData = ensureConnected();
+
     //    validData &= validateConfig();
     validData &= updateSystemData();
     validData &= updateSolarForecast();
     validData &= updateBoilerData();
 
-    updateSwitch(validData);
-
-    Serial.printf("ESP Heap %uk/%uk CPU: %u Mhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
+    if (calibrateLoad)
+    {
+      calibrate(validData);
+    }
+    else
+    {
+      updateSwitch(validData);
+    }
+    Serial.printf("ESP Heap %uk/%uk CPU: %uMhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
 
     doUpdateFlag = false;
   }
@@ -838,7 +885,8 @@ bool updateSystemData()
     systemData.dstOffset = isDST(&time) ? dstOffset : 0;
 
     systemData.ts = mktime(&time) - stdOffset - systemData.dstOffset;
-    if(systemData.start_ts == 0){
+    if (systemData.start_ts == 0)
+    {
       systemData.start_ts = systemData.ts;
     }
     systemData.tm_yday = time.tm_yday;
