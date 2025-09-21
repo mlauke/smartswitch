@@ -672,8 +672,8 @@ bool updateBoilerData()
 void calibrate(bool validData)
 {
   static uint8_t cnt = CNT_CALIBRATE_LOOP + 1;
-  static uint16_t load_on = 0;
-  static uint16_t load_off = 0;
+  static uint32_t load_on = 0;
+  static uint32_t load_off = 0;
 
   if (cnt != 0)
   {
@@ -689,13 +689,13 @@ void calibrate(bool validData)
     toggleSwitch(measure);
 
     char event[64];
-    snprintf(event, sizeof(event), "load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), load_on / (CNT_CALIBRATE_LOOP >> 1) - load_off / (CNT_CALIBRATE_LOOP >> 1));
+    snprintf(event, sizeof(event), "load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1) - load_on / (CNT_CALIBRATE_LOOP >> 1));
     putEvent(event);
   }
   else
   {
     calibrateLoad = false;
-    config.loadPower_W = load_on / (CNT_CALIBRATE_LOOP >> 1) - load_off / (CNT_CALIBRATE_LOOP >> 1);
+    config.loadPower_W = load_off / (CNT_CALIBRATE_LOOP >> 1) - load_on / (CNT_CALIBRATE_LOOP >> 1);
     char event[64];
     snprintf(event, sizeof(event), "final load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), config.loadPower_W);
     putEvent(event);
