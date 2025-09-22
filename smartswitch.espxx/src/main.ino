@@ -471,8 +471,15 @@ void handleAPI()
   }
   else if (server.hasArg("calibrate"))
   {
-    config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
-    calibrateLoad = true;
+    if (server.arg("calibrate").equals("set"))
+    {
+      config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
+    }
+    else
+    {
+      toggleSwitch(false);
+      calibrateLoad = true;
+    }
   }
   else if (server.hasArg("update_startup"))
   {
@@ -671,39 +678,42 @@ bool updateBoilerData()
 
 void calibrate(bool validData)
 {
-  static uint8_t cnt = CNT_CALIBRATE_LOOP + 1;
+  static uint8_t cnt = CNT_CALIBRATE_LOOP;
   static uint32_t load_on = 0;
   static uint32_t load_off = 0;
 
-  if (cnt != 0)
+  if (cnt == 0)
   {
-    bool measure = (cnt-- & 0x01) == 0;
-    if (measure)
-    {
-      load_off += systemData.cons_W_nom;
-    }
-    else
-    {
-      load_on += systemData.cons_W_nom;
-    }
-    toggleSwitch(measure);
-
+    config.loadPower_W = load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV;
     char event[64];
-    snprintf(event, sizeof(event), "load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1) - load_on / (CNT_CALIBRATE_LOOP >> 1));
+    snprintf(event, sizeof(event), "final load: %d %d %d %d => %d", load_on, load_off, load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
     putEvent(event);
-  }
-  else
-  {
-    calibrateLoad = false;
-    config.loadPower_W = load_off / (CNT_CALIBRATE_LOOP >> 1) - load_on / (CNT_CALIBRATE_LOOP >> 1);
-    char event[64];
-    snprintf(event, sizeof(event), "final load: %d %d %d %d => %d", load_on, load_off, load_on / (CNT_CALIBRATE_LOOP >> 1), load_off / (CNT_CALIBRATE_LOOP >> 1), config.loadPower_W);
-    putEvent(event);
+    saveConfig();
 
     load_on = 0;
     load_off = 0;
-    cnt = CNT_CALIBRATE_LOOP + 1;
-    saveConfig();
+    cnt = CNT_CALIBRATE_LOOP;
+    calibrateLoad = false;
+  }
+  else
+  {
+    bool on = (--cnt & 0x04) == 0;
+    if ((cnt & 0x03) != 3) // skip first measuring after load was toggled
+    {
+      if (on)
+      {
+        load_on += systemData.cons_W_nom;
+      }
+      else
+      {
+        load_off += systemData.cons_W_nom;
+      }
+    }
+    toggleSwitch(on);
+
+    char event[64];
+    snprintf(event, sizeof(event), "load: (%d) %d %d %d %d => %d", cnt, load_on, load_off, load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV);
+    putEvent(event);
   }
 }
 
