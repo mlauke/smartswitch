@@ -686,10 +686,10 @@ void calibrate(bool validData)
   if (cnt == 0)
   {
     config.loadPower_W = load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV;
-    char event[64];
-    snprintf(event, sizeof(event), "final load: %d %d %d %d => %d", load_on, load_off, load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
-    putEvent(event);
     saveConfig();
+    char event[64];
+    snprintf(event, sizeof(event), "load calibrated on avg %dW off avg %dW => %dW", load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
+    putEvent(event);
 
     load_on = 0;
     load_off = 0;
@@ -705,18 +705,14 @@ void calibrate(bool validData)
     {
       if (on)
       {
-        load_on += systemData.cons_W_nom;
+        load_on += systemData.cons_W;
       }
       else
       {
-        load_off += systemData.cons_W_nom;
+        load_off += systemData.cons_W;
       }
     }
     systemData.switchEnabled = on;
-
-    char event[64];
-    snprintf(event, sizeof(event), "load: (%d) %d %d %d %d => %d", cnt, load_on, load_off, load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV);
-    putEvent(event);
   }
 }
 

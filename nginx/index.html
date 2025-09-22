@@ -186,11 +186,7 @@
   </form>
   <form action="/api/update" method="post" onSubmit="return confirm('Sure?');">
     <fieldset>
-      <legend>System</legend>
-      <div class="fg">
-        <div>Start:</div>
-        <div name="start_ts"></div>
-      </div>
+      <legend>Software</legend>
       <div class="fg">
         <div>Git Release:</div>
         <div>
@@ -204,15 +200,6 @@
           <input type="radio" name="update_startup" value="1">On
         </div>
       </div>
-      <div class="fg">
-        <div></div>
-        <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
-      </div>
-      <div class="fg">
-        <div></div>
-        <input type="submit" name="reset" value="Factory Reset"
-          onclick="return confirm('Sure? WLAN Access Data will be erased!');">
-      </div>
     </fieldset>
   </form>
   <form action="api/update" method="post">
@@ -225,6 +212,24 @@
       <div class="fg">
         <div></div>
         <button type="submit">Update</button>
+      </div>
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post" onSubmit="return confirm('Sure?');">
+    <fieldset>
+      <legend>System</legend>
+      <div class="fg">
+        <div>Start:</div>
+        <div name="start_ts"></div>
+      </div>
+      <div class="fg">
+        <div></div>
+        <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
+      </div>
+      <div class="fg">
+        <div></div>
+        <input type="submit" name="reset" value="Factory Reset"
+          onclick="return confirm('Sure? WLAN Access Data will be erased!');">
       </div>
     </fieldset>
   </form>
