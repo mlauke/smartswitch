@@ -188,6 +188,7 @@ void systemDefaults()
   systemData.pv_forecast_ts = 0;
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   systemData.eventIx = 0;
+  systemData.switchEnabled = false;
   systemData.skipUpdateCountSysten = 0;
 }
 
@@ -474,10 +475,10 @@ void handleAPI()
     if (server.arg("calibrate").equals("set"))
     {
       config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
+      saveConfig();
     }
     else
     {
-      toggleSwitch(false);
       calibrateLoad = true;
     }
   }
@@ -678,7 +679,7 @@ bool updateBoilerData()
 
 void calibrate(bool validData)
 {
-  static uint8_t cnt = CNT_CALIBRATE_LOOP;
+  static uint8_t cnt = CALIBRATE_LOOP_CNT;
   static uint32_t load_on = 0;
   static uint32_t load_off = 0;
 
@@ -692,13 +693,15 @@ void calibrate(bool validData)
 
     load_on = 0;
     load_off = 0;
-    cnt = CNT_CALIBRATE_LOOP;
+    cnt = CALIBRATE_LOOP_CNT;
     calibrateLoad = false;
+
+    systemData.switchEnabled = false;
   }
   else
   {
-    bool on = (--cnt & 0x04) == 0;
-    if ((cnt & 0x03) != 3) // skip first measuring after load was toggled
+    bool on = (--cnt & CALIBRATE_ONOFF_TOGGLE) == 0;
+    if ((cnt & CALIBRATE_MEASURE) == 0) // wait with measure after toggle
     {
       if (on)
       {
@@ -709,7 +712,7 @@ void calibrate(bool validData)
         load_off += systemData.cons_W_nom;
       }
     }
-    toggleSwitch(on);
+    systemData.switchEnabled = on;
 
     char event[64];
     snprintf(event, sizeof(event), "load: (%d) %d %d %d %d => %d", cnt, load_on, load_off, load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV);
@@ -740,6 +743,8 @@ void loop()
     {
       updateSwitch(validData);
     }
+    toggleSwitch(systemData.switchEnabled);
+
     Serial.printf("ESP Heap %uk/%uk CPU: %uMhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
 
     doUpdateFlag = false;
@@ -1007,8 +1012,6 @@ void updateSwitch(bool validData)
   systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
 
   Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
-
-  toggleSwitch(systemData.switchEnabled);
 }
 
 void toggleSwitch(bool switchEnabled)
