@@ -39,24 +39,24 @@ R_max = 2,42K/W
 R_heatsink = R_max - R_jc = 2,42K/W - 1,7K/W
 R_heatsink = 0,7K/W !!!
 ```
-... heatsink with <=0,7K/W makes no sense since this will result in too much power wasted for heat and would "blow up" the overall system design.
-therefore we decided to use a triac as switching device for a simple NO1 relais ("Schütz") which in turn will drive the load. the NO1 relais can directly placed next to the arduino case on our din rail.
+... heatsink with <=0,7K/W makes no sense since this will result in too much power wasted for heat and would "blow up" the overall system design in terms of size and housing the components.
+therefore i decided to use a triac as switching device for a simple NO1 relais ("Schütz") which in turn will drive the load. the NO1 relais can directly placed next to the arduino case on our din rail.
 
 #### Why not using a SSR?
-as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with controller board on a din rail inside of my houses fuse box.
+as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with the ESP controller board on a din rail inside of my houses fuse box.
 
 # TODOs
-  - fix: flicker if bat is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
-  - battery system data update every day or from time to time
-  - feat: skip updateSwitch if not set to Auto
-  - feat: wait or delay on reset/restart requests, make sure response is send
-  - feat: suspend/sleep for a while (or double the amount of sleep)
+  - ✅ fix: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
+  - ❌ battery system data update every day or from time to time
+  - ❌ feat: skip updateSwitch if not set to Auto
+  - ❌ feat: wait or delay on reset/restart requests, make sure response is send
+  - ❌ feat: suspend/sleep for a while (or double the amount of sleep)
     - if switch is off and will stay off
-    - if boilder temp. is alread reached
-  - feat: measure consumption avg per hour and week day and save to config for better long term approximation
-  - feat: calibrate load automatically
-  - feat: below cap min but Production increases and remaining capacity is enough to drive load - but be aware that cap_min is never reached at this time
+    - if boiler temp. is alread reached
+  - ❌ feat: measure consumption avg per hour and week day and save to config for better long term approximation
+  - ✅ feat: calibrate load automatically
+  - ❌ feat: below cap min but Production increases and remaining capacity is enough to drive load - but be aware that cap_min is never reached at this time
 
-## Dreams
+## Vision
 - hardware
   - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power

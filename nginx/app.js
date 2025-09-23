@@ -45,6 +45,7 @@ function fetchData() {
   fetchAPI("/api/data", function (response, json) {
     if (response !== undefined && response.ok && json !== undefined) {
       systemDataVersion = json["version"];
+      toggleLoadPowerFields(false);
     }
   });
 }
@@ -124,17 +125,37 @@ function closeLog() {
   logOverlay !== null && logOverlay.classList.remove("active");
 }
 
+function sendUpdate(payload){
+  fetch("/api/update", {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams(payload).toString()
+  });
+}
+
+function toggleLoadPowerFields(isLoading){
+  document.getElementById("sn_loadpower").disabled = isLoading;
+  const btn = document.getElementById("calibrateBtn");
+  btn.disabled = isLoading;
+  if(isLoading){
+    btn.classList.add("loading");
+  }else{
+    btn.classList.remove("loading");
+  }
+}
+
+function triggerCalibrate(){
+  toggleLoadPowerFields(true);
+  sendUpdate("calibrate");
+}
+
 document.querySelectorAll("input[type='radio']").forEach(radio => {
   radio.addEventListener("change", (event) => {
     const form = radio.closest("form");
     const formData = new FormData(form);
-    fetch("/api/update", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams(formData).toString()
-    });
+    sendUpdate(formData);
   });
 });
 

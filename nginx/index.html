@@ -114,11 +114,13 @@
   <form action="/api/update" method="post">
     <fieldset>
       <legend>Load</legend>
-      <div class="fg">
-        <label for="sn_loadpower">Load (W):
-        <button type="submit" name="calibrate" value="calibrate">Calibrate</button>
-        </label>
+      <div class="fg spinner-input">
+        <label for="sn_loadpower">Load (W):</label>
         <input id="sn_loadpower" name="sn_loadpower" maxlength="4">
+      </div>
+      <div class="fg">
+        <div></div>
+        <button id="calibrateBtn" type="button" onclick="javascript:triggerCalibrate();"><div class="spinner"></div><span>Calibrate</span></button>
       </div>
       <div class="fg">
         <div></div>
