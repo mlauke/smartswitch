@@ -20,6 +20,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include <SmartSwitch.h>
+#include <Logic.h>
+
+#include <ArduinoJson.h>
+#include <LittleFS.h>
+#include <Ticker.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+#include <WiFiManager.h>
+
+// echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
+// echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
+// echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
+
+#include "GithubOTA.h"
+#include "RestClient.h"
+#include "LPB.h"
+
+#include "app_js.h"
+#include "app_css.h"
+#include "app_icon.h"
+#include "index_html.h"
+
+#include "debug.h"
+
+#ifdef ESP32
+#include <ESPmDNS.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <Arduino.h>
+#include <esp_task_wdt.h>
+
+#elif ESP8266
+#include <ESP8266HTTPClient.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+#include <ESP8266mDNS.h>
+#include <ESP8266httpUpdate.h>
+
+#endif
 
 #ifdef ESP32
 static WebServer server(WEBSERVER_PORT);
@@ -32,32 +71,10 @@ volatile bool doUpdateFlag = false;
 LPB *lpb;
 WiFiManager wifiManager;
 Ticker timer;
-systemDataStruct systemData;
-configStruct config;
+SystemData systemData;
+SystemConfig config;
 bool saveConfigFile = false;
 bool calibrateLoad = false;
-
-int stdOffset = 3600; // 1h utc offset Europe/Berlin
-int dstOffset = 3600; // 1h suummer time offset
-
-char tsfmt[20];
-char *toDate(uint32_t utc_ts, uint16_t offset)
-{
-  time_t time = (time_t)(utc_ts + offset);
-  tm *timeinfo = gmtime(&time);
-  strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", timeinfo);
-  return tsfmt;
-}
-
-char *toDate(uint32_t utc_ts)
-{
-  return toDate(utc_ts, 0);
-}
-
-char *toLocalDate(uint32_t utc_ts)
-{
-  return toDate(utc_ts, (stdOffset + systemData.dstOffset));
-}
 
 void saveConfigCallback()
 {
@@ -219,6 +236,11 @@ void configDefaults()
   config.version = 0;
 }
 
+static bool isDevMode()
+{
+  return strstr(config.hostname, "-dev") != NULL;
+}
+
 bool updateSolarForecast()
 {
 
@@ -231,7 +253,7 @@ bool updateSolarForecast()
     RestClient restClient;
     JsonDocument doc;
 
-    String solarUrl = strstr(config.hostname, "-dev") == NULL ? URL_SOLAR_FORECAST : URL_SOLAR_FORECAST_DEV;
+    String solarUrl = isDevMode() ? URL_SOLAR_FORECAST_DEV : URL_SOLAR_FORECAST;
     char url[128];
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
@@ -252,7 +274,8 @@ bool updateSolarForecast()
         }
         else
         {
-          putEvent("WARN: overflow " + i);
+          putEvent(String("WARN: overflow ") + i);
+          break;
         }
       }
       setConfigStr(config, location, doc["message"]["info"]["place"].as<const char *>());
@@ -397,7 +420,7 @@ void sendJson(String from, JsonDocument &json)
 
 void addLog(JsonArray &array, logEntry &log)
 {
-  if (!log.msg.isEmpty())
+  if (strlen(log.msg))
   {
     JsonObject e = array.add<JsonObject>();
     e["ts"] = log.ts;
@@ -410,7 +433,7 @@ void handleData()
   JsonDocument data;
 
   configToJson(data);
-  data["start_ts"] = toLocalDate(systemData.start_ts);
+  data["start_ts"] = toLocalDate(&systemData, systemData.start_ts);
   sendJson("data", data);
 }
 
@@ -602,7 +625,7 @@ void handleGithubUpdate()
 
 void clearLocationError()
 {
-  systemData.error_lc.msg.clear();
+  systemData.error_lc.msg[0] = '\0';
 }
 
 void putLocationError(String event)
@@ -612,7 +635,7 @@ void putLocationError(String event)
 
 void clearBatteryError()
 {
-  systemData.error_bt.msg.clear();
+  systemData.error_bt.msg[0] = '\0';
 }
 
 void putBatteryError(String event)
@@ -627,13 +650,12 @@ void putBoilerError(String event)
 
 void clearBoilerError()
 {
-  systemData.error_bs.msg.clear();
+  systemData.error_bs.msg[0] = '\0';
 }
 
 void putLog(logEntry &log, const char *event)
 {
-  log.msg.clear();
-  log.msg.concat(event);
+  strncpy(log.msg, event, sizeof(log.msg));
   log.ts = systemData.ts;
   Serial.printf("log %u: %s\n", systemData.ts, event);
 }
@@ -660,7 +682,7 @@ bool updateBoilerData()
     lastUpdate = ms;
 
     boilder_t boilerData;
-    if ((lastResult = lpb->update(&boilerData)))
+    if ((lastResult = lpb->update(&boilerData, isDevMode())))
     {
       systemData.boiler_T_cur = boilerData.t_cur;
       systemData.boiler_T_nom = boilerData.t_nom;
@@ -685,7 +707,7 @@ void calibrate(bool validData)
 
   if (cnt == 0)
   {
-    config.loadPower_W = load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV;
+    config.loadPower_W = MAX(0, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV);
     saveConfig();
     char event[64];
     snprintf(event, sizeof(event), "load calibrated on avg %dW off avg %dW => %dW", load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
@@ -887,9 +909,6 @@ bool updateSystemData()
     systemData.pac_total_W = json["Pac_total_W"].as<int16_t>();
     systemData.charge = json["BatteryCharging"].as<short>() - json["BatteryDischarging"].as<short>();
 
-    systemData.cons_W_nom = (systemData.cons_W + 50) / 100 * 100;
-    systemData.cons_W_norm = (systemData.switchEnabled && systemData.cons_W_nom > config.loadPower_W) ? systemData.cons_W_nom - config.loadPower_W : systemData.cons_W_nom; // consumption without load
-
     struct tm time;
     strptime(json["Timestamp"].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
 
@@ -901,6 +920,8 @@ bool updateSystemData()
       systemData.start_ts = systemData.ts;
     }
     systemData.tm_yday = time.tm_yday;
+
+    updateConsumption(&config, &systemData);
   }
 
   // TODO wrong error category
@@ -916,7 +937,7 @@ bool updateSystemData()
   }
   else
   {
-    systemData.skipUpdateCountSysten = errorLoopBackoff; // crash loop back off
+    systemData.skipUpdateCountSysten = errorLoopBackoff; // error loop back off
     if (errorLoopBackoff != (1 << 7))
     {
       errorLoopBackoff <<= 1;
@@ -935,7 +956,9 @@ const String CONSTRAINTS[] = {
     "battery min capacity reached at %s",
     "boiler temperature min reached",
     "boiler temperature max reached",
-    "latency count reached %d/%d"};
+    "latency count reached %d/%d"
+
+};
 
 void updateSwitch(bool validData)
 {
@@ -944,8 +967,6 @@ void updateSwitch(bool validData)
 
   uint32_t ts = 0;
   uint8_t constraint = 0;
-
-  uint16_t hysteresis_Wh = config.loadPower_W / 6; // Wh if load is switched on for 10min
 
   float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.8; // ~0.8 °C heater "afterglow"
   float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
@@ -956,7 +977,7 @@ void updateSwitch(bool validData)
                       // if surplus ("waste") exceeds load
                       (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) ||
                        // forecast battery capacity and be aware of discharge allowed
-                       ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(hysteresis_Wh, &ts))) &&
+                       ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(&config, &systemData, &ts))) &&
                       (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) ||
                        ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
@@ -989,13 +1010,13 @@ void updateSwitch(bool validData)
     stableOnCnt = 0;
   }
 
-  if (config.mode == 2 && systemData.switchEnabled != desiredState)
+  if (config.mode == SMODE_AUTO && systemData.switchEnabled != desiredState)
   {
-    char msg[64];
+    char msg[80];
     switch (constraint)
     {
     case 5:
-      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), toLocalDate(ts));
+      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), toLocalDate(&systemData, ts));
       break;
     case 7:
       snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), inverterLatencyCnt, SONNEN_INVERTER_LATENCY_COUNT);
@@ -1005,7 +1026,7 @@ void updateSwitch(bool validData)
     }
     putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + msg + ")");
   }
-  systemData.switchEnabled = (desiredState && config.mode == 2) || (config.mode == 1); // combine with mode
+  systemData.switchEnabled = (desiredState && config.mode == SMODE_AUTO) || (config.mode == SMODE_ON); // combine with mode
 
   Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 }
@@ -1042,50 +1063,6 @@ bool isDST(struct tm *timeinfo)
 
   time_t now = mktime(timeinfo);
   return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
-}
-
-bool batteryCapacityTargetFulfilled(uint16_t hysteresis_Wh, uint32_t *ts)
-{
-  bool foundPvData = false;
-
-  if (systemData.pv_forecast_wh_h[0][0] == 0)
-  {
-    return foundPvData; // no solar forecast data, assume battery will become empty
-  }
-
-  *ts = systemData.ts - (systemData.ts % 3600); // start timestamp of last full hour
-
-  uint32_t cap_bat_Wh = systemData.cap_bat_Wh;
-
-  for (uint8_t i = 0; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
-  {
-
-    if ((foundPvData = (systemData.pv_forecast_wh_h[i][0] == *ts)))
-    { // seek to pv forecast upon system ts
-
-      uint32_t wh = (*ts + 3600 - systemData.ts) * systemData.pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
-
-      for (i++; i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]); i++)
-      {
-        if (cap_bat_Wh < config.cap_bat_min_Wh)
-        { // capacity below expected min capacity
-          return false;
-        }
-        if (cap_bat_Wh == systemData.cap_bat_max_Wh)
-        {
-          return true;
-        }
-        // cumulate battery capacity upon production forecast
-        cap_bat_Wh = MIN(systemData.cap_bat_max_Wh, (uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData.inv_max_w, (int)wh - systemData.cons_W_norm)));
-        Serial.printf("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) usoc: %u%%\n", i, *ts, toDate(*ts), wh, cap_bat_Wh, cap_bat_Wh * 100 / systemData.cap_bat_max_Wh);
-
-        *ts = systemData.pv_forecast_wh_h[i][0];
-        wh = systemData.pv_forecast_wh_h[i][1];
-      }
-    }
-  }
-  Serial.println(String("capacity ") + cap_bat_Wh + "Wh " + hysteresis_Wh + "Wh (hys) at " + toLocalDate(*ts));
-  return foundPvData && cap_bat_Wh >= (uint32_t)(config.cap_bat_min_Wh + (systemData.switchEnabled ? 0 : hysteresis_Wh));
 }
 
 bool loadConfig()

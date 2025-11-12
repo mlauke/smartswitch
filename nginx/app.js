@@ -115,7 +115,7 @@ function showLog() {
   const overlay = document.getElementById("overlay");
   const logElem = document.getElementById("eventLog");
   if (logElem !== null) {
-    renderLog(logElem, eventLog.events, "li");
+    renderLog(logElem, eventLog.events, "div");
     overlay.classList.add("active");
   }
 }

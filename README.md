@@ -1,5 +1,5 @@
 # Sonnen SmartSwitch
-DIY sonnen battery controlled switch which drives a "3.3kW Heater" (Heißwasserspeicher-Einbauheizung)
+DIY sonnen battery controller based on ESP8266/ESP32 to drive a 3.3kW heater (Heißwasserspeicher-Einbauheizung) and integrates with the local hot water system.
 
 ## Features
 - accesses the local hot water system (boiler system) via LPB to get the hot water system data - e.g. hot water temparature
@@ -14,11 +14,12 @@ the reference implementation (at my home) uses the following components
 - Heater - https://www.austria-email.at/produkte/zubehoer/elektro-einbauheizung/reu-18-33/
 - Hot Water Tank - https://www.austria-email.at/produkte/indirekt-beheizte-speicher/standspeicher/standspeicher-hr/hr-160/
 - Sonnen Battery https://sonnen.de/stromspeicher/sonnenbatterie-10/
-- Boiler System - Siemens RVD250 attached connected to Local Process Bus (LPB)
-- ESP8266/ESP32 module
+- Boiler System - Siemens RVD250 attached and connected to the ESP controller via the Local Process Bus (LPB)
+- ESP8266/ESP32 controller modules
 - ArduiBox housing https://www.az-delivery.de/en/products/arduibox-nodemcu-hutschienen-montage-und-anschluss-set
 - DIN Rail Power supply +12V
-- AC mains Triac cicuit to drive a 1NO Relay (Schütz)
+- AC mains Triac cicuit to drive a 1NO Relay
+- 1NO Relay (Schütz) https://www.reichelt.de/de/de/shop/produkt/schaltrelais_1_s_230_v_ac_16_a-155592
 
 ### Thoughts
 #### Why not using a TRIAC only solution?

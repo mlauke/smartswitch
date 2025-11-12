@@ -24,51 +24,17 @@
 #define SMARTSWITCH_H
 
 #include <stdint.h>
-#include <ArduinoJson.h>
-#include <LittleFS.h>
-#include <Ticker.h>
-#include <WiFiClient.h>
-#include <WiFiClientSecure.h>
-#include <WiFiManager.h>
-
-// echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
-   echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
-   echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
-#include "GithubOTA.h"
-#include "RestClient.h"
-#include "LPB.h"
-
-#include "app_js.h"
-#include "app_css.h"
-#include "app_icon.h"
-#include "index_html.h"
-
-#include "debug.h"
 
 #ifdef ESP32
-#include <ESPmDNS.h>
-#include <WiFi.h>
-#include <WebServer.h>
-#include <Arduino.h>
-#include <esp_task_wdt.h>
-
 #define PIN_LPB_RX GPIO_NUM_16
 #define PIN_LPB_TX GPIO_NUM_17
 #define PIN_SSR GPIO_NUM_21
 
 #elif ESP8266
-
-#include <ESP8266HTTPClient.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <ESP8266httpUpdate.h>
-
 #define LED_BUILTIN 2
 #define PIN_LPB_TX 5  // GPIO5 (D1)
 #define PIN_LPB_RX 4  // GPIO4 (D2)
 #define PIN_SSR 13    // GPIO13 (D7)
-
 #endif
 
 #define HOSTNAME "smartswitch"
@@ -87,7 +53,7 @@
 #define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_STATUS "status"
 #define SONNEN_INVERTER_LATENCY_MS 5000  // battery inverter latency until load is compensated - sonnen battery 10 specific
-#define SONNEN_INVERTER_LATENCY_COUNT MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
+#define SONNEN_INVERTER_LATENCY_COUNT (uint8_t) MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
@@ -109,6 +75,7 @@
 #define CFG_SZ_SONNENTOKEN 37
 #define CFG_SZ_LOCATION 64
 #define CFG_SZ_TZ 32
+#define SZ_LOG_ENTRY 128
 
 #define CALIBRATE_LOOP_CNT (1<<5)
 #define CALIBRATE_ONOFF_TOGGLE 8
@@ -120,7 +87,7 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define _cs(a) sizeof(((configStruct*)0)->a)
+#define _cs(a) sizeof(((SystemConfig*)0)->a)
 #define setConfigStr(cfg, property, str) \
   if (strlen(str)) { \
     strncpy((cfg).property, (str), MIN(_cs(property), strlen((str)))); \
@@ -147,16 +114,16 @@ typedef struct {
   uint8_t mode;         // 0 - off, 1 - on, 2 - automatic
   bool update_startup;  // release update check on startup
   uint16_t version;     //
-} configStruct;
+} SystemConfig;
 
 typedef struct {
   uint32_t ts;
-  String msg;
+  char msg[SZ_LOG_ENTRY];
 } logEntry;
 
 typedef struct {
-  uint32_t start_ts; // start timestamp
-  uint32_t ts;       // current system time, taken from battery status
+  uint32_t start_ts; // system start timestamp
+  uint32_t ts;       // current system time (UTC) - taken from battery status
   uint16_t tm_yday;  // day of year
   uint16_t dstOffset;
 
@@ -182,7 +149,7 @@ typedef struct {
   short charge;              // battery charge state 0 - none, 1 - charge, -1 - discharge
 
   long pv_forecast_ts;               // last update timestamp in ms since mcu start
-  uint32_t pv_forecast_wh_h[49][2];  // pair of timestamp and pv production (Wh/h) for today and tomorrow
+  uint32_t pv_forecast_wh_h[49][2];  // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
 
   logEntry events[SIZE_EVENT_BUFFER];  // event buffer
   uint8_t eventIx = 0;
@@ -194,6 +161,12 @@ typedef struct {
   logEntry error_lc;  // last solar forecast or location error
   uint8_t errorIx = 0;
 
-} systemDataStruct;
+} SystemData;
+
+enum SwitchMode {
+  SMODE_OFF,
+  SMODE_ON,
+  SMODE_AUTO
+};
 
 #endif

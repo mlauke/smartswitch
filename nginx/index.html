@@ -43,8 +43,10 @@
         </div>
         <div class="fg">
           <div>Battery Load:</div>
-          <div class="value"><span data-value class=""><span name="pac_total_w"></span> W</span><span data-value
-              name="chrg" class="arrow-up">▲</span><span data-value name="chrg" class="arrow-down">▼</span>
+          <div class="value">
+            <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg"
+              class="arrow-down">▼</span>
+            <span data-value class=""><span name="pac_total_w"></span> W</span>
           </div>
         </div>
       </div>
@@ -63,7 +65,7 @@
       <div class="events" name="events"></div>
       <div id="overlay" class="overlay">
         <div class="overlay-content">
-          <ul id="eventLog" class="eventLog"></ul>
+          <div id="eventLog" class="eventLog"></div>
           <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
         </div>
       </div>
@@ -120,7 +122,9 @@
       </div>
       <div class="fg">
         <div></div>
-        <button id="calibrateBtn" type="button" onclick="javascript:triggerCalibrate();"><div class="spinner"></div><span>Calibrate</span></button>
+        <button id="calibrateBtn" type="button" onclick="javascript:triggerCalibrate();">
+          <div class="spinner"></div><span>Calibrate</span>
+        </button>
       </div>
       <div class="fg">
         <div></div>

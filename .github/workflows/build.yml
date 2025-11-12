@@ -35,6 +35,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pio-
 
+      - name: Run Tests
+        run: |
+          cd smartswitch.espxx
+          pio test -e native
+
       - name: Build ESP32 and ESP8266 firmware
         run: |
           cd smartswitch.espxx

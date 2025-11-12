@@ -1,13 +1,13 @@
 #include <LPB.h>
 
 #define printlnToDebug(format) \
-  { \
-    printToDebug(format); \
-    writelnToDebug(); \
+  {                            \
+    printToDebug(format);      \
+    writelnToDebug();          \
   }
 
-
-LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) {
+LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr)
+{
   rx_pin = rx;
   tx_pin = tx;
   myAddr = addr;
@@ -17,7 +17,8 @@ LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) {
   offset = 4;
   pl_start = 13;
 
-  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++)
+  {
     dev_lookup[i].dev_fam = 0xFF;
     dev_lookup[i].dev_var = 0xFF;
     dev_lookup[i].dev_id = 0xFF;
@@ -27,11 +28,13 @@ LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) {
   }
 }
 
-void printToDebug(const char* format) {
+void printToDebug(const char *format)
+{
   Serial.print(format);
 }
 
-int printFmtToDebug(const char* format, ...) {
+int printFmtToDebug(const char *format, ...)
+{
 
   char DebugBuff[256];
   va_list args;
@@ -42,23 +45,29 @@ int printFmtToDebug(const char* format, ...) {
   return len;
 }
 
-void writelnToDebug() {
+void writelnToDebug()
+{
   Serial.println();
 }
 
-static void SerialPrintRAW(byte* msg, byte len);
-static int bin2hex(char* toBuffer, byte* fromAddr, int len, char delimiter);
+static void SerialPrintRAW(byte *msg, byte len);
+static int bin2hex(char *toBuffer, byte *fromAddr, int len, char delimiter);
 
-void LPB::printTelegram(byte* msg, float line) {
+void LPB::printTelegram(byte *msg, float line)
+{
 
-  Serial.printf("%.2x -> %.2x: ", msg[3], msg[2]);  // source => destination address
+  Serial.printf("%.2x -> %.2x: ", msg[3], msg[2]); // source => destination address
   int data_len = 0;
-  if (msg[4 + offset] < 0x12 || msg[4 + offset] > 0x20) {
-    data_len = msg[getLen_idx()] - 14;  // get packet length, then subtract
-  } else {
-    data_len = msg[getLen_idx()] - 7;  // for yet unknow telegram types 0x12 to 0x15
+  if (msg[4 + offset] < 0x12 || msg[4 + offset] > 0x20)
+  {
+    data_len = msg[getLen_idx()] - 14; // get packet length, then subtract
   }
-  for (int x = 0; x < data_len; x++) {
+  else
+  {
+    data_len = msg[getLen_idx()] - 7; // for yet unknow telegram types 0x12 to 0x15
+  }
+  for (int x = 0; x < data_len; x++)
+  {
     Serial.printf("%.2x ", msg[getPl_start() + x]);
   }
   printFmtToDebug("%4.1f", line);
@@ -73,7 +82,8 @@ void LPB::printTelegram(byte* msg, float line) {
   Serial.println();
 }
 
-static void SerialPrintRAW(byte* msg, byte len) {
+static void SerialPrintRAW(byte *msg, byte len)
+{
 
   char outBuf[256];
   int outBufLen = strlen(outBuf);
@@ -83,16 +93,22 @@ static void SerialPrintRAW(byte* msg, byte len) {
   outBuf[outBufLen] = 0;
 }
 
-int bin2hex(char* toBuffer, byte* fromAddr, int len, char delimiter) {
+int bin2hex(char *toBuffer, byte *fromAddr, int len, char delimiter)
+{
   int resultLen = 0;
   bool isNotFirst = false;
-  for (int i = 0; i < len; i++) {
-    if (isNotFirst) {
-      if (delimiter != 0) {
+  for (int i = 0; i < len; i++)
+  {
+    if (isNotFirst)
+    {
+      if (delimiter != 0)
+      {
         toBuffer[resultLen] = delimiter;
         resultLen++;
       }
-    } else {
+    }
+    else
+    {
       isNotFirst = true;
     }
     resultLen += sprintf_P(toBuffer + resultLen, "%02X", fromAddr[i]);
@@ -100,110 +116,152 @@ int bin2hex(char* toBuffer, byte* fromAddr, int len, char delimiter) {
   return resultLen;
 }
 
-const char* printError(uint16_t error) {
-  const char* errormsgptr;
-  switch (error) {
-    case 0: errormsgptr = ""; break;
-    case 7: errormsgptr = " (parameter not supported)"; break;
-    case 256: errormsgptr = " - decoding error"; break;
-    case 257: errormsgptr = " unknown command"; break;
-    case 258: errormsgptr = " - not found"; break;
-    case 259: errormsgptr = " no enum str"; break;
-    case 260: errormsgptr = " - unknown type"; break;
-    case 261: errormsgptr = " query failed"; break;
-    default:
-      if (error < 256) errormsgptr = " (bus error)";
-      else errormsgptr = " (??? error)";
-      break;
+const char *printError(uint16_t error)
+{
+  const char *errormsgptr;
+  switch (error)
+  {
+  case 0:
+    errormsgptr = "";
+    break;
+  case 7:
+    errormsgptr = " (parameter not supported)";
+    break;
+  case 256:
+    errormsgptr = " - decoding error";
+    break;
+  case 257:
+    errormsgptr = " unknown command";
+    break;
+  case 258:
+    errormsgptr = " - not found";
+    break;
+  case 259:
+    errormsgptr = " no enum str";
+    break;
+  case 260:
+    errormsgptr = " - unknown type";
+    break;
+  case 261:
+    errormsgptr = " query failed";
+    break;
+  default:
+    if (error < 256)
+      errormsgptr = " (bus error)";
+    else
+      errormsgptr = " (??? error)";
+    break;
   }
   return errormsgptr;
 }
 
-void LPB::enableInterface() {
+void LPB::enableInterface()
+{
 
 #ifdef ESP32
-  serial = new HardwareSerial(2);  // UART2
-  ((HardwareSerial*)serial)->begin(LPB_BAUDRATE, SERIAL_8N1, rx_pin, tx_pin, false);
+  serial = new HardwareSerial(2); // UART2
+  ((HardwareSerial *)serial)->begin(LPB_BAUDRATE, SERIAL_8N1, rx_pin, tx_pin, false);
 #elif defined(ESP8266)
   serial = new SoftwareSerial();
-  ((SoftwareSerial*)serial)->begin(LPB_BAUDRATE, SWSERIAL_8O1, rx_pin, tx_pin, false);
+  ((SoftwareSerial *)serial)->begin(LPB_BAUDRATE, SWSERIAL_8O1, rx_pin, tx_pin, false);
 #endif
   Serial.println("LPB interface enabled.");
 }
 
-void LPB::disableInterface() {
-  if (serial) {
+void LPB::disableInterface()
+{
+  if (serial)
+  {
 #ifdef ESP32
-    ((HardwareSerial*)serial)->flush();
-    ((HardwareSerial*)serial)->end();
+    ((HardwareSerial *)serial)->flush();
+    ((HardwareSerial *)serial)->end();
 #elif defined(ESP8266)
-    ((SoftwareSerial*)serial)->flush();
-    ((SoftwareSerial*)serial)->end();
+    ((SoftwareSerial *)serial)->flush();
+    ((SoftwareSerial *)serial)->end();
 #endif
   }
   serial = NULL;
 }
 
+float _toFIXPOINT(float dval, uint8_t precision)
+{
 
-float _toFIXPOINT(float dval, uint8_t precision) {
-
-  if (precision == 0) {
+  if (precision == 0)
+  {
     return dval;
   }
 
   float rval = 10.0;
-  for (int i = 0; i < precision; i++) rval *= 10.0;
-  return (int)(dval * rval + 0.5) / rval;  //rounding
+  for (int i = 0; i < precision; i++)
+    rval *= 10.0;
+  return (int)(dval * rval + 0.5) / rval; // rounding
 }
 
-
-float LPB::toFIXPOINT(byte* msg, cmd_t cmd) {
+float LPB::toFIXPOINT(byte *msg, cmd_t cmd)
+{
 
   int data_len = 0;
-  if (msg[4 + offset] < 0x12 || msg[4 + offset] > 0x20) {
-    data_len = msg[getLen_idx()] - 14;  // get packet length, then subtract
-  } else {
-    data_len = msg[getLen_idx()] - 7;  // for yet unknow telegram types 0x12 to 0x15
+  if (msg[4 + offset] < 0x12 || msg[4 + offset] > 0x20)
+  {
+    data_len = msg[getLen_idx()] - 14; // get packet length, then subtract
+  }
+  else
+  {
+    data_len = msg[getLen_idx()] - 7; // for yet unknow telegram types 0x12 to 0x15
   }
 
   Serial.printf("dval len %d %d 0x%08x\n", data_len, cmd.type, cmd.flags);
-  if (data_len == 3 || data_len == 5) {
-    if (msg[getPl_start()] == 0 || (cmd.flags & FL_SPECIAL_INF)) {
+  if (data_len == 3 || data_len == 5)
+  {
+    if (msg[getPl_start()] == 0 || (cmd.flags & FL_SPECIAL_INF))
+    {
 
       float divider = optbl[cmd.type].operand;
       uint8_t precision = optbl[cmd.type].precision;
 
       float dval;
 
-      if (data_len == 3) {
-        if (cmd.flags & FL_SPECIAL_INF) {
+      if (data_len == 3)
+      {
+        if (cmd.flags & FL_SPECIAL_INF)
+        {
           dval = float((int16_t)(msg[getPl_start()] << 8) + (int16_t)msg[getPl_start() + 1]) / divider;
           Serial.printf("dval %d %f %f %d\n", (msg[getPl_start()] << 8) + (int16_t)msg[getPl_start() + 1], dval, divider, precision);
-        } else {
+        }
+        else
+        {
           dval = float((int16_t)(msg[getPl_start() + 1] << 8) + (int16_t)msg[getPl_start() + 2]) / divider;
           Serial.printf("dval %d %f %f %d\n", (msg[getPl_start() + 1] << 8) + (int16_t)msg[getPl_start() + 2], dval, divider, precision);
         }
-      } else {
+      }
+      else
+      {
         dval = float((int16_t)(msg[getPl_start() + 3] << 8) + (int16_t)msg[getPl_start() + 4]) / divider;
         Serial.printf("dval %d %f %f %d\n", (msg[getPl_start() + 3] << 8) + msg[getPl_start() + 4], dval, divider, precision);
       }
       return _toFIXPOINT(dval, precision);
-    } else {
-      //undefinedValueToBuffer(decodedTelegram.value);
     }
-    //printDebugValueAndUnit(decodedTelegram.value, decodedTelegram.unit);
-  } else {
+    else
+    {
+      // undefinedValueToBuffer(decodedTelegram.value);
+    }
+    // printDebugValueAndUnit(decodedTelegram.value, decodedTelegram.unit);
+  }
+  else
+  {
     printToDebug("FIXPOINT len !=3: ");
-    //prepareToPrintHumanReadableTelegram(msg, data_len, getPl_start());
-    //decodedTelegram.error = 256;
+    // prepareToPrintHumanReadableTelegram(msg, data_len, getPl_start());
+    // decodedTelegram.error = 256;
   }
   return NAN;
 }
 
-float LPB::getTemperature(float line, float* r) {
+float LPB::getTemperature(float line, float *r)
+{
 
   byte rx_msg[33];
-  if (query(line, rx_msg) == 0) {
+  if (query(line, rx_msg) == 0)
+  {
     cmd_t cmd = cmdtbl[findLine(line)];
     *r = toFIXPOINT(rx_msg, cmd);
     Serial.printf("getTemp() %f %f\n", line, *r);
@@ -213,16 +271,25 @@ float LPB::getTemperature(float line, float* r) {
   return NAN;
 }
 
-bool LPB::update(boilder_t* p) {
+bool LPB::update(boilder_t *p, bool simulate)
+{
 
-  if (dev_lookup[0].dev_id == 0xFF) {
+  if (simulate)
+  {
+    p->t_cur = 52.0f;
+    p->t_max = 65.0f;
+    p->t_min = 45.0f;
+    p->t_nom = 55.0f;
+    return true;
+  }
+
+  if (dev_lookup[0].dev_id == 0xFF)
+  {
     return false;
   }
 
-  if (getTemperature(8310, &boilderData.t_cur) == NAN
-      || getTemperature(1610, &boilderData.t_nom) == NAN
-      || getTemperature(1612, &boilderData.t_min) == NAN
-      || getTemperature(1645, &boilderData.t_max) == NAN) {
+  if (getTemperature(8310, &boilderData.t_cur) == NAN || getTemperature(1610, &boilderData.t_nom) == NAN || getTemperature(1612, &boilderData.t_min) == NAN || getTemperature(1645, &boilderData.t_max) == NAN)
+  {
     return false;
   }
   p->t_cur = boilderData.t_cur;
@@ -233,57 +300,73 @@ bool LPB::update(boilder_t* p) {
   return true;
 }
 
-uint8_t LPB::getBusAddr() {
+uint8_t LPB::getBusAddr()
+{
   return myAddr;
 }
 
-uint8_t LPB::getBusDest() {
+uint8_t LPB::getBusDest()
+{
   return destAddr;
 }
 
-uint8_t LPB::getLen_idx() {
+uint8_t LPB::getLen_idx()
+{
   return len_idx;
 }
 
-uint8_t LPB::getPl_start() {
+uint8_t LPB::getPl_start()
+{
   return pl_start;
 }
 
-device_map* LPB::getDestDevice() {
-  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
-    if (dev_lookup[i].dev_id == getBusDest()) {
+device_map *LPB::getDestDevice()
+{
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++)
+  {
+    if (dev_lookup[i].dev_id == getBusDest())
+    {
       return &dev_lookup[i];
     }
   }
   return NULL;
 }
 
-bool LPB::GetDevId() {
+bool LPB::GetDevId()
+{
 
-  if (dev_lookup[0].dev_id == 0xFF) {
+  if (dev_lookup[0].dev_id == 0xFF)
+  {
 
-    byte msg[33] = { 0 };
-    byte tx_msg[33] = { 0 };
+    byte msg[33] = {0};
+    byte tx_msg[33] = {0};
     uint8_t save_destAddr = getBusDest();
 
     int8_t anz_dev = 0;
     printlnToDebug("Scanning devices on the bus...");
 
-    if (Send(TYPE_QINF, 0x053D0064, msg, tx_msg, NULL, 0, false) == BUS_OK) {
+    if (Send(TYPE_QINF, 0x053D0064, msg, tx_msg, NULL, 0, false) == BUS_OK)
+    {
       printTelegram(tx_msg, -1);
       unsigned long startquery = millis();
-      while (millis() - startquery < 10000) {
-        if (GetMessage(msg)) {
+      while (millis() - startquery < 10000)
+      {
+        if (GetMessage(msg))
+        {
           printTelegram(msg, -1);
-          if (msg[4 + offset] != TYPE_INF || msg[2] != getBusAddr()) {
+          if (msg[4 + offset] != TYPE_INF || msg[2] != getBusAddr())
+          {
             break;
           }
-          for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
-            if (dev_lookup[i].dev_id == msg[3]) {  // dest
+          for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++)
+          {
+            if (dev_lookup[i].dev_id == msg[3])
+            { // dest
               //                found = true;
               break;
             }
-            if (dev_lookup[i].dev_id == 0xFF) {
+            if (dev_lookup[i].dev_id == 0xFF)
+            {
               dev_lookup[i].dev_id = msg[3];
               dev_lookup[i].dev_fam = msg[10 + offset];
               dev_lookup[i].dev_var = msg[12 + offset];
@@ -297,20 +380,26 @@ bool LPB::GetDevId() {
         }
         delay(1);
       }
-      for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
-        if (dev_lookup[i].dev_id == 0xFF) break;
+      for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++)
+      {
+        if (dev_lookup[i].dev_id == 0xFF)
+          break;
 
         destAddr = dev_lookup[i].dev_id;
-        if (Send(TYPE_QUR, 0x053D0001, msg, tx_msg, NULL, 0, true) == BUS_OK) {
+        if (Send(TYPE_QUR, 0x053D0001, msg, tx_msg, NULL, 0, true) == BUS_OK)
+        {
           printTelegram(tx_msg, -1);
           printTelegram(msg, -1);
           memcpy(dev_lookup[i].name, &msg[getPl_start()], 17);
         }
       }
       printlnToDebug("Bus devices found:");
-      for (int i = 0; i < (int)sizeof(dev_lookup) / (int)sizeof(dev_lookup[0]); i++) {
-        if (dev_lookup[i].dev_id == 0xFF) {
-          if (i < anz_dev - 1) {
+      for (int i = 0; i < (int)sizeof(dev_lookup) / (int)sizeof(dev_lookup[0]); i++)
+      {
+        if (dev_lookup[i].dev_id == 0xFF)
+        {
+          if (i < anz_dev - 1)
+          {
             printFmtToDebug("Only %d out of %d devices have responded, will run device detection again next time.\n", i + 1, anz_dev);
             dev_lookup[0].dev_id = 0xFF;
             return false;
@@ -323,8 +412,10 @@ bool LPB::GetDevId() {
     destAddr = save_destAddr;
   }
   // get first device
-  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++) {
-    if (dev_lookup[i].dev_id == getBusDest()) {
+  for (uint8_t i = 0; i < sizeof(dev_lookup) / sizeof(dev_lookup[0]); i++)
+  {
+    if (dev_lookup[i].dev_id == getBusDest())
+    {
       my_dev_fam = dev_lookup[i].dev_fam;
       my_dev_var = dev_lookup[i].dev_var;
       my_dev_oc = dev_lookup[i].dev_oc;
@@ -337,50 +428,67 @@ bool LPB::GetDevId() {
   return false;
 }
 
-int LPB::findLine(float line) {
+int LPB::findLine(float line)
+{
   uint8_t found = 0;
   int i = -1;
   int save_i = 0;
   uint32_t c;
   float l;
 
-  for (uint16_t j = 0; j < cmdtbl_size; j++) {
-    if (cmdtbl[j].line == line) {
+  for (uint16_t j = 0; j < cmdtbl_size; j++)
+  {
+    if (cmdtbl[j].line == line)
+    {
       i = j;
       break;
       return i;
     }
   }
-  if (i == -1) return i;
+  if (i == -1)
+    return i;
 
   l = cmdtbl[i].line;
-  while (l == line) {
+  while (l == line)
+  {
     c = cmdtbl[i].cmd;
     uint8_t dev_fam = cmdtbl[i].dev_fam;
     uint8_t dev_var = cmdtbl[i].dev_var;
     uint32_t dev_flags = cmdtbl[i].flags;
 
-    if ((dev_fam == my_dev_fam || dev_fam == DEV_FAM(DEV_ALL)) && (dev_var == my_dev_var || dev_var == DEV_VAR(DEV_ALL))) {
-      if (dev_fam == my_dev_fam && dev_var == my_dev_var) {
-        if ((dev_flags & FL_NO_CMD) == FL_NO_CMD) {
-          while (c == cmdtbl[i].cmd) {
+    if ((dev_fam == my_dev_fam || dev_fam == DEV_FAM(DEV_ALL)) && (dev_var == my_dev_var || dev_var == DEV_VAR(DEV_ALL)))
+    {
+      if (dev_fam == my_dev_fam && dev_var == my_dev_var)
+      {
+        if ((dev_flags & FL_NO_CMD) == FL_NO_CMD)
+        {
+          while (c == cmdtbl[i].cmd)
+          {
             i++;
           }
           found = 0;
           i--;
-        } else {
+        }
+        else
+        {
           found = 1;
           save_i = i;
           break;
         }
-      } else if ((!found && dev_fam != my_dev_fam) || (dev_fam == my_dev_fam)) {  // wider match has hit -> store in case of best match
-        if ((dev_flags & FL_NO_CMD) == FL_NO_CMD) {
-          while (c == cmdtbl[i].cmd) {
+      }
+      else if ((!found && dev_fam != my_dev_fam) || (dev_fam == my_dev_fam))
+      { // wider match has hit -> store in case of best match
+        if ((dev_flags & FL_NO_CMD) == FL_NO_CMD)
+        {
+          while (c == cmdtbl[i].cmd)
+          {
             i++;
           }
           found = 0;
           i--;
-        } else {
+        }
+        else
+        {
           found = 1;
           save_i = i;
         }
@@ -390,15 +498,17 @@ int LPB::findLine(float line) {
     l = cmdtbl[i].line;
   }
 
-  if (!found) {
+  if (!found)
+  {
     return -1;
   }
   return save_i;
 }
 
-uint16_t LPB::query(float line, byte* msg) {  // line (ProgNr)
+uint16_t LPB::query(float line, byte *msg)
+{ // line (ProgNr)
 
-  byte tx_msg[33] = { 0 };  // xmit buffer
+  byte tx_msg[33] = {0}; // xmit buffer
 
   int i = 0;
   int retry;
@@ -408,81 +518,97 @@ uint16_t LPB::query(float line, byte* msg) {  // line (ProgNr)
   uint32_t c = cmdtbl[i].cmd;
   uint8_t query_type = TYPE_QUR;
   uint32_t dev_flags = cmdtbl[i].flags;
-  if (dev_flags & FL_QINF_ONLY) {
+  if (dev_flags & FL_QINF_ONLY)
+  {
     query_type = TYPE_QINF;
   }
-  if (dev_flags & FL_NOSWAP_QUR) {
-    c = ((c & 0xFF000000) >> 8) | ((c & 0x00FF0000) << 8) | (c & 0x0000FFFF);  // Bytes 1+2 of CoID will be swapped for QUR command, but need to remain as-is for FL_NOSWAP_QUR parameters, so swap here again.
+  if (dev_flags & FL_NOSWAP_QUR)
+  {
+    c = ((c & 0xFF000000) >> 8) | ((c & 0x00FF0000) << 8) | (c & 0x0000FFFF); // Bytes 1+2 of CoID will be swapped for QUR command, but need to remain as-is for FL_NOSWAP_QUR parameters, so swap here again.
   }
-  if (i >= 0) {
-    if (c != CMD_UNKNOWN && (dev_flags & FL_NO_CMD) != FL_NO_CMD) {  // send only valid command codes
+  if (i >= 0)
+  {
+    if (c != CMD_UNKNOWN && (dev_flags & FL_NO_CMD) != FL_NO_CMD)
+    { // send only valid command codes
       retry = QUERY_RETRIES;
-      while (retry) {
-        if (Send(query_type, c, msg, tx_msg) == BUS_OK) {
+      while (retry)
+      {
+        if (Send(query_type, c, msg, tx_msg) == BUS_OK)
+        {
           // Decode the xmit telegram and send it
           printTelegram(tx_msg, line);
           // Decode the rcv telegram and send it
           printTelegram(msg, line);
           printFmtToDebug("#%g: ", line);
-          //printlnToDebug(build_pvalstr(0));
-          break;  // success, break out of while loop
-        } else {
-          printlnToDebug(printError(261));  //query failed
-          retry--;                          // decrement number of attempts
+          // printlnToDebug(build_pvalstr(0));
+          break; // success, break out of while loop
         }
-      }  // endwhile, maximum number of retries reached
-      if (retry == 0) {
+        else
+        {
+          printlnToDebug(printError(261)); // query failed
+          retry--;                         // decrement number of attempts
+        }
+      } // endwhile, maximum number of retries reached
+      if (retry == 0)
+      {
         printFmtToDebug("%g\n", line);
         return 261;
       }
     }
-    return 0;  // ok
+    return 0; // ok
   }
   return -1;
 }
 
 // Generates checksum from LPB message
 // (255 - (Telegrammlänge ohne PS - 1)) * 256 + Telegrammlänge ohne PS - 1 + Summe aller Telegrammbytes
-uint16_t LPB::CRC_LPB(byte* buffer, uint8_t length) {
+uint16_t LPB::CRC_LPB(byte *buffer, uint8_t length)
+{
   uint16_t crc = 0;
 
   crc = (257 - length) * 256 + length - 2;
 
-  for (uint8_t i = 0; i < length - 1; i++) {
+  for (uint8_t i = 0; i < length - 1; i++)
+  {
     crc = crc + buffer[i];
   }
 
   return crc;
 }
 
-
 // Dumps a message to Serial
-void LPB::print(byte* msg) {
+void LPB::print(byte *msg)
+{
   byte len = msg[len_idx];
-  if (len > 32) return;
+  if (len > 32)
+    return;
   byte data = 0;
 
-  for (int i = 0; i < len + 1; i++) {  // msg length counts from zero with LPB (bus_type 1) and from 1 with BSB (bus_type 0)
+  for (int i = 0; i < len + 1; i++)
+  { // msg length counts from zero with LPB (bus_type 1) and from 1 with BSB (bus_type 0)
     data = msg[i];
-    if (data < 16) Serial.print("0");
+    if (data < 16)
+      Serial.print("0");
     Serial.print(data, HEX);
     Serial.print(" ");
   }
   Serial.println();
 }
 
-
-bool LPB::rx_pin_read() {
+bool LPB::rx_pin_read()
+{
   return bool(*portInputRegister(digitalPinToPort(rx_pin)) & digitalPinToBitMask(rx_pin)) ^ 1;
 }
 
-uint8_t LPB::readByte() {
+uint8_t LPB::readByte()
+{
   byte read = serial->read() ^ 0xFF;
   return read;
 }
 
 // Low-Level sending of message to bus
-inline int8_t LPB::_send(byte* msg) {
+inline int8_t LPB::_send(byte *msg)
+{
   // Nun - Ein Teilnehmer will senden :
   byte data, len;
   len = msg[len_idx];
@@ -496,44 +622,50 @@ inline int8_t LPB::_send(byte* msg) {
 #if DEBUG_LL
   print(msg);
 #endif
-  static const unsigned long timeoutabort = 1000;  // one second timeout
+  static const unsigned long timeoutabort = 1000; // one second timeout
   unsigned long start_timer = millis();
   unsigned long waitfree;
 retry:
-  waitfree = random(1, 20) + 3 + 59;              // range 63 .. 82 ms, BSB mimimum delay between telegrams is 59 ms (25 for LPB -> miwi), plus duration of one full (32 bytes) telegram (3 ms), plus random amount of 1-20 ms.
-  {                                               // block begins
-    if (millis() - start_timer > timeoutabort) {  // one second has elapsed
+  waitfree = random(1, 20) + 3 + 59; // range 63 .. 82 ms, BSB mimimum delay between telegrams is 59 ms (25 for LPB -> miwi), plus duration of one full (32 bytes) telegram (3 ms), plus random amount of 1-20 ms.
+  {                                  // block begins
+    if (millis() - start_timer > timeoutabort)
+    { // one second has elapsed
       return BUS_NOTFREE;
     }
     unsigned long timeout = millis();
     // Probe the bus until the delay calculated above has passed. We want to wait this long even on the first try because we want to make sure the minimum delay between telegrams has passed.
-    while (millis() - timeout < waitfree) {
+    while (millis() - timeout < waitfree)
+    {
       bool rx_pin = rx_pin_read();
-      if (rx_pin) {  // If there is activity on the bus / the bus has been pulled low, we have to try again and wait for 'waitfree' ms.
+      if (rx_pin)
+      { // If there is activity on the bus / the bus has been pulled low, we have to try again and wait for 'waitfree' ms.
 #if DEBUG_LL
         Serial.println("Activity on the bus while waiting, retrying...");
 #endif
-        delay(146);  // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
-        while (serial->available()) {
+        delay(146); // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
+        while (serial->available())
+        {
           char c = readByte();
 #if DEBUG_LL
-          if (c < 16) Serial.print("0");
+          if (c < 16)
+            Serial.print("0");
           Serial.print(c, HEX);
           Serial.print(" ");
 #endif
-          c = c;  // prevent compiler warning about unused variable if DEBUG_LL is not active
+          c = c; // prevent compiler warning about unused variable if DEBUG_LL is not active
         }
 #if DEBUG_LL
         Serial.println();
 #endif
         goto retry;
-      }  // endif
-    }    // endwhile
-  }      // block ends
+      } // endif
+    } // endwhile
+  } // block ends
 
   byte loop_len = len;
-  loop_len = len;  // same msg length difference as above
-  for (byte i = 0; i <= loop_len; i++) {
+  loop_len = len; // same msg length difference as above
+  for (byte i = 0; i <= loop_len; i++)
+  {
     data = msg[i];
     data = data ^ 0xFF;
     serial->write(data);
@@ -541,31 +673,38 @@ retry:
     serial->flush();
 #endif
   }
-  //#if !defined(ESP32)
+  // #if !defined(ESP32)
   serial->flush();
   unsigned long timeout = millis();
-  while ((millis() - timeout < 50) && serial->available() == 0) {
+  while ((millis() - timeout < 50) && serial->available() == 0)
+  {
     delay(1);
   }
-  //#endif
-  //  delay(loop_len*2+10);      // Wait up to 32 characters for the maximum number of bytes in a telegram to show up again on RX after sending it via TX.
-  if (false) {
-    if (serial->available()) {
-      for (uint8_t i = 0; i <= loop_len; i++) {
+  // #endif
+  //   delay(loop_len*2+10);      // Wait up to 32 characters for the maximum number of bytes in a telegram to show up again on RX after sending it via TX.
+  if (false)
+  {
+    if (serial->available())
+    {
+      for (uint8_t i = 0; i <= loop_len; i++)
+      {
         char readdata = readByte();
-        if (msg[i] != readdata) {
+        if (msg[i] != readdata)
+        {
 #if DEBUG_LL
           Serial.println(readdata, HEX);
 #endif
           Serial.println("Collision on the bus, retrying...");
-          delay(146);  // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
-          while (serial->available()) {
+          delay(146); // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
+          while (serial->available())
+          {
             char c = readByte();
 #if DEBUG_LL
-            if (c < 16) Serial.print("0");
+            if (c < 16)
+              Serial.print("0");
             Serial.print(c, HEX);
 #endif
-            c = c;  // prevent compiler warning about unused variable if DEBUG_LL is not active
+            c = c; // prevent compiler warning about unused variable if DEBUG_LL is not active
           }
 #if DEBUG_LL
           Serial.println();
@@ -578,17 +717,19 @@ retry:
   return BUS_OK;
 }
 
-
-bool LPB::GetMessage(byte* msg) {
+bool LPB::GetMessage(byte *msg)
+{
 
   byte i = 0;
   uint8_t read;
 
-  while (serial->available() > 0 && i < 33) {
+  while (serial->available() > 0 && i < 33)
+  {
     // Read serial data...
     read = readByte();
     // ... until SOF detected (= 0xDC, 0xDE bei BSB bzw. 0x78 bei LPB)
-    if (read == 0x78) {
+    if (read == 0x78)
+    {
       // Restore otherwise dropped SOF indicator
       msg[i++] = read;
 
@@ -600,11 +741,13 @@ bool LPB::GetMessage(byte* msg) {
       //	      }
 
       // Delay for more data
-      if (serial->available() == 0) {
-        delay(4);  // I wonder why HardwareSerial needs longer than SoftwareSerial until a character is ready to be processed. Also, why 3ms are fine for the Mega, but at least 4ms are necessary on the Due
+      if (serial->available() == 0)
+      {
+        delay(4); // I wonder why HardwareSerial needs longer than SoftwareSerial until a character is ready to be processed. Also, why 3ms are fine for the Mega, but at least 4ms are necessary on the Due
       }
       // read the rest of the message
-      while (serial->available() > 0 && i < 33) {
+      while (serial->available() > 0 && i < 33)
+      {
         read = readByte();
         msg[i++] = read;
         /*
@@ -617,30 +760,38 @@ bool LPB::GetMessage(byte* msg) {
 #endif
 */
         // Break if message seems to be completely received (i==msg.length)
-        if (i > len_idx) {
-          if (msg[len_idx] > 32)  // check for maximum message length
+        if (i > len_idx)
+        {
+          if (msg[len_idx] > 32) // check for maximum message length
             break;
           if (i >= msg[len_idx] + 1)
             break;
         }
         // Delay until we got next byte
-        if (serial->available() == 0) {
-          delay(4);  // see question/reason above
+        if (serial->available() == 0)
+        {
+          delay(4); // see question/reason above
         }
       }
 
       // We should have read the message completely. Now check and return
 
-      if (i == msg[len_idx] + 1) {  // LPB msg length is one less than BSB
-                                    // Seems to have received all data
-        if (CRC_LPB(msg, i - 1) - msg[i - 2] * 256 - msg[i - 1] == 0) {
+      if (i == msg[len_idx] + 1)
+      { // LPB msg length is one less than BSB
+        // Seems to have received all data
+        if (CRC_LPB(msg, i - 1) - msg[i - 2] * 256 - msg[i - 1] == 0)
+        {
           return true;
-        } else {
+        }
+        else
+        {
           Serial.println("CRC error:");
           print(msg);
           return false;
         }
-      } else {
+      }
+      else
+      {
         // Length error
         Serial.printf("Length error: 0x%.2x / 0x%.2x\n", i, msg[len_idx] + 1);
         print(msg);
@@ -652,12 +803,14 @@ bool LPB::GetMessage(byte* msg) {
   return false;
 }
 
-int8_t LPB::Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* param, byte param_len, bool wait_for_reply) {
+int8_t LPB::Send(uint8_t type, uint32_t cmd, byte *rx_msg, byte *tx_msg, byte *param, byte param_len, bool wait_for_reply)
+{
   byte i;
   byte length_offset = 0;
 
-  while (serial->available() > 0) {
-    readByte();  // flush
+  while (serial->available() > 0)
+  {
+    readByte(); // flush
   }
 
   // first two bytes are swapped
@@ -667,21 +820,23 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* p
   byte A4 = (cmd & 0x000000ff);
 
   // special treatment of internal query types
-  if (type == 0x12) {  // TYPE_IQ1
+  if (type == 0x12)
+  { // TYPE_IQ1
     A1 = A3;
     A2 = A4;
     length_offset = 2;
   }
-  if (type == 0x14) {  // TYPE_IQ2
+  if (type == 0x14)
+  { // TYPE_IQ2
     A1 = A4;
     length_offset = 3;
   }
 
   tx_msg[1] = param_len + 14 - length_offset;
-  tx_msg[4] = 0xC0;  // some kind of sending/receiving flag?
-  tx_msg[5] = 0x02;  // yet unknown
-  tx_msg[6] = 0x00;  // yet unknown
-  tx_msg[7] = 0x14;  // yet unknown
+  tx_msg[4] = 0xC0; // some kind of sending/receiving flag?
+  tx_msg[5] = 0x02; // yet unknown
+  tx_msg[6] = 0x00; // yet unknown
+  tx_msg[7] = 0x14; // yet unknown
   tx_msg[8] = type;
   // Adress
   tx_msg[9] = A1;
@@ -690,18 +845,23 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* p
   tx_msg[12] = A4;
 
   // Value
-  for (i = 0; i < param_len; i++) {
+  for (i = 0; i < param_len; i++)
+  {
     tx_msg[13 + i] = param[i];
   }
   int8_t return_value = _send(tx_msg);
-  if (return_value != BUS_OK) return return_value;
-  if (!wait_for_reply) return return_value;
+  if (return_value != BUS_OK)
+    return return_value;
+  if (!wait_for_reply)
+    return return_value;
 
   i = 15;
 
   unsigned long timeout = millis() + 3000;
-  while ((i > 0) && (millis() < timeout)) {
-    if (GetMessage(rx_msg)) {
+  while ((i > 0) && (millis() < timeout))
+  {
+    if (GetMessage(rx_msg))
+    {
 #if DEBUG_LL
       Serial.print(F("\r\nDuration until answer received: "));
       Serial.println(3000 - (timeout - millis()));
@@ -709,23 +869,30 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* p
 #endif
       i--;
       byte msg_type = rx_msg[4 + offset];
-      if (rx_msg[2] == myAddr && ((type == 0x12 && msg_type == 0x13) || (type = 0x14 && msg_type == 0x15))) {
+      if (rx_msg[2] == myAddr && ((type == 0x12 && msg_type == 0x13) || (type = 0x14 && msg_type == 0x15)))
+      {
         return BUS_OK;
       }
       /* Activate for LPB systems with truncated error messages (no commandID in return telegram)
-*/
-      if (rx_msg[2] == myAddr && rx_msg[8] == 0x08) {  // TYPE_ERR
+       */
+      if (rx_msg[2] == myAddr && rx_msg[8] == 0x08)
+      { // TYPE_ERR
         return false;
       }
-      if ((rx_msg[2] == myAddr) && (rx_msg[5 + offset] == A2) && (rx_msg[6 + offset] == A1) && (rx_msg[7 + offset] == A3) && (rx_msg[8 + offset] == A4)) {
+      if ((rx_msg[2] == myAddr) && (rx_msg[5 + offset] == A2) && (rx_msg[6 + offset] == A1) && (rx_msg[7 + offset] == A3) && (rx_msg[8 + offset] == A4))
+      {
         return BUS_OK;
-      } else {
+      }
+      else
+      {
 #if DEBUG_LL
         Serial.println(F("Message received, but not for us:"));
         print(rx_msg);
 #endif
       }
-    } else {
+    }
+    else
+    {
       delayMicroseconds(205);
     }
   }

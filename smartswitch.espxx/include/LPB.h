@@ -70,7 +70,7 @@ public:
   device_map* getDestDevice();
 
   void disableInterface();
-  bool update(boilder_t*);
+  bool update(boilder_t* data, bool simulate);
 
   int8_t Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* param = NULL, byte param_len = 0, bool wait_for_reply = true);
   bool GetMessage(byte* msg);

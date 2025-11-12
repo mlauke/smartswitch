@@ -8,9 +8,9 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  opacity: 0;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
+  z-index: 1;
 }
 
 .overlay.active {
@@ -19,10 +19,9 @@
 }
 
 .overlay-content {
-
-  font-size:medium;
+  font-size: small;
   background: white;
-  padding: 20px;
+  padding: 4px;
   border-radius: 10px;
   max-width: 90%;
   width: 90%;
@@ -67,7 +66,7 @@ input[type="radio"] {
 }
 
 body {
-  font-size:medium;
+  font-size: medium;
   background: #ffffff;
   color: #333;
   display: grid;
@@ -109,14 +108,14 @@ button {
 
 .fg {
   display: grid;
-  grid-template-columns: 40% 60%;
+  grid-template-columns: 44% 50%;
   align-items: center;
   position: relative;
 
   .value {
     padding: 0 0 4px 4px;
     font-size: large;
-    justify-self:auto;
+    justify-self: right;
   }
 }
 
@@ -137,7 +136,6 @@ legend {
 }
 
 label {
-  width: 100%;
   text-align: left;
   margin-right: 10px;
 }
@@ -151,7 +149,7 @@ input {
 
 .container {
   display: grid;
-  grid-template-columns: 75% 25%;
+  grid-template-columns: 65% 35%;
   align-items: center;
   gap: 4px;
 }
@@ -181,10 +179,12 @@ input {
   display: none;
   color: #d1050c;
   overflow-wrap: anywhere;
-  ul{
+
+  ul {
     padding: 4px;
   }
-  li{
+
+  li {
     list-style: none;
   }
 }
@@ -276,17 +276,23 @@ button.loading span {
 }
 
 button.loading .spinner {
-    position: absolute;
-    width: 16px;
-    height: 16px;
-    right: 28%;
-    top: 50%;
-    border: 2px solid #ccc;
-    border-top-color: #333;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  right: 28%;
+  top: 50%;
+  border: 2px solid #ccc;
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: translateY(-50%) rotate(0deg);
   }
-  @keyframes spin {
-    0% { transform: translateY(-50%) rotate(0deg); }
-    100% { transform: translateY(-50%) rotate(360deg); }
+
+  100% {
+    transform: translateY(-50%) rotate(360deg);
   }
+}
