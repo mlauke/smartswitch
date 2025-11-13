@@ -102,23 +102,23 @@ void setup()
   wifiManager.setConfigPortalTimeout(10);
   if (!wifiManager.autoConnect("SmartSwitchAP"))
   {
-    Serial.println("Failed to connect, restarting...");
+    Serial.println(F("Failed to connect, restarting..."));
     restart();
   }
 
-  Serial.println("Mounting FS...");
+  Serial.println(F("Mounting FS..."));
   if (LittleFS.begin())
   {
     if (!loadConfig())
     {
-      Serial.println("Error loading config");
+      Serial.println(F("Error loading config"));
     }
   }
   else
   {
-    Serial.print("Failed to mount FS. Attempting to format...");
+    Serial.print(F("Failed to mount FS. Attempting to format..."));
     LittleFS.format();
-    Serial.println(" done.");
+    Serial.println(F(" done."));
 
     saveConfig();
   }
@@ -130,7 +130,7 @@ void setup()
     setConfigStr(config, hostname, lcHostname.c_str());
     if (!saveConfig())
     {
-      Serial.println("Error saving config");
+      Serial.println(F("Error saving config"));
     }
   }
 
@@ -161,7 +161,7 @@ void setup()
   server.onNotFound(handleNotFound);
 
   server.begin(); // Actually start the server
-  Serial.println("HTTP server started");
+  Serial.println(F("HTTP server started"));
 
   lpb->enableInterface();
   uint8_t retry = 0;
@@ -193,10 +193,10 @@ void onOTAEnd(bool success)
 {
   if (success)
   {
-    Serial.println("OTA update finished successfully!"); // Log when OTA has finished
+    Serial.println(F("OTA update finished successfully!")); // Log when OTA has finished
     return;
   }
-  Serial.println("There was an error during OTA update!");
+  Serial.println(F("There was an error during OTA update!"));
 }
 
 void systemDefaults()
@@ -251,18 +251,18 @@ bool updateSolarForecast()
   {
 
     RestClient restClient;
-    JsonDocument doc;
+    JsonDocument json;
 
     String solarUrl = isDevMode() ? URL_SOLAR_FORECAST_DEV : URL_SOLAR_FORECAST;
     char url[128];
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
-    if ((lastResult = restClient.fetch(String(url), doc, NULL)))
+    if ((lastResult = restClient.fetch(String(url), json, NULL)))
     {
 
-      serializeJsonPretty(doc, Serial);
+      serializeJsonPretty(json, Serial);
       uint8_t i = 0;
-      for (JsonPair entry : doc["result"].as<JsonObject>())
+      for (JsonPair entry : json[F("result")].as<JsonObject>())
       {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
@@ -274,17 +274,17 @@ bool updateSolarForecast()
         }
         else
         {
-          putEvent(String("WARN: overflow ") + i);
+          putEvent(String(F("WARN: overflow ")) + i);
           break;
         }
       }
-      setConfigStr(config, location, doc["message"]["info"]["place"].as<const char *>());
+      setConfigStr(config, location, json[F("message")]["info"]["place"].as<const char *>());
 
       clearLocationError();
     }
     else
     {
-      putLocationError("WARN solar forecast " + restClient.lastError());
+      putLocationError(String(F("WARN solar forecast ")) + restClient.lastError());
     }
     systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
   }
@@ -298,14 +298,14 @@ void updateLocation()
   {
 
     RestClient restClient;
-    JsonDocument doc;
+    JsonDocument json;
 
-    if ((saveConfigFile = restClient.fetch(URL_LOCATION, doc, NULL)))
+    if ((saveConfigFile = restClient.fetch(URL_LOCATION, json, NULL)))
     {
-      config.lon = doc["lon"].as<double>();
-      config.lat = doc["lat"].as<double>();
-      snprintf(config.location, CFG_SZ_LOCATION, "%s %s", doc["zip"].as<const char *>(), doc["city"].as<const char *>());
-      setConfigStr(config, tz, doc["timezone"]);
+      config.lon = json[F("lon")].as<double>();
+      config.lat = json[F("lat")].as<double>();
+      snprintf(config.location, CFG_SZ_LOCATION, "%s %s", json[F("zip")].as<const char *>(), json[F("city")].as<const char *>());
+      setConfigStr(config, tz, json[F("timezone")]);
       Serial.printf("Location: %f/%f - tz: %s loc: %s\n", config.lon, config.lat, config.tz, config.location);
     }
   }
@@ -314,14 +314,13 @@ void updateLocation()
 void cacheControlHeader(bool cache)
 {
   if (cache)
-    server.sendHeader("cache-control", "max-age=31536000, must-revalidate");
+    server.sendHeader(F("cache-control"), F("max-age=31536000, must-revalidate"));
   else
-    server.sendHeader("cache-control", "no-cache");
+    server.sendHeader(F("cache-control"), F("no-cache"));
 }
 
 void commonHeader()
 {
-  // server.sendHeader("last-modified", "");
   server.sendHeader("connection", "close");
   server.sendHeader("content-encoding", "gzip");
 }
@@ -353,58 +352,58 @@ void handleRoot()
   server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
 }
 
-void jsonToConfig(JsonDocument &data)
+void jsonToConfig(JsonDocument &json)
 {
-  config.mode = data["mode"].as<uint8_t>();
-  setConfigStr(config, release_tag, data["release_tag"]);
+  config.mode = json[F("mode")].as<uint8_t>();
+  setConfigStr(config, release_tag, json[F("release_tag")]);
 
-  config.update_startup = data["update_startup"];
+  config.update_startup = json[F("update_startup")];
 
-  setConfigStr(config, hostname, data["hostname"]);
+  setConfigStr(config, hostname, json[F("hostname")]);
 
-  setConfigStr(config, sonnenHostname, data["sn_host"]);
-  setConfigStr(config, sonnenApiToken, data["sn_token"]);
-  config.gridMin_W = data["sn_grdmin"].as<uint16_t>();
-  config.loadPower_W = data["sn_loadpower"].as<uint16_t>();
-  config.cap_bat_min_Wh = data["sn_cap_min"].as<uint16_t>();
+  setConfigStr(config, sonnenHostname, json[F("sn_host")]);
+  setConfigStr(config, sonnenApiToken, json[F("sn_token")]);
+  config.gridMin_W = json[F("sn_grdmin")].as<uint16_t>();
+  config.loadPower_W = json[F("sn_loadpower")].as<uint16_t>();
+  config.cap_bat_min_Wh = json[F("sn_cap_min")].as<uint16_t>();
 
-  config.lon = data["lc_lon"].as<float>();
-  config.lat = data["lc_lat"].as<float>();
-  config.kWp = data["lc_kWp"].as<float>();
-  config.az = data["lc_az"].as<uint16_t>();
-  config.dec = data["lc_dec"].as<uint16_t>();
+  config.lon = json[F("lc_lon")].as<float>();
+  config.lat = json[F("lc_lat")].as<float>();
+  config.kWp = json[F("lc_kWp")].as<float>();
+  config.az = json[F("lc_az")].as<uint16_t>();
+  config.dec = json[F("lc_dec")].as<uint16_t>();
 
-  setConfigStr(config, location, data["loc"]);
-  setConfigStr(config, tz, data["tz"]);
+  setConfigStr(config, location, json[F("loc")]);
+  setConfigStr(config, tz, json[F("tz")]);
 
-  config.version = data["version"].as<uint16_t>();
+  config.version = json[F("version")].as<uint16_t>();
 }
 
-void configToJson(JsonDocument &data)
+void configToJson(JsonDocument &json)
 {
-  data["mode"] = config.mode;
-  data["release_tag"] = config.release_tag;
+  json[F("mode")] = config.mode;
+  json[F("release_tag")] = config.release_tag;
 
-  data["update_startup"] = config.update_startup;
+  json[F("update_startup")] = config.update_startup;
 
-  data["hostname"] = config.hostname;
+  json[F("hostname")] = config.hostname;
 
-  data["sn_host"] = config.sonnenHostname;
-  data["sn_token"] = config.sonnenApiToken;
-  data["sn_grdmin"] = config.gridMin_W;
-  data["sn_loadpower"] = config.loadPower_W;
-  data["sn_cap_min"] = config.cap_bat_min_Wh;
+  json[F("sn_host")] = config.sonnenHostname;
+  json[F("sn_token")] = config.sonnenApiToken;
+  json[F("sn_grdmin")] = config.gridMin_W;
+  json[F("sn_loadpower")] = config.loadPower_W;
+  json[F("sn_cap_min")] = config.cap_bat_min_Wh;
 
-  data["lc_lon"] = config.lon;
-  data["lc_lat"] = config.lat;
-  data["lc_kWp"] = config.kWp;
-  data["lc_az"] = config.az;
-  data["lc_dec"] = config.dec;
+  json[F("lc_lon")] = config.lon;
+  json[F("lc_lat")] = config.lat;
+  json[F("lc_kWp")] = config.kWp;
+  json[F("lc_az")] = config.az;
+  json[F("lc_dec")] = config.dec;
 
-  data["loc"] = config.location;
-  data["tz"] = config.tz;
+  json[F("loc")] = config.location;
+  json[F("tz")] = config.tz;
 
-  data["version"] = config.version;
+  json[F("version")] = config.version;
 }
 
 void sendJson(String from, JsonDocument &json)
@@ -430,27 +429,27 @@ void addLog(JsonArray &array, logEntry &log)
 
 void handleData()
 {
-  JsonDocument data;
+  JsonDocument json;
 
-  configToJson(data);
-  data["start_ts"] = toLocalDate(&systemData, systemData.start_ts);
-  sendJson("data", data);
+  configToJson(json);
+  json[F("start_ts")] = toLocalDate(&systemData, systemData.start_ts);
+  sendJson("data", json);
 }
 
 // api/status
 void handleStatus()
 {
-  JsonDocument data;
+  JsonDocument json;
 
-  data["cons_w"] = systemData.cons_W;
-  data["cons_avg_w"] = systemData.cons_avg_W;
-  data["prod"] = systemData.prod_W;
-  data["grid"] = systemData.gridFeedIn_W;
-  data["usoc"] = systemData.usoc;
-  data["chrg"] = systemData.charge;
-  data["pac_total_w"] = systemData.pac_total_W * -1; // invert - positive means discharge, we invert for display
-  data["switch"] = systemData.switchEnabled;
-  data["sn_cap_max"] = systemData.cap_bat_max_Wh;
+  json[F("cons_w")] = systemData.cons_W;
+  json[F("cons_avg_w")] = systemData.cons_avg_W;
+  json[F("prod")] = systemData.prod_W;
+  json[F("grid")] = systemData.gridFeedIn_W;
+  json[F("usoc")] = systemData.usoc;
+  json[F("chrg")] = systemData.charge;
+  json[F("pac_total_w")] = systemData.pac_total_W * -1; // invert - positive means discharge, we invert for display
+  json[F("switch")] = systemData.switchEnabled;
+  json[F("sn_cap_max")] = systemData.cap_bat_max_Wh;
 
   char devid[40] = "unknown";
   device_map *device = lpb->getDestDevice();
@@ -458,18 +457,18 @@ void handleStatus()
   {
     snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
-  data["bs_devid"] = devid;
-  data["bs_t_cur"] = systemData.boiler_T_cur;
-  data["bs_t_max"] = systemData.boiler_T_max;
-  data["bs_t_min"] = systemData.boiler_T_min;
-  data["bs_t_nom"] = systemData.boiler_T_nom;
+  json[F("bs_devid")] = devid;
+  json[F("bs_t_cur")] = systemData.boiler_T_cur;
+  json[F("bs_t_max")] = systemData.boiler_T_max;
+  json[F("bs_t_min")] = systemData.boiler_T_min;
+  json[F("bs_t_nom")] = systemData.boiler_T_nom;
 
-  JsonArray errors = data["errors"].to<JsonArray>();
+  JsonArray errors = json[F("errors")].to<JsonArray>();
   addLog(errors, systemData.error_bt);
   addLog(errors, systemData.error_bs);
   addLog(errors, systemData.error_lc);
 
-  JsonArray events = data["events"].to<JsonArray>();
+  JsonArray events = json[F("events")].to<JsonArray>();
   unsigned short i = SIZE_EVENT_BUFFER;
   while (i-- > 0)
   {
@@ -477,9 +476,9 @@ void handleStatus()
     addLog(events, log);
   }
 
-  data["version"] = config.version;
+  json[F("version")] = config.version;
 
-  sendJson("status", data);
+  sendJson("status", json);
 }
 
 void handleAPI()
@@ -579,6 +578,8 @@ void restart()
   ESP.restart();
 }
 
+const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>";
+
 void handleGithubUpdate()
 {
 
@@ -588,7 +589,7 @@ void handleGithubUpdate()
   {
     if (server.client() && server.client().connected())
     {
-      server.send(404, "text/plain", "No Update found");
+      server.send(404, String(F("text/plain")), String(F("Update failed. ")) + gh_updater.getUpdateStatus());
     }
     return;
   }
@@ -596,22 +597,19 @@ void handleGithubUpdate()
   if (server.client() && server.client().connected())
   {
     char buffer[256];
-    snprintf(buffer, sizeof(buffer), "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>", gh_updater.release_tag.c_str());
+    snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, gh_updater.release_tag.c_str());
     server.send(200, "text/html;charset=utf-8", buffer);
   }
-
-  Serial.setDebugOutput(true);
-
   if (gh_updater.doUpdate(&onOTABegin))
   {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig())
     {
-      putEvent("error saving config with release tag.");
+      putEvent(String(F("error saving config with release tag ")) + gh_updater.release_tag);
     }
     else
     {
-      Serial.println("config saved.");
+      Serial.println(F("config saved."));
       restart();
     }
   }
@@ -619,8 +617,6 @@ void handleGithubUpdate()
   {
     putEvent(gh_updater.getUpdateStatus());
   }
-
-  Serial.setDebugOutput(false);
 }
 
 void clearLocationError()
@@ -802,11 +798,11 @@ bool ensureConnected()
   wl_status_t status = WiFi.status();
   if (status != WL_CONNECTED)
   {
-    Serial.print("Connecting");
+    Serial.print(F("Connecting"));
     for (int retry = 1; retry <= 8; retry++)
     {
       statusLED(0);
-      Serial.print(".");
+      Serial.print(F("."));
       delay(500);
 
       status = WiFi.status();
@@ -833,7 +829,7 @@ bool ensureConnected()
   return status == WL_CONNECTED;
 }
 
-bool fetchBatteryData(String uri, JsonDocument &doc)
+bool fetchBatteryData(String uri, JsonDocument &json)
 {
 
   bool r = false;
@@ -844,7 +840,7 @@ bool fetchBatteryData(String uri, JsonDocument &doc)
   {
     char url[128];
     snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    r = restClient.fetch(String(url), doc, NULL, "auth-token", config.sonnenApiToken);
+    r = restClient.fetch(String(url), json, NULL, "auth-token", config.sonnenApiToken);
     if (!r)
     {
       putBatteryError(restClient.lastError());
@@ -876,7 +872,7 @@ bool updateSystemData()
   {
     if ((ok &= fetchBatteryData(SONNEN_API_CONFIGURATIONS, json)))
     {
-      systemData.inv_max_w = json["IC_InverterMaxPower_w"].as<int>();
+      systemData.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
       Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
     }
     else
@@ -888,7 +884,7 @@ bool updateSystemData()
   {
     if ((ok &= fetchBatteryData(SONNEN_API_LATEST_DATA, json)))
     {
-      systemData.cap_bat_max_Wh = json["FullChargeCapacity"].as<uint16_t>();
+      systemData.cap_bat_max_Wh = json[F("FullChargeCapacity")].as<uint16_t>();
       Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
     }
     else
@@ -899,18 +895,18 @@ bool updateSystemData()
 
   if ((ok &= fetchBatteryData(SONNEN_API_STATUS, json)))
   {
-    systemData.usoc = json["USOC"].as<uint8_t>();
+    systemData.usoc = json[F("USOC")].as<uint8_t>();
     systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
-    systemData.gridFeedIn_W = json["GridFeedIn_W"].as<int>();
-    systemData.prod_W = json["Production_W"].as<uint16_t>();
-    systemData.cons_W = json["Consumption_W"].as<uint16_t>();
-    systemData.cons_avg_W = json["Consumption_Avg"].as<uint16_t>();
-    systemData.dischargeNotAllowed = json["dischargeNotAllowed"].as<bool>();
-    systemData.pac_total_W = json["Pac_total_W"].as<int16_t>();
-    systemData.charge = json["BatteryCharging"].as<short>() - json["BatteryDischarging"].as<short>();
+    systemData.gridFeedIn_W = json[F("GridFeedIn_W")].as<int>();
+    systemData.prod_W = json[F("Production_W")].as<uint16_t>();
+    systemData.cons_W = json[F("Consumption_W")].as<uint16_t>();
+    systemData.cons_avg_W = json[F("Consumption_Avg")].as<uint16_t>();
+    systemData.dischargeNotAllowed = json[F("dischargeNotAllowed")].as<bool>();
+    systemData.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
+    systemData.charge = json[F("BatteryCharging")].as<short>() - json[F("BatteryDischarging")].as<short>();
 
     struct tm time;
-    strptime(json["Timestamp"].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
+    strptime(json[F("Timestamp")].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
 
     systemData.dstOffset = isDST(&time) ? dstOffset : 0;
 
@@ -1069,7 +1065,7 @@ bool loadConfig()
 {
   if (!LittleFS.exists(CONFIGFILE))
   {
-    Serial.println("Config file not found");
+    Serial.println(F("Config file not found"));
 
     return false;
   }
@@ -1091,7 +1087,7 @@ bool loadConfig()
     return false;
   }
 
-  Serial.println("Config loaded:");
+  Serial.println(F("Config loaded:"));
   serializeJsonPretty(json, Serial);
 
   jsonToConfig(json);
@@ -1112,7 +1108,7 @@ bool saveConfig()
 
   JsonDocument json;
   configToJson(json);
-  Serial.print("saveConfig() ");
+  Serial.print(F("saveConfig() "));
   serializeJsonPretty(json, Serial);
   serializeJson(json, f);
   f.close();

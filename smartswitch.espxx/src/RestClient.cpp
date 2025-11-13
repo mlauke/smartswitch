@@ -47,7 +47,6 @@ bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, Stri
   bool res = http.begin(*wifiClient, url);
   if (res)
   {
-
     http.setTimeout(REQUEST_TIMEOUT);
     http.setReuse(false);
     http.setFollowRedirects(followRedirects_t::HTTPC_STRICT_FOLLOW_REDIRECTS);
@@ -85,9 +84,7 @@ bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, Stri
   }
   http.end();
 
-  wifiClient->stop();
-
-  delete wifiClient;
+  releaseWiFiClient(wifiClient);
 
   return res;
 }

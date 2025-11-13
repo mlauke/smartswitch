@@ -44,43 +44,42 @@ GithubOTA::GithubOTA(const char *host, const char *url, const char *type, const 
 
 bool GithubOTA::checkUpdate(const char *current_release_tag)
 {
-
-  JsonDocument doc;
+  JsonDocument json;
   JsonDocument filter;
   RestClient restClient;
 
   updateStatus.clear();
 
-  filter["tag_name"] = true;
-  filter["prerelease"] = true;
-  filter["assets"][0]["content_type"] = true;
-  filter["assets"][0]["name"] = true;
-  filter["assets"][0]["browser_download_url"] = true;
+  filter[F("tag_name")] = true;
+  filter[F("prerelease")] = true;
+  filter[F("assets")][0][F("content_type")] = true;
+  filter[F("assets")][0][F("name")] = true;
+  filter[F("assets")][0][F("browser_download_url")] = true;
 
   String url = String(update_host) + update_url;
-  if (restClient.fetch(url, doc, &filter))
+  if (restClient.fetch(url, json, &filter))
   {
-    if (!doc["tag_name"].is<const char *>())
+    if (!json[F("tag_name")].is<const char *>())
     {
-      Serial.println("no release tag found");
+      updateStatus = F("No release tag found");
       return false;
     }
 
-    release_tag = doc["tag_name"].as<String>();
+    release_tag = json[F("tag_name")].as<String>();
 
-    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, doc["prerelease"].as<bool>());
+    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, json[F("prerelease")].as<bool>());
 
-    if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || doc["prerelease"].as<bool>())
+    if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || json[F("prerelease")].as<bool>())
     {
-      Serial.println("no newer release tag found");
+      updateStatus = F("No new release tag found");
       return false;
     }
 
-    for (auto asset : doc["assets"].as<JsonArray>())
+    for (auto asset : json[F("assets")].as<JsonArray>())
     {
-      const char *asset_type = asset["content_type"];
-      const char *asset_name = asset["name"];
-      const char *asset_url = asset["browser_download_url"];
+      const char *asset_type = asset[F("content_type")];
+      const char *asset_name = asset[F("name")];
+      const char *asset_url = asset[F("browser_download_url")];
 
       Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
       Serial.printf("expected: [%s], Type: [%s]\n", update_filename, update_type);
@@ -89,16 +88,16 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
       {
         download_url = String(asset_url);
 
-        Serial.println("Found Update URL: " + download_url);
+        Serial.println(String(F("Found Update URL: ")) + download_url);
 
         return true;
       }
     }
+    updateStatus = String(F("No Update URL found for new release tag ")) + release_tag;
   }
   else
   {
     updateStatus = restClient.lastError();
-    Serial.println(updateStatus);
   }
   return false;
 }
@@ -127,7 +126,7 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
 
   if (download_url.length() == 0)
   {
-    Serial.println("No download URL");
+    Serial.println(F("No download URL"));
     return false;
   }
 
@@ -158,47 +157,47 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
       WiFiClient *stream = http.getStreamPtr();
       if (!stream || !stream->available())
       {
-        Serial.println("ERROR: Stream not available");
+        Serial.println(F("ERROR: Stream not available"));
         return success;
       }
-      Serial.println("Begin OTA...");
+      Serial.println(F("Begin OTA..."));
       size_t written = Update.writeStream(*stream);
 
       if (written == contentLength)
       {
-        Serial.println("Written : " + String(written) + " successfully");
+        Serial.println(String(F("Written : ")) + written + F(" successfully"));
       }
       else
       {
         Update.abort();
-        Serial.println("Written only : " + String(written) + "/" + String(contentLength) + "!");
+        Serial.println(String(F("Written only : )")) + written + "/" + contentLength + "!");
       }
       if (Update.end())
       {
-        Serial.println("OTA done!");
+        Serial.println(F("OTA done!"));
         if (Update.isFinished())
         {
-          Serial.println("Update successfully completed.");
+          Serial.println(F("Update successfully completed."));
           success = true;
         }
         else
         {
-          updateStatus = String("Update not finished? Something went wrong!");
+          updateStatus = String(F("Update not finished? Something went wrong!"));
         }
       }
       else
       {
-        updateStatus = String("Error Occurred. Error #: ") + Update.getError();
+        updateStatus = String(F("Error Occurred. Error #: ")) + Update.getError();
       }
     }
     else
     {
-      updateStatus = String("Not enough space to begin OTA");
+      updateStatus = String(F("Not enough space to begin OTA"));
     }
   }
   else
   {
-    updateStatus = String("Failed to download firmware. HTTP code: ") + String(httpCode);
+    updateStatus = String(F("Failed to download firmware. HTTP code: ")) + String(httpCode);
   }
   http.end();
 
@@ -214,11 +213,11 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
   success = ESPhttpUpdate.update(*updateClient, download_url) == HTTP_UPDATE_OK;
   if (!success)
   {
-    updateStatus = String("Update Failed: ") + ESPhttpUpdate.getLastErrorString();
+    updateStatus = String(F("Update Failed: ")) + ESPhttpUpdate.getLastErrorString();
   }
 #endif
 
-  delete updateClient;
+  releaseWiFiClient(updateClient);
 
   if (!success)
   {

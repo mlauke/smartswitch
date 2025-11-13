@@ -108,7 +108,7 @@ button {
 
 .fg {
   display: grid;
-  grid-template-columns: 44% 50%;
+  grid-template-columns: 40% 58%;
   align-items: center;
   position: relative;
 
