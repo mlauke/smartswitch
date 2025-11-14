@@ -1,20 +1,38 @@
+// MIT License
+//
+// Copyright (c) 2024 Marko Lauke
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 #ifndef LOGIC_H
 #define LOGIC_H
 
-#include <SmartSwitch.h>
 #include <time.h>
-#include <debug.h>
+#include "SmartSwitch.h"
+#include "debug.h"
 
-// TODO
-int stdOffset = 3600; // 1h utc offset Europe/Berlin
-int dstOffset = 3600; // 1h suummer time offset
-
-char tsfmt[20];
-char *toDate(uint32_t utc_ts, uint16_t offset)
+char tsfmt[30];
+char *toDate(uint32_t utc_ts, int16_t offset)
 {
   time_t time = (time_t)(utc_ts + offset);
-  tm *timeinfo = gmtime(&time);
-  strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", timeinfo);
+  tm timeinfo;
+  gmtime_r(&time, &timeinfo);
+  strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", &timeinfo);
   return tsfmt;
 }
 
@@ -24,11 +42,11 @@ char *toDate(uint32_t utc_ts)
 }
 char *toLocalDate(SystemData *systemData, uint32_t utc_ts)
 {
-  return toDate(utc_ts, (stdOffset + systemData->dstOffset));
+  return toDate(utc_ts, (systemData->utc_offset));
 }
 
 void updateConsumption(SystemConfig *systemConfig, SystemData *systemData){
-  systemData->cons_W_nom = (systemData->cons_W + 5) / 10 * 10 + systemConfig->gridMin_W;// round up multiple of 10W
+  systemData->cons_W_nom = (systemData->cons_W + 5) / 10 * 10;// round up multiple of 10W
   // consumption without load
   systemData->cons_W_norm = (systemData->switchEnabled && systemData->cons_W_nom > systemConfig->loadPower_W)
     ? systemData->cons_W_nom - systemConfig->loadPower_W
@@ -48,7 +66,7 @@ bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemData *syst
   uint32_t cap_bat_Wh = systemData->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemData->switchEnabled ? 0 : hysteresis_Wh);
 
-  *ts = systemData->ts - (systemData->ts % 3600); // start timestamp of last full hour
+  *ts = systemData->ts - (systemData->ts % 3600); // start with timestamp of last full hour
 
   uint8_t i = 0;
   for (; i < sizeof(systemData->pv_forecast_wh_h) / sizeof(systemData->pv_forecast_wh_h[0]); i++)
@@ -60,7 +78,7 @@ bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemData *syst
   }
 
   uint32_t wh = (*ts + 3600 - systemData->ts) * systemData->pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
-
+  DEBUG("%d => %u %u (s) %s %u/%u (Wh)\n", i, *ts, systemData->ts, toDate(*ts), wh, systemData->pv_forecast_wh_h[i][1]);
   for (i++; i < sizeof(systemData->pv_forecast_wh_h) / sizeof(systemData->pv_forecast_wh_h[0]); i++)
   {
     if (cap_bat_Wh < cap_bat_min_Wh)
@@ -78,7 +96,7 @@ bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemData *syst
     *ts = systemData->pv_forecast_wh_h[i][0];
     wh = systemData->pv_forecast_wh_h[i][1];
   }
-  DEBUG("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_Wh, cap_bat_min_Wh, hysteresis_Wh, systemData->cons_W_norm, toLocalDate(systemData, *ts));
+  DEBUG("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_Wh, cap_bat_min_Wh, hysteresis_Wh, systemData->cons_W_norm, toDate(*ts));
   return foundPvData && cap_bat_Wh >= cap_bat_min_Wh;
 }
 

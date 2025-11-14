@@ -125,8 +125,7 @@ typedef struct {
   uint32_t start_ts; // system start timestamp
   uint32_t ts;       // current system time (UTC) - taken from battery status
   uint16_t tm_yday;  // day of year
-  uint16_t dstOffset;
-
+  uint16_t utc_offset; // UTC to local time offset in seconds
   bool switchEnabled = false;  // state of the load switch
 
   float boiler_T_cur;

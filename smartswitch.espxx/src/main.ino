@@ -19,9 +19,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-#include <SmartSwitch.h>
-#include <Logic.h>
-
+#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <Ticker.h>
@@ -42,13 +40,10 @@
 #include "app_icon.h"
 #include "index_html.h"
 
-#include "debug.h"
-
 #ifdef ESP32
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <WebServer.h>
-#include <Arduino.h>
 #include <esp_task_wdt.h>
 
 #elif ESP8266
@@ -59,6 +54,10 @@
 #include <ESP8266httpUpdate.h>
 
 #endif
+
+#include "SmartSwitch.h"
+#include "Logic.h"
+#include "debug.h"
 
 #ifdef ESP32
 static WebServer server(WEBSERVER_PORT);
@@ -853,6 +852,8 @@ bool fetchBatteryData(String uri, JsonDocument &json)
   return r;
 }
 
+// #define dstOffset 3600 // TODO may vary - 1h summer time offset except for Australia: Lord Howe Island
+
 bool updateSystemData()
 {
 
@@ -885,6 +886,7 @@ bool updateSystemData()
     if ((ok &= fetchBatteryData(SONNEN_API_LATEST_DATA, json)))
     {
       systemData.cap_bat_max_Wh = json[F("FullChargeCapacity")].as<uint16_t>();
+      systemData.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
       Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
     }
     else
@@ -908,9 +910,7 @@ bool updateSystemData()
     struct tm time;
     strptime(json[F("Timestamp")].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
 
-    systemData.dstOffset = isDST(&time) ? dstOffset : 0;
-
-    systemData.ts = mktime(&time) - stdOffset - systemData.dstOffset;
+    systemData.ts = mktime(&time) - systemData.utc_offset; // to UTC
     if (systemData.start_ts == 0)
     {
       systemData.start_ts = systemData.ts;
@@ -920,9 +920,9 @@ bool updateSystemData()
     updateConsumption(&config, &systemData);
   }
 
-  // TODO wrong error category
-  if (!(ok &= config.loadPower_W > 0))
+  if (ok && config.loadPower_W <= 0)
   {
+    // TODO wrong error category
     putBatteryError("Load not properly configured! Must be > 0!");
   }
 
@@ -952,9 +952,7 @@ const String CONSTRAINTS[] = {
     "battery min capacity reached at %s",
     "boiler temperature min reached",
     "boiler temperature max reached",
-    "latency count reached %d/%d"
-
-};
+    "latency count reached %d/%d"};
 
 void updateSwitch(bool validData)
 {
@@ -1033,6 +1031,9 @@ void toggleSwitch(bool switchEnabled)
   buildInLED(switchEnabled);
 }
 
+/*
+ * return true if summer time
+ */
 bool isDST(struct tm *timeinfo)
 {
   int year = timeinfo->tm_year + 1900;
@@ -1108,7 +1109,7 @@ bool saveConfig()
 
   JsonDocument json;
   configToJson(json);
-  Serial.print(F("saveConfig() "));
+  Serial.println(F("saveConfig() => "));
   serializeJsonPretty(json, Serial);
   serializeJson(json, f);
   f.close();

@@ -17,23 +17,23 @@ void test_upateConsumption()
   systemData.cons_W = 33;
   updateConsumption(&systemConfig, &systemData);
 
-  TEST_ASSERT_EQUAL(130, systemData.cons_W_nom);
-  TEST_ASSERT_EQUAL(130, systemData.cons_W_norm);
+  TEST_ASSERT_EQUAL(30, systemData.cons_W_nom);
+  TEST_ASSERT_EQUAL(30, systemData.cons_W_norm);
 
   systemData.cons_W = 103;
+  updateConsumption(&systemConfig, &systemData);
+  TEST_ASSERT_EQUAL(100, systemData.cons_W_nom);
+  TEST_ASSERT_EQUAL(100, systemData.cons_W_norm);
+
+  systemData.cons_W = 199;
   updateConsumption(&systemConfig, &systemData);
   TEST_ASSERT_EQUAL(200, systemData.cons_W_nom);
   TEST_ASSERT_EQUAL(200, systemData.cons_W_norm);
 
-  systemData.cons_W = 199;
-  updateConsumption(&systemConfig, &systemData);
-  TEST_ASSERT_EQUAL(300, systemData.cons_W_nom);
-  TEST_ASSERT_EQUAL(300, systemData.cons_W_norm);
-
   systemData.cons_W = 207;
   updateConsumption(&systemConfig, &systemData);
-  TEST_ASSERT_EQUAL(310, systemData.cons_W_nom);
-  TEST_ASSERT_EQUAL(310, systemData.cons_W_norm);
+  TEST_ASSERT_EQUAL(210, systemData.cons_W_nom);
+  TEST_ASSERT_EQUAL(210, systemData.cons_W_norm);
 }
 
 void test_batteryCapacityTargetFulfilledNoData()
@@ -45,8 +45,8 @@ void test_batteryCapacityTargetFulfilledNoData()
 void test_batteryCapacityTargetFulfilledSwitchOff()
 {
   systemData.ts = 1762598185;
-  systemData.cap_bat_Wh = 2670;
-  systemData.cons_W = 307;
+  systemData.cap_bat_Wh = 2600;
+  systemData.cons_W = 397;
   systemData.switchEnabled = true;
 
   updateConsumption(&systemConfig, &systemData);
@@ -130,6 +130,7 @@ void setUp(void)
   systemConfig.cap_bat_min_Wh = 2500;
   systemData.cap_bat_max_Wh = 9900;
   systemData.inv_max_w = 4500;
+  systemData.utc_offset = 3600;
 
   int r = 0;
   systemData.pv_forecast_wh_h[r][0] = 1762556400;

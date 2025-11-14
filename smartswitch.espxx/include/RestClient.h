@@ -13,8 +13,6 @@
   #include <ESP8266HTTPClient.h>
 #endif
 
-#include "debug.h"
-
 #define REQUEST_TIMEOUT 8000
 
 class RestClient {
