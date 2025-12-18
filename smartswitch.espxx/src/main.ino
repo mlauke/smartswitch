@@ -259,7 +259,6 @@ bool updateSolarForecast()
 
     if ((lastResult = restClient.fetch(String(url), json, NULL)))
     {
-
       serializeJsonPretty(json, Serial);
       uint8_t i = 0;
       for (JsonPair entry : json[F("result")].as<JsonObject>())
