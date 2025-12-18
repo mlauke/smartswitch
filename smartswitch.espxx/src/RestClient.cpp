@@ -41,7 +41,7 @@ bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, Stri
 
   WiFiClient *wifiClient = newWiFiClient(url);
 
-  DEBUG("url: '%s' - hdr: '%s' : '%s'\n", url.c_str(), hName.c_str(), hValue.c_str());
+  DEBUGF("url: '%s' - hdr: '%s' : '%s'\n", url.c_str(), hName.c_str(), hValue.c_str());
 
   _lastError.clear();
 
@@ -51,36 +51,36 @@ bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, Stri
     http.setTimeout(REQUEST_TIMEOUT);
     http.setReuse(false);
     http.setFollowRedirects(followRedirects_t::HTTPC_STRICT_FOLLOW_REDIRECTS);
-    http.setUserAgent(String("SmartSwitch - "));
+    http.setUserAgent(String(F("SmartSwitch - ")));
     if (hName.length() != 0 && hValue.length() != 0)
     {
       http.addHeader(hName, hValue);
     }
-    http.addHeader("accept", "application/json", true, true);
+    http.addHeader(F("accept"), F("application/json"));
 
     _lastResponseCode = http.GET();
     if ((res = _lastResponseCode == HTTP_CODE_OK))
     {
       DeserializationError error;
-      if (filter != NULL)
-      {
-        error = deserializeJson(doc, http.getString(), DeserializationOption::Filter(*filter));
-      }
-      else
+      if (filter == NULL)
       {
         error = deserializeJson(doc, http.getString());
       }
+      else
+      {
+        error = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(*filter));
+      }
       if (error)
       {
-        _lastError.concat("json error: " + url + " - " + error.c_str());
-        Serial.println(_lastError + " " + http.getString());
+        _lastError.concat(String(F("json error: ")) + url + F(" - ") + error.f_str());
+        DEBUGP(_lastError + " " + http.getString());
       }
       res = error == DeserializationError::Ok;
     }
     else
     {
       _lastError.concat(url + " code: " + _lastResponseCode + " " + http.errorToString(_lastResponseCode));
-      Serial.println(_lastError);
+      DEBUGF("%s\n", _lastError.c_str());
     }
   }
   http.end();

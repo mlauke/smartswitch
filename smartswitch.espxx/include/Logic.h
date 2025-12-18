@@ -78,7 +78,7 @@ bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemData *syst
   }
 
   uint32_t wh = (*ts + 3600 - systemData->ts) * systemData->pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
-  DEBUG("%d => %u %u (s) %s %u/%u (Wh)\n", i, *ts, systemData->ts, toDate(*ts), wh, systemData->pv_forecast_wh_h[i][1]);
+  DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", i, *ts, systemData->ts, toDate(*ts), wh, systemData->pv_forecast_wh_h[i][1]);
   for (i++; i < sizeof(systemData->pv_forecast_wh_h) / sizeof(systemData->pv_forecast_wh_h[0]); i++)
   {
     if (cap_bat_Wh < cap_bat_min_Wh)
@@ -91,12 +91,12 @@ bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemData *syst
     }
     // cumulate battery capacity upon production forecast in range [0..<bat max capacity>]
     cap_bat_Wh = MIN((uint16_t)MAX(0, (int)cap_bat_Wh + MIN(systemData->inv_max_w, (int)wh - systemData->cons_W_norm)), systemData->cap_bat_max_Wh);
-    DEBUG("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) cons %uW usoc: %u%%\n", i, *ts, toDate(*ts), wh, cap_bat_Wh, systemData->cons_W_norm, cap_bat_Wh * 100 / systemData->cap_bat_max_Wh);
+    DEBUGF("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) cons %uW usoc: %u%%\n", i, *ts, toDate(*ts), wh, cap_bat_Wh, systemData->cons_W_norm, cap_bat_Wh * 100 / systemData->cap_bat_max_Wh);
 
     *ts = systemData->pv_forecast_wh_h[i][0];
     wh = systemData->pv_forecast_wh_h[i][1];
   }
-  DEBUG("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_Wh, cap_bat_min_Wh, hysteresis_Wh, systemData->cons_W_norm, toDate(*ts));
+  DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_Wh, cap_bat_min_Wh, hysteresis_Wh, systemData->cons_W_norm, toDate(*ts));
   return foundPvData && cap_bat_Wh >= cap_bat_min_Wh;
 }
 

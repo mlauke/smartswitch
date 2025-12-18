@@ -19,7 +19,7 @@ public:
 
   GithubOTA(const char *, const char *, const char *, const char *);
   bool checkUpdate(const char *);
-  bool doUpdate(void (*fnOTABegin)(void));
+  bool doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOTAEnd)(bool));
   String getUpdateStatus();
 
 protected:

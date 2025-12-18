@@ -31,8 +31,9 @@
 #include <ESP8266httpUpdate.h>
 #endif
 
-#include <GithubOTA.h>
-#include <WiFiUtil.h>
+#include "GithubOTA.h"
+#include "WiFiUtil.h"
+#include "debug.h"
 
 GithubOTA::GithubOTA(const char *host, const char *url, const char *type, const char *filename)
 {
@@ -67,7 +68,7 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
 
     release_tag = json[F("tag_name")].as<String>();
 
-    Serial.printf("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, json[F("prerelease")].as<bool>());
+    DEBUGF("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, json[F("prerelease")].as<bool>());
 
     if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || json[F("prerelease")].as<bool>())
     {
@@ -81,14 +82,14 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
       const char *asset_name = asset[F("name")];
       const char *asset_url = asset[F("browser_download_url")];
 
-      Serial.printf("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
-      Serial.printf("expected: [%s], Type: [%s]\n", update_filename, update_type);
+      DEBUGF("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
+      DEBUGF("expected: [%s], Type: [%s]\n", update_filename, update_type);
 
       if (strcmp(asset_type, update_type) == 0 && strcmp(asset_name, update_filename) == 0)
       {
         download_url = String(asset_url);
 
-        Serial.println(String(F("Found Update URL: ")) + download_url);
+        DEBUGF("Found Update URL: %s\n", download_url.c_str());
 
         return true;
       }
@@ -109,7 +110,7 @@ void onOTAProgress(size_t current, size_t final)
   if (millis() - ota_progress_millis > 1000)
   {
     ota_progress_millis = millis();
-    Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
+    DEBUGF("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
   }
 }
 
@@ -118,7 +119,7 @@ String GithubOTA::getUpdateStatus()
   return updateStatus;
 }
 
-bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
+bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOTAEnd)(bool))
 {
   bool success = false;
 
@@ -126,89 +127,105 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
 
   if (download_url.length() == 0)
   {
-    Serial.println(F("No download URL"));
+    DEBUGLN("No download URL");
     return false;
   }
+  fnOTABegin();
 
   WiFiClient *updateClient = newWiFiClient(download_url);
 
-#ifdef ESP32
+  DEBUGF("Heap: %uk\n", ESP.getFreeHeap());
+
+  Update.clearError();
+  Update.onProgress(onOTAProgress);
 
   HTTPClient http;
+#if defined(ESP32)
+  http.setConnectTimeout(5000);
+#endif
+  http.setReuse(false);
+  http.setUserAgent(userAgent);
+  http.setTimeout(5000);
+  http.setFollowRedirects(followRedirects_t::HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
   http.begin(*updateClient, download_url);
-  http.setConnectTimeout(3000);
-  http.setTimeout(5000);
-  http.setFollowRedirects(followRedirects_t::HTTPC_STRICT_FOLLOW_REDIRECTS);
-
   int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_TEMPORARY_REDIRECT || httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_FOUND)
+  {
+    String newUrl = http.getLocation();
+    http.end();
+    DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
+    http.begin(*updateClient, newUrl);
+    httpCode = http.GET();
+
+    DEBUGF("get asset url %d\n", httpCode);
+  }
   if (httpCode == HTTP_CODE_OK)
   {
     int contentLength = http.getSize();
 
-    Update.clearError();
-    Update.onProgress(onOTAProgress);
-
-    bool canBegin = Update.begin(contentLength, U_FLASH, BUILTIN_LED);
+    bool canBegin = Update.begin(contentLength, U_FLASH, LED_BUILTIN);
     if (canBegin)
     {
-      fnOTABegin();
-
-      WiFiClient *stream = http.getStreamPtr();
-      if (!stream || !stream->available())
+      WiFiClient stream = http.getStream();
+      if (stream == NULL) // || !stream->available())
       {
-        Serial.println(F("ERROR: Stream not available"));
-        return success;
-      }
-      Serial.println(F("Begin OTA..."));
-      size_t written = Update.writeStream(*stream);
-
-      if (written == contentLength)
-      {
-        Serial.println(String(F("Written : ")) + written + F(" successfully"));
+        DEBUGF("ERROR: Stream not available %u %p\n", contentLength, stream);
       }
       else
       {
-        Update.abort();
-        Serial.println(String(F("Written only : )")) + written + "/" + contentLength + "!");
-      }
-      if (Update.end())
-      {
-        Serial.println(F("OTA done!"));
-        if (Update.isFinished())
+        DEBUGLN("Begin OTA...");
+        size_t written = Update.writeStream(stream);
+
+        if (written == contentLength)
         {
-          Serial.println(F("Update successfully completed."));
-          success = true;
+          DEBUGF("Written : %d successfully\n", written);
         }
         else
         {
-          updateStatus = String(F("Update not finished? Something went wrong!"));
+#if defined(ESP32)
+          Update.abort();
+#endif
+          DEBUGF("Written only : %u/%u !\n", written, contentLength);
         }
-      }
-      else
-      {
-        updateStatus = String(F("Error Occurred. Error #: ")) + Update.getError();
+        if (Update.end())
+        {
+          DEBUGLN("OTA done!");
+          if (Update.isFinished())
+          {
+            DEBUGLN("Update successfully completed.");
+            success = true;
+          }
+          else
+          {
+            updateStatus = String("Update not finished? Something went wrong!");
+          }
+        }
+        else
+        {
+          updateStatus = String("Error Occurred. Error #: ") + Update.getError();
+        }
       }
     }
     else
     {
-      updateStatus = String(F("Not enough space to begin OTA"));
+      updateStatus = String("Not enough space to begin OTA");
     }
   }
   else
   {
-    updateStatus = String(F("Failed to download firmware. HTTP code: ")) + String(httpCode);
+    updateStatus = String("Failed to download firmware. HTTP code: ") + String(httpCode);
   }
   http.end();
 
-#elif defined(ESP8266)
+#if defined(_ESP8266)
 
   ESPhttpUpdate.onStart(fnOTABegin);
   ESPhttpUpdate.onProgress(onOTAProgress);
   ESPhttpUpdate.setLedPin(LED_BUILTIN, HIGH);
   ESPhttpUpdate.setClientTimeout(10000);
   ESPhttpUpdate.rebootOnUpdate(false); // restart from outside
-  ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  ESPhttpUpdate.followRedirects(true);
 
   success = ESPhttpUpdate.update(*updateClient, download_url) == HTTP_UPDATE_OK;
   if (!success)
@@ -221,8 +238,9 @@ bool GithubOTA::doUpdate(void (*fnOTABegin)(void))
 
   if (!success)
   {
-    Serial.println(updateStatus);
+    DEBUGP(updateStatus);
   }
+  fnOTAEnd(success);
 
   return success;
 }

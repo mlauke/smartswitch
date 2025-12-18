@@ -57,40 +57,41 @@ typedef struct {
   float t_nom;
   float t_min;
   float t_max;
-} boilder_t;
+} boiler_t;
 
 class LPB {
 public:
 
   LPB(uint8_t rx, uint8_t tx, uint8_t addr = 0x42, uint8_t d_addr = 0x00);
 
-  void enableInterface();
+  bool enableInterface(uint8_t retries);
   bool GetDevId();
 
   device_map* getDestDevice();
 
   void disableInterface();
-  bool update(boilder_t* data, bool simulate);
+  bool update(boiler_t* data, bool simulate);
 
-  int8_t Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, byte* param = NULL, byte param_len = 0, bool wait_for_reply = true);
+  int8_t Send(uint8_t type, uint32_t cmd, byte* rx_msg, byte* tx_msg, const byte* param = NULL, byte param_len = 0, bool wait_for_reply = true);
   bool GetMessage(byte* msg);
-  void print(byte* msg);
+  void print(const byte* msg);
 
 private:
 
-  boilder_t boilderData;
+  uint8_t rx_pin;
+  uint8_t tx_pin;
+  uint8_t myAddr;
+  uint8_t destAddr;
+  uint8_t len_idx;
+  uint8_t offset;
+  uint8_t pl_start;
+
+  boiler_t boilerData = {0, 0, 0 ,0};
 
   uint8_t getBusAddr();
   uint8_t getBusDest();
   uint8_t getPl_start();
   uint8_t getLen_idx();
-  uint8_t offset;
-  uint8_t myAddr;
-  uint8_t destAddr;
-  uint8_t len_idx;
-  uint8_t pl_start;
-  uint8_t rx_pin;
-  uint8_t tx_pin;
 
   uint8_t my_dev_fam = 0;
   uint8_t my_dev_var = 0;
@@ -101,7 +102,7 @@ private:
 
   inline int8_t _send(byte* msg);
   uint16_t CRC(byte* buffer, uint8_t length);
-  uint16_t CRC_LPB(byte* buffer, uint8_t length);
+  uint16_t CRC_LPB(const byte* buffer, uint8_t length);
   uint16_t _crc_xmodem_update(uint16_t crc, uint8_t data);
   uint8_t readByte();
   bool rx_pin_read();

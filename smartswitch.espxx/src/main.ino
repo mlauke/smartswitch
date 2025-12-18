@@ -80,6 +80,23 @@ void saveConfigCallback()
   saveConfigFile = true;
 }
 
+void start()
+{
+  server.begin(); // Actually start the server
+  DEBUGLN("HTTP server started");
+
+  uint8_t retries = 3;
+  if (!lpb->enableInterface(retries))
+  {
+    putBoilerError(String("LPB: No device found after ") + retries + " retries!");
+  }
+#ifdef ESP32
+  // esp_task_wdt_init({ 20000, 0, true });
+#elif ESP8266
+  ESP.wdtEnable(20000);
+#endif
+}
+
 void setup()
 {
   configDefaults();
@@ -101,23 +118,23 @@ void setup()
   wifiManager.setConfigPortalTimeout(10);
   if (!wifiManager.autoConnect("SmartSwitchAP"))
   {
-    Serial.println(F("Failed to connect, restarting..."));
+    DEBUGLN("Failed to connect, restarting...");
     restart();
   }
 
-  Serial.println(F("Mounting FS..."));
+  DEBUGLN("Mounting FS...");
   if (LittleFS.begin())
   {
     if (!loadConfig())
     {
-      Serial.println(F("Error loading config"));
+      DEBUGLN("Error loading config");
     }
   }
   else
   {
-    Serial.print(F("Failed to mount FS. Attempting to format..."));
+    DEBUGLN("Failed to mount FS. Attempting to format...");
     LittleFS.format();
-    Serial.println(F(" done."));
+    DEBUGLN(" done.");
 
     saveConfig();
   }
@@ -129,7 +146,7 @@ void setup()
     setConfigStr(config, hostname, lcHostname.c_str());
     if (!saveConfig())
     {
-      Serial.println(F("Error saving config"));
+      DEBUGLN("Error saving config");
     }
   }
 
@@ -138,17 +155,12 @@ void setup()
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
-#ifdef ESP32
-  // esp_task_wdt_init({ 20000, 0, true });
-#elif ESP8266
-  ESP.wdtEnable(20000);
-  server.keepAlive(false);
-#endif
-
   if (config.update_startup)
   {
     handleGithubUpdate();
   }
+
+  updateLocation();
 
   server.on("/", handleRoot);
   server.on("/favicon.ico", handleFavicon);
@@ -158,18 +170,10 @@ void setup()
   server.on("/api/data", handleData);
   server.on("/api/update", handleAPI);
   server.onNotFound(handleNotFound);
-
-  server.begin(); // Actually start the server
-  Serial.println(F("HTTP server started"));
-
-  lpb->enableInterface();
-  uint8_t retry = 0;
-  while (retry++ < 2 && !lpb->GetDevId())
-  {
-    putBoilerError(String("LPB: No device found after ") + retry + " retries!");
-  }
-
-  updateLocation();
+#if ESP8266
+  server.keepAlive(false);
+#endif
+  start();
 }
 
 void timerCallback()
@@ -192,10 +196,11 @@ void onOTAEnd(bool success)
 {
   if (success)
   {
-    Serial.println(F("OTA update finished successfully!")); // Log when OTA has finished
+    DEBUGLN("OTA update finished successfully!");
     return;
   }
-  Serial.println(F("There was an error during OTA update!"));
+  DEBUGLN("There was an error during OTA update!");
+  start(); // restart server again
 }
 
 void systemDefaults()
@@ -253,7 +258,7 @@ bool updateSolarForecast()
     JsonDocument json;
 
     String solarUrl = isDevMode() ? URL_SOLAR_FORECAST_DEV : URL_SOLAR_FORECAST;
-    char url[128];
+    char url[160];
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
 
     if ((lastResult = restClient.fetch(String(url), json, NULL)))
@@ -305,7 +310,7 @@ void updateLocation()
       config.lat = json[F("lat")].as<double>();
       snprintf(config.location, CFG_SZ_LOCATION, "%s %s", json[F("zip")].as<const char *>(), json[F("city")].as<const char *>());
       setConfigStr(config, tz, json[F("timezone")]);
-      Serial.printf("Location: %f/%f - tz: %s loc: %s\n", config.lon, config.lat, config.tz, config.location);
+      DEBUGF("Location: %f/%f - tz: %s loc: %s\n", config.lon, config.lat, config.tz, config.location);
     }
   }
 }
@@ -410,7 +415,7 @@ void sendJson(String from, JsonDocument &json)
   String jsonString;
 
   size_t r = serializeJsonPretty(json, jsonString);
-  Serial.printf("%s - json (%d) %s\n", from.c_str(), r, jsonString.c_str());
+  DEBUGF("%s - json (%d) %s\n", from.c_str(), r, jsonString.c_str());
 
   cacheControlHeader(false);
   server.send(200, "application/json", jsonString);
@@ -488,7 +493,7 @@ void handleAPI()
   if (server.hasArg("mode"))
   {
     config.mode = server.arg("mode").toInt() & 3;
-    Serial.printf("Mode: %d\n", config.mode);
+    DEBUGF("Mode: %d\n", config.mode);
     saveConfig();
   }
   else if (server.hasArg("calibrate"))
@@ -506,7 +511,7 @@ void handleAPI()
   else if (server.hasArg("update_startup"))
   {
     config.update_startup = server.arg("update_startup").toInt();
-    Serial.printf("Enabled: %d\n", config.update_startup);
+    DEBUGF("Enabled: %d\n", config.update_startup);
     saveConfig();
   }
   else if (server.hasArg("boiler"))
@@ -577,6 +582,11 @@ void restart()
   ESP.restart();
 }
 
+String userAgent()
+{
+  return String(F("SmartSwitch v")) + config.release_tag;
+}
+
 const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>";
 
 void handleGithubUpdate()
@@ -599,7 +609,7 @@ void handleGithubUpdate()
     snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, gh_updater.release_tag.c_str());
     server.send(200, "text/html;charset=utf-8", buffer);
   }
-  if (gh_updater.doUpdate(&onOTABegin))
+  if (gh_updater.doUpdate(userAgent(), &onOTABegin, &onOTAEnd))
   {
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig())
@@ -608,7 +618,7 @@ void handleGithubUpdate()
     }
     else
     {
-      Serial.println(F("config saved."));
+      DEBUGLN("config saved.");
       restart();
     }
   }
@@ -652,7 +662,7 @@ void putLog(logEntry &log, const char *event)
 {
   strncpy(log.msg, event, sizeof(log.msg));
   log.ts = systemData.ts;
-  Serial.printf("log %u: %s\n", systemData.ts, event);
+  DEBUGF("log %u: %s\n", systemData.ts, event);
 }
 
 void putEvent(const char *event)
@@ -676,7 +686,7 @@ bool updateBoilerData()
   {
     lastUpdate = ms;
 
-    boilder_t boilerData;
+    boiler_t boilerData;
     if ((lastResult = lpb->update(&boilerData, isDevMode())))
     {
       systemData.boiler_T_cur = boilerData.t_cur;
@@ -688,7 +698,7 @@ bool updateBoilerData()
     }
     else
     {
-      putBoilerError("Could not update boiler data.");
+      putBoilerError(F("Could not update boiler data."));
     }
   }
   return lastResult; // no new data, so still ok
@@ -736,8 +746,17 @@ void calibrate(bool validData)
 // main loop
 void loop()
 {
+
   if (doUpdateFlag)
   {
+    static uint16_t updateSystimeCount = 0;
+    if (updateSystimeCount-- == 0)
+    {
+      updateSystimeCount = 4 * 60 * SYSTEM_UPDATE_INTERVAL_MS / 1000;
+      configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+      DEBUGLN("systime configured.");
+    }
+
     uint32_t heap = ESP.getFreeHeap();
     uint32_t cpuFreq = ESP.getCpuFreqMHz();
 
@@ -758,7 +777,7 @@ void loop()
     }
     toggleSwitch(systemData.switchEnabled);
 
-    Serial.printf("ESP Heap %uk/%uk CPU: %uMhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
+    DEBUGF("ESP Heap %uk/%uk CPU: %uMhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
 
     doUpdateFlag = false;
   }
@@ -797,22 +816,22 @@ bool ensureConnected()
   wl_status_t status = WiFi.status();
   if (status != WL_CONNECTED)
   {
-    Serial.print(F("Connecting"));
+    DEBUG("Connecting");
     for (int retry = 1; retry <= 8; retry++)
     {
       statusLED(0);
-      Serial.print(F("."));
+      DEBUG(".");
       delay(500);
 
       status = WiFi.status();
       if (status == WL_CONNECTED)
       {
-        Serial.printf("Connected. IP address: %s status: %d\n", WiFi.localIP().toString().c_str(), status);
+        DEBUGF("Connected. IP address: %s status: %d\n", WiFi.localIP().toString().c_str(), status);
         break;
       }
       else
       {
-        Serial.printf("Wifi not connected, status: %d\n", status);
+        DEBUGF("Wifi not connected, status: %d\n", status);
         if (status == WL_IDLE_STATUS)
         {
           WiFi.disconnect();
@@ -847,12 +866,10 @@ bool fetchBatteryData(String uri, JsonDocument &json)
   }
   else
   {
-    putBatteryError("Sonnen Battery Hostname/Token not properly configured!");
+    putBatteryError(F("Sonnen Battery Hostname/Token not properly configured!"));
   }
   return r;
 }
-
-// #define dstOffset 3600 // TODO may vary - 1h summer time offset except for Australia: Lord Howe Island
 
 bool updateSystemData()
 {
@@ -874,11 +891,11 @@ bool updateSystemData()
     if ((ok &= fetchBatteryData(SONNEN_API_CONFIGURATIONS, json)))
     {
       systemData.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
-      Serial.printf("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
+      DEBUGF("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
     }
     else
     {
-      Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
+      DEBUGF("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
     }
   }
   if (systemData.cap_bat_max_Wh == 0)
@@ -887,11 +904,11 @@ bool updateSystemData()
     {
       systemData.cap_bat_max_Wh = json[F("FullChargeCapacity")].as<uint16_t>();
       systemData.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
-      Serial.printf("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
+      DEBUGF("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
     }
     else
     {
-      Serial.printf("ERROR: fetchSystemData(%s)\n", SONNEN_API_LATEST_DATA);
+      DEBUGF("ERROR: fetchSystemData(%s)\n", SONNEN_API_LATEST_DATA);
     }
   }
 
@@ -996,7 +1013,7 @@ void updateSwitch(bool validData)
     else
     {
       stableOnCnt++;
-      Serial.printf("stable count %d\n", stableOnCnt);
+      DEBUGF("stable count %d\n", stableOnCnt);
     }
   }
   else
@@ -1022,7 +1039,7 @@ void updateSwitch(bool validData)
   }
   systemData.switchEnabled = (desiredState && config.mode == SMODE_AUTO) || (config.mode == SMODE_ON); // combine with mode
 
-  Serial.printf("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  DEBUGF("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
 }
 
 void toggleSwitch(bool switchEnabled)
@@ -1066,7 +1083,7 @@ bool loadConfig()
 {
   if (!LittleFS.exists(CONFIGFILE))
   {
-    Serial.println(F("Config file not found"));
+    DEBUGLN("Config file not found");
 
     return false;
   }
@@ -1074,7 +1091,7 @@ bool loadConfig()
   File f = LittleFS.open(CONFIGFILE, "r");
   if (!f)
   {
-    Serial.printf("Could not open config file %s\n", CONFIGFILE);
+    DEBUGF("Could not open config file %s\n", CONFIGFILE);
 
     return false;
   }
@@ -1088,7 +1105,7 @@ bool loadConfig()
     return false;
   }
 
-  Serial.println(F("Config loaded:"));
+  DEBUGLN("Config loaded:");
   serializeJsonPretty(json, Serial);
 
   jsonToConfig(json);
@@ -1101,7 +1118,7 @@ bool saveConfig()
   File f = LittleFS.open(CONFIGFILE, "w");
   if (!f)
   {
-    Serial.printf("Could not open config file %s for writing\n", CONFIGFILE);
+    DEBUGF("Could not open config file %s for writing\n", CONFIGFILE);
     return false;
   }
 
@@ -1109,7 +1126,7 @@ bool saveConfig()
 
   JsonDocument json;
   configToJson(json);
-  Serial.println(F("saveConfig() => "));
+  DEBUGLN("saveConfig() => ");
   serializeJsonPretty(json, Serial);
   serializeJson(json, f);
   f.close();
