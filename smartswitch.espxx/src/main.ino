@@ -123,19 +123,15 @@ void setup()
   }
 
   DEBUGLN("Mounting FS...");
-  if (LittleFS.begin())
-  {
-    if (!loadConfig())
-    {
-      DEBUGLN("Error loading config");
-    }
-  }
-  else
+  if (!LittleFS.begin())
   {
     DEBUGLN("Failed to mount FS. Attempting to format...");
     LittleFS.format();
     DEBUGLN(" done.");
-
+  }
+  if (!loadConfig())
+  {
+    DEBUGLN("Error loading config");
     saveConfig();
   }
 

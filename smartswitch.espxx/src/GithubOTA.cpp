@@ -177,7 +177,7 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
         DEBUGLN("Begin OTA...");
         size_t written = Update.writeStream(*stream);
 
-        if (written == contentLength)
+        if (written == (size_t)contentLength)
         {
           DEBUGF("Written : %d successfully\n", written);
         }
