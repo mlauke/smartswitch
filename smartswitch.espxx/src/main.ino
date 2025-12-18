@@ -582,7 +582,7 @@ String userAgent()
   return String(F("SmartSwitch v")) + config.release_tag;
 }
 
-const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><p>Update found, Going to install Release %s</p></body></html>";
+const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><h1>Update found, Going to install Release %s. Restart in 30s...</h1></body></html>";
 
 void handleGithubUpdate()
 {
