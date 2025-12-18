@@ -582,7 +582,14 @@ String userAgent()
   return String(F("SmartSwitch v")) + config.release_tag;
 }
 
-const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><h1>Update found, Going to install Release %s. Restart in 30s...</h1></body></html>";
+const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><h1>%s</h1><p>Redirect in 30s...</p></body></html>";
+
+void sendUpdateStatus(int code, char *status)
+{
+  char buffer[256];
+  snprintf_P(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
+  server.send(code, "text/html;charset=utf-8", buffer);
+}
 
 void handleGithubUpdate()
 {
@@ -593,16 +600,18 @@ void handleGithubUpdate()
   {
     if (server.client() && server.client().connected())
     {
-      server.send(404, String(F("text/plain")), String(F("Update failed. ")) + gh_updater.getUpdateStatus());
+      char msg[128];
+      snprintf_P(msg, sizeof(msg), "Update failed: %s", gh_updater.getUpdateStatus().c_str());
+      sendUpdateStatus(404, msg);
     }
     return;
   }
 
   if (server.client() && server.client().connected())
   {
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, gh_updater.release_tag.c_str());
-    server.send(200, "text/html;charset=utf-8", buffer);
+    char msg[128];
+    snprintf_P(msg, sizeof(msg), "Update found: Going to install Release %s.", gh_updater.release_tag.c_str());
+    sendUpdateStatus(200, msg);
   }
   if (gh_updater.doUpdate(userAgent(), &onOTABegin, &onOTAEnd))
   {
