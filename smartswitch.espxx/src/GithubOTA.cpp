@@ -167,15 +167,15 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
     bool canBegin = Update.begin(contentLength, U_FLASH, LED_BUILTIN);
     if (canBegin)
     {
-      WiFiClient stream = http.getStream();
-      if (stream == NULL) // || !stream->available())
-      {
-        DEBUGF("ERROR: Stream not available %u %p\n", contentLength, stream);
-      }
-      else
+      WiFiClient *stream = http.getStreamPtr();
+      // if (stream == NULL) // || !stream->available())
+      // {
+      //   DEBUGF("ERROR: Stream not available %u %p\n", contentLength, stream);
+      // }
+      // else
       {
         DEBUGLN("Begin OTA...");
-        size_t written = Update.writeStream(stream);
+        size_t written = Update.writeStream(*stream);
 
         if (written == contentLength)
         {
