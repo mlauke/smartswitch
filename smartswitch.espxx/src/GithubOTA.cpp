@@ -132,8 +132,6 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
   }
   fnOTABegin();
 
-  WiFiClient *updateClient = newWiFiClient(download_url);
-
   DEBUGF("Heap: %uk\n", ESP.getFreeHeap());
 
   Update.clearError();
@@ -148,13 +146,18 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
   http.setTimeout(5000);
   http.setFollowRedirects(followRedirects_t::HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
+  WiFiClient *updateClient = newWiFiClient(download_url);
   http.begin(*updateClient, download_url);
   int httpCode = http.GET();
   if (httpCode == HTTP_CODE_TEMPORARY_REDIRECT || httpCode == HTTP_CODE_PERMANENT_REDIRECT || httpCode == HTTP_CODE_FOUND)
   {
     String newUrl = http.getLocation();
     http.end();
+    releaseWiFiClient(updateClient);
+
+    //newUrl.replace("https://", "http://");
     DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
+    updateClient = newWiFiClient(newUrl);
     http.begin(*updateClient, newUrl);
     httpCode = http.GET();
 
@@ -168,7 +171,7 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
     if (canBegin)
     {
       WiFiClient *stream = http.getStreamPtr();
-      if (!stream->available())
+      if (stream == nullptr || !stream->available())
       {
         DEBUGF("ERROR: Stream not available %u %p\n", contentLength, stream);
       }
