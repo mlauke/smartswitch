@@ -153,13 +153,11 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
   {
     String newUrl = http.getLocation();
     http.end();
-    releaseWiFiClient(updateClient);
 
     #if defined(ESP8266) // workaround, fetch firmware via ssl seems too havy for esp8266
     newUrl.replace("https://", "http://");
     #endif
     DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
-    updateClient = newWiFiClient(newUrl);
     http.begin(*updateClient, newUrl);
     httpCode = http.GET();
 
@@ -222,23 +220,6 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
     updateStatus = String("Failed to download firmware. HTTP code: ") + String(httpCode);
   }
   http.end();
-
-#if defined(_ESP8266)
-
-  ESPhttpUpdate.onStart(fnOTABegin);
-  ESPhttpUpdate.onProgress(onOTAProgress);
-  ESPhttpUpdate.setLedPin(LED_BUILTIN, HIGH);
-  ESPhttpUpdate.setClientTimeout(10000);
-  ESPhttpUpdate.rebootOnUpdate(false); // restart from outside
-  ESPhttpUpdate.followRedirects(true);
-
-  success = ESPhttpUpdate.update(*updateClient, download_url) == HTTP_UPDATE_OK;
-  if (!success)
-  {
-    updateStatus = String(F("Update Failed: ")) + ESPhttpUpdate.getLastErrorString();
-  }
-#endif
-
   releaseWiFiClient(updateClient);
 
   if (!success)
