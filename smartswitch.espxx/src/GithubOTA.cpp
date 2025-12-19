@@ -153,11 +153,13 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
   {
     String newUrl = http.getLocation();
     http.end();
+    releaseWiFiClient(updateClient);
 
     #if defined(ESP8266) // workaround, fetch firmware via ssl seems too havy for esp8266
     newUrl.replace("https://", "http://");
     #endif
     DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
+    updateClient = newWiFiClient(newUrl);
     http.begin(*updateClient, newUrl);
     httpCode = http.GET();
 
