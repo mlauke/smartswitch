@@ -409,8 +409,8 @@ void sendJson(String from, JsonDocument &json)
 {
   String jsonString;
 
-  size_t r = serializeJsonPretty(json, jsonString);
-  DEBUGF("%s - json (%d) %s\n", from.c_str(), r, jsonString.c_str());
+  serializeJsonPretty(json, jsonString);
+  DEBUGF("%s - json %s\n", from.c_str(), jsonString.c_str());
 
   cacheControlHeader(false);
   server.send(200, "application/json", jsonString);
@@ -761,9 +761,6 @@ void loop()
       DEBUGLN("systime configured.");
     }
 
-    uint32_t heap = ESP.getFreeHeap();
-    uint32_t cpuFreq = ESP.getCpuFreqMHz();
-
     bool validData = ensureConnected();
 
     //    validData &= validateConfig();
@@ -781,7 +778,7 @@ void loop()
     }
     toggleSwitch(systemData.switchEnabled);
 
-    DEBUGF("ESP Heap %uk/%uk CPU: %uMhz valid: %d\n", heap >> 10, ESP.getFreeHeap() >> 10, cpuFreq, validData);
+    DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), validData);
 
     doUpdateFlag = false;
   }
