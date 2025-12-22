@@ -130,13 +130,13 @@ int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
-  // RUN_TEST(test_updateSwitch);
-  // RUN_TEST(test_upateConsumption);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
-  //  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
+  RUN_TEST(test_updateSwitch);
+  RUN_TEST(test_upateConsumption);
+  RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
 
   return UNITY_END();
