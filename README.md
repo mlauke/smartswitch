@@ -40,7 +40,7 @@ R_max = 2,42K/W
 R_heatsink = R_max - R_jc = 2,42K/W - 1,7K/W
 R_heatsink = 0,7K/W !!!
 ```
-... heatsink with <=0,7K/W makes no sense since this will result in too much power wasted for heat and would "blow up" the overall system design in terms of size and housing the components.
+... heatsink with <=0,7K/W makes no sense, because we will waste too much power wasted just for heating the environment and maybe would "blow up" the overall system design in terms of size and housing the components.
 therefore i decided to use a triac as switching device for a simple NO1 relais ("Schütz") which in turn will drive the load. the NO1 relais can directly placed next to the arduino case on our din rail.
 
 #### Why not using a SSR?
@@ -61,4 +61,4 @@ as mentioned above, a SSR which can drive the 3,3kW load will become very hot if
 
 ## Vision
 - hardware
-  - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power
+  - build a GaN (HEMT) AC Power Converter to dynamically control the "waste" of surplus power based on a bidirection GaN (HEMT) device => https://www.infineon.com/products/power/gallium-nitride/gan-bidirectional-switches/high-voltage-gan-bidirectional-switches e.g. https://www.infineon.com/part/IGLT65R055B2

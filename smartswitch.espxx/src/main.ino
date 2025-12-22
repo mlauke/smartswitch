@@ -714,9 +714,16 @@ void calibrate(bool validData)
   static uint32_t load_on = 0;
   static uint32_t load_off = 0;
 
+  if (!validData)
+  {
+    putEvent("invalid configuration, cannot calibrate load");
+    calibrateLoad = false;
+    return;
+  }
+
   if (cnt == 0)
   {
-    config.loadPower_W = MAX(0, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV);
+    config.loadPower_W = MAX(0, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV + 100);
     saveConfig();
     char event[64];
     snprintf(event, sizeof(event), "load calibrated on avg %dW off avg %dW => %dW", load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);

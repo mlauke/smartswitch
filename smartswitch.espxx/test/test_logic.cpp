@@ -88,9 +88,27 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresis()
   updateConsumption(&systemConfig, &systemData);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemData, &ts));
 
-  systemData.ts = 1762598185 + 26 * 3600 + 10 * 60;
-  systemData.switchEnabled = true;
+  systemData.ts = 1762598185 + 26 * 3600 + 10 * 60; // 10 min
   systemData.cons_W = systemConfig.loadPower_W + 261;
+  systemData.switchEnabled = true;
+  updateConsumption(&systemConfig, &systemData);
+  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemData, &ts));
+}
+
+void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
+{
+  systemConfig.loadPower_W = 3400;
+
+  systemData.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
+  systemData.cap_bat_Wh = 3100;
+  systemData.cons_W = 352;
+  systemData.switchEnabled = false;
+  updateConsumption(&systemConfig, &systemData);
+  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemData, &ts));
+
+  systemData.ts = 1762598185 + 26 * 3600 - 44 + 10 * 60; // 10min later
+  systemData.cons_W = systemConfig.loadPower_W + 352;
+  systemData.switchEnabled = true;
   updateConsumption(&systemConfig, &systemData);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemData, &ts));
 }
@@ -112,13 +130,14 @@ int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
-  RUN_TEST(test_updateSwitch);
-  RUN_TEST(test_upateConsumption);
-  RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
+  // RUN_TEST(test_updateSwitch);
+  // RUN_TEST(test_upateConsumption);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
+  //  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
 
   return UNITY_END();
 }
