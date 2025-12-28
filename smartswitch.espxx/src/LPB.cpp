@@ -35,7 +35,6 @@ static int bin2hex(char *toBuffer, byte *fromAddr, int len, char delimiter);
 
 void LPB::printTelegram(byte *msg, float line)
 {
-
   DEBUGF("%.2x -> %.2x: ", msg[3], msg[2]); // source => destination address
   int data_len = 0;
   if (msg[4 + offset] < 0x12 || msg[4 + offset] > 0x20)
@@ -62,7 +61,7 @@ static void SerialPrintRAW(byte *msg, byte len)
 {
   char outBuf[256];
 
-  int outBufLen = strlen(outBuf);
+  size_t outBufLen = strlen(outBuf);
 
   bin2hex(outBuf + outBufLen, msg, len, ' ');
   printToDebug(outBuf + outBufLen);
@@ -425,7 +424,6 @@ int LPB::findLine(float line)
     {
       i = j;
       break;
-      return i;
     }
   }
   if (i == -1)
@@ -635,7 +633,6 @@ retry:
           DEBUG(c, HEX);
           DEBUG(" ");
 #endif
-          c = c; // prevent compiler warning about unused variable if DEBUG_LL is not active
         }
 #if DEBUG_LL
         DEBUGLN();
@@ -686,7 +683,6 @@ retry:
               DEBUG("0");
             DEBUG(c, HEX);
 #endif
-            c = c; // prevent compiler warning about unused variable if DEBUG_LL is not active
           }
 #if DEBUG_LL
           DEBUGLN();

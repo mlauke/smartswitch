@@ -255,7 +255,8 @@ bool updateSolarForecast()
 
     String solarUrl = isDevMode() ? URL_SOLAR_FORECAST_DEV : URL_SOLAR_FORECAST;
     char url[160];
-    snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.az, config.dec, config.kWp);
+    // solar forecast api requires azimuth with -180 north, -90 east, 0 south, 90 west
+    snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.dec, config.az - 180, config.kWp);
 
     if ((lastResult = restClient.fetch(String(url), json, NULL)))
     {
@@ -992,7 +993,7 @@ void updateSwitch(bool validData)
 
   bool desiredState = (constraint = 1) && validData &&
                       // aware of max system power (production + max inverter power)
-                      ((constraint = 2) && systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_nom - (systemData.switchEnabled ? 0 : config.loadPower_W) > 0) &&
+                      ((constraint = 2) && (systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_norm - config.loadPower_W) >= config.gridMin_W) &&
                       // if surplus ("waste") exceeds load
                       (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) ||
                        // forecast battery capacity and be aware of discharge allowed

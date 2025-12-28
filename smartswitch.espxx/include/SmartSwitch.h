@@ -108,7 +108,7 @@ typedef struct {
   float lon;
   float kWp;    // installed PV power
   uint8_t dec;  // PV panel declination (0..90°)
-  uint16_t az;  // PV panel Azimuth
+  uint16_t az;  // PV panel Azimuth 0..360°
   char location[CFG_SZ_LOCATION];
   char tz[CFG_SZ_TZ + 1];
   uint8_t mode;         // 0 - off, 1 - on, 2 - automatic
@@ -137,7 +137,7 @@ typedef struct {
   uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
   uint16_t prod_W;           // prodcution (Watt)
   uint16_t cons_W;           // consumption (Watt)
-  uint16_t cons_W_nom;       // consumption rounded as multiple of 100 (Watt)
+  uint16_t cons_W_nom;       // consumption rounded as multiple of 10 (Watt)
   uint16_t cons_W_norm;      // normalized consumption without load
   uint16_t cons_avg_W;       // consumption average (W)
   uint16_t cap_bat_Wh;       // current capacity
