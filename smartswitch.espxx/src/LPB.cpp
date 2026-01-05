@@ -142,10 +142,10 @@ bool LPB::enableInterface(uint8_t retries)
   DEBUGLN("LPB interface enabled.");
 
   bool success = false;
-  while (--retries > 0 && !(success = GetDevId())){
+  while (--retries > 0 && !(success = GetDevId()))
+  {
     DEBUGF("LPP get device retries %d\n", retries);
-  }
-    ; // retry get device id
+  }; // retry get device id
 
   return success;
 }
@@ -491,10 +491,8 @@ uint16_t LPB::query(float line, byte *msg)
 
   byte tx_msg[33] = {0}; // xmit buffer
 
-  int i = 0;
-
-  i = findLine(line);
-  if (i == -1)
+  int i = findLine(line);
+  if (i < 0)
   {
     return i;
   }
@@ -510,38 +508,34 @@ uint16_t LPB::query(float line, byte *msg)
   {
     c = ((c & 0xFF000000) >> 8) | ((c & 0x00FF0000) << 8) | (c & 0x0000FFFF); // Bytes 1+2 of CoID will be swapped for QUR command, but need to remain as-is for FL_NOSWAP_QUR parameters, so swap here again.
   }
-  if (i >= 0)
-  {
-    if (c != CMD_UNKNOWN && (dev_flags & FL_NO_CMD) != FL_NO_CMD)
-    { // send only valid command codes
-      short retry = QUERY_RETRIES;
-      while (retry)
+  if (c != CMD_UNKNOWN && (dev_flags & FL_NO_CMD) != FL_NO_CMD)
+  { // send only valid command codes
+    short retry = QUERY_RETRIES;
+    while (retry)
+    {
+      if (Send(query_type, c, msg, tx_msg) == BUS_OK)
       {
-        if (Send(query_type, c, msg, tx_msg) == BUS_OK)
-        {
-          // Decode the xmit telegram and send it
-          printTelegram(tx_msg, line);
-          // Decode the rcv telegram and send it
-          printTelegram(msg, line);
-          DEBUGF("#%g: ", line);
-          // printlnToDebug(build_pvalstr(0));
-          break; // success, break out of while loop
-        }
-        else
-        {
-          printlnToDebug(printError(261)); // query failed
-          retry--;                         // decrement number of attempts
-        }
-      } // endwhile, maximum number of retries reached
-      if (retry == 0)
-      {
-        DEBUGF("%g\n", line);
-        return 261;
+        // Decode the xmit telegram and send it
+        printTelegram(tx_msg, line);
+        // Decode the rcv telegram and send it
+        printTelegram(msg, line);
+        DEBUGF("#%g: ", line);
+        // printlnToDebug(build_pvalstr(0));
+        break; // success, break out of while loop
       }
+      else
+      {
+        printlnToDebug(printError(261)); // query failed
+        retry--;                         // decrement number of attempts
+      }
+    } // endwhile, maximum number of retries reached
+    if (retry == 0)
+    {
+      DEBUGF("%g\n", line);
+      return 261;
     }
-    return 0; // ok
   }
-  return -1;
+  return 0; // ok
 }
 
 // Generates checksum from LPB message

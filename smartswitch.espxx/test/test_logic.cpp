@@ -81,8 +81,9 @@ void test_batteryCapacityTargetFulfilledSwitchOffOn()
 
 void test_batteryCapacityTargetFulfilledSwitchHysteresis()
 {
-  systemData.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemData.cap_bat_Wh = 3100;
+
+  systemData.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemData.cons_W = 245;
   systemData.switchEnabled = false;
   updateConsumption(&systemConfig, &systemData);
@@ -97,16 +98,16 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresis()
 
 void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
 {
-  systemConfig.loadPower_W = 3400;
+  systemConfig.loadPower_W = 3249;
+  systemData.cap_bat_Wh = 3100;
 
   systemData.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
-  systemData.cap_bat_Wh = 3100;
-  systemData.cons_W = 352;
+  systemData.cons_W = 342;
   systemData.switchEnabled = false;
   updateConsumption(&systemConfig, &systemData);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemData, &ts));
 
-  systemData.ts = 1762598185 + 26 * 3600 - 44 + 10 * 60; // 10min later
+  systemData.ts = 1762598185 + 26 * 3600 - 44 + 10; // 10s later
   systemData.cons_W = systemConfig.loadPower_W + 352;
   systemData.switchEnabled = true;
   updateConsumption(&systemConfig, &systemData);

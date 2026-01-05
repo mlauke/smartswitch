@@ -588,7 +588,7 @@ const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equi
 void sendUpdateStatus(int code, char *status)
 {
   char buffer[256];
-  snprintf_P(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
+  snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
   server.send(code, "text/html;charset=utf-8", buffer);
 }
 
@@ -602,7 +602,7 @@ void handleGithubUpdate()
     if (server.client() && server.client().connected())
     {
       char msg[128];
-      snprintf_P(msg, sizeof(msg), "Update failed: %s", gh_updater.getUpdateStatus().c_str());
+      snprintf(msg, sizeof(msg), "Update failed: %s", gh_updater.getUpdateStatus().c_str());
       sendUpdateStatus(404, msg);
     }
     return;
@@ -611,7 +611,7 @@ void handleGithubUpdate()
   if (server.client() && server.client().connected())
   {
     char msg[128];
-    snprintf_P(msg, sizeof(msg), "Update found: Going to install Release %s.", gh_updater.release_tag.c_str());
+    snprintf(msg, sizeof(msg), "Update found: Going to install Release %s.", gh_updater.release_tag.c_str());
     sendUpdateStatus(200, msg);
   }
   if (gh_updater.doUpdate(userAgent(), &onOTABegin, &onOTAEnd))
@@ -724,7 +724,7 @@ void calibrate(bool validData)
 
   if (cnt == 0)
   {
-    config.loadPower_W = MAX(0, load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV + 100);
+    config.loadPower_W = MAX(0, (load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV) * 103 / 100); // +3%
     saveConfig();
     char event[64];
     snprintf(event, sizeof(event), "load calibrated on avg %dW off avg %dW => %dW", load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
@@ -1038,13 +1038,13 @@ void updateSwitch(bool validData)
     case 5:
       snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), toLocalDate(&systemData, ts));
       break;
-    case 7:
+    case 8:
       snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), inverterLatencyCnt, SONNEN_INVERTER_LATENCY_COUNT);
       break;
     default:
       snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str());
     }
-    putEvent(String("switch ") + (desiredState ? "on" : "off") + " (C" + constraint + " - " + msg + ")");
+    putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" (C") + constraint + F(" - ") + msg + F(")"));
   }
   systemData.switchEnabled = (desiredState && config.mode == SMODE_AUTO) || (config.mode == SMODE_ON); // combine with mode
 
