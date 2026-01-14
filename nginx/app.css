@@ -246,12 +246,16 @@ input {
   transition: height 0.5s ease-in-out, background-color 0.5s;
 }
 
+.cycles {
+  color: #a0a0a0;
+  font-size: 0.8rem;
+  position: absolute;
+  top: 2%;
+}
+
 .charge-lvl {
   color: rgb(7, 68, 124);
   font-weight: bold;
-  text-align: center;
-  display: flex;
-  align-items: center;
   position: absolute;
 }
 

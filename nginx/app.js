@@ -53,7 +53,7 @@ function fetchData() {
 function fetchStatus() {
   fetchAPI("/api/status", function (response, json) {
     if (response !== undefined && response.ok && json !== undefined) {
-      updateBattery();
+      updateBattery(json["usoc"]);
       const events = json["events"];
       if (events !== undefined && events.length) {
         eventLog.addEvents(events);
@@ -71,9 +71,8 @@ function fetchStatus() {
   });
 }
 
-function updateBattery() {
+function updateBattery(level) {
   const chargeBar = document.getElementById("charge");
-  const level = document.getElementById("usoc").value;
 
   if (level !== "") {
     var lvl = "low";
@@ -111,8 +110,13 @@ function renderLog(el, ls, nm) {
   });
 }
 
+function batteryInfo(){
+  const overlay = document.getElementById("batInfoOverlay");
+  overlay.classList.add("active");
+}
+
 function showLog() {
-  const overlay = document.getElementById("overlay");
+  const overlay = document.getElementById("logOverlay");
   const logElem = document.getElementById("eventLog");
   if (logElem !== null) {
     renderLog(logElem, eventLog.events, "div");
@@ -120,9 +124,9 @@ function showLog() {
   }
 }
 
-function closeLog() {
-  const logOverlay = document.getElementById("overlay");
-  logOverlay !== null && logOverlay.classList.remove("active");
+function closeOverlay() {
+  const overlay = document.getElementById("logOverlay");
+  overlay !== null && overlay.classList.remove("active");
 }
 
 function sendUpdate(payload){

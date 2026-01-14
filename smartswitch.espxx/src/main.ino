@@ -205,6 +205,8 @@ void systemDefaults()
   systemData.pv_forecast_ts = 0;
   memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
   systemData.eventIx = 0;
+  systemData.inv_max_w = -1;
+  systemData.utc_offset = -1;
   systemData.switchEnabled = false;
   systemData.skipUpdateCountSysten = 0;
 }
@@ -278,7 +280,7 @@ bool updateSolarForecast()
           break;
         }
       }
-      setConfigStr(config, location, json[F("message")]["info"]["place"].as<const char *>());
+      setConfigStr(config, location, json[F("message")][F("info")][F("place")].as<const char *>());
 
       clearLocationError();
     }
@@ -321,8 +323,7 @@ void cacheControlHeader(bool cache)
 
 void commonHeader()
 {
-  server.sendHeader("connection", "close");
-  server.sendHeader("content-encoding", "gzip");
+  server.sendHeader(F("content-encoding"), F("gzip"));
 }
 
 void handleFavicon()
@@ -422,8 +423,8 @@ void addLog(JsonArray &array, logEntry &log)
   if (strlen(log.msg))
   {
     JsonObject e = array.add<JsonObject>();
-    e["ts"] = log.ts;
-    e["msg"] = log.msg;
+    e[F("ts")] = log.ts;
+    e[F("msg")] = log.msg;
   }
 }
 
@@ -450,6 +451,7 @@ void handleStatus()
   json[F("pac_total_w")] = systemData.pac_total_W * -1; // invert - positive means discharge, we invert for display
   json[F("switch")] = systemData.switchEnabled;
   json[F("sn_cap_max")] = systemData.cap_bat_max_Wh;
+  json[F("sn_cycles")] = systemData.bat_cycles;
 
   char devid[40] = "unknown";
   device_map *device = lpb->getDestDevice();
@@ -486,17 +488,17 @@ void handleAPI()
 
   bool doRestart = false;
 
-  if (server.hasArg("mode"))
+  if (server.hasArg(F("mode")))
   {
-    config.mode = server.arg("mode").toInt() & 3;
+    config.mode = server.arg(F("mode")).toInt() & 3;
     DEBUGF("Mode: %d\n", config.mode);
     saveConfig();
   }
-  else if (server.hasArg("calibrate"))
+  else if (server.hasArg(F("calibrate")))
   {
-    if (server.arg("calibrate").equals("set"))
+    if (server.arg(F("calibrate")).equals(F("set")))
     {
-      config.loadPower_W = MAX(0, server.arg("sn_loadpower").toInt());
+      config.loadPower_W = MAX(0, server.arg(F("sn_loadpower")).toInt());
       saveConfig();
     }
     else
@@ -504,60 +506,60 @@ void handleAPI()
       calibrateLoad = true;
     }
   }
-  else if (server.hasArg("update_startup"))
+  else if (server.hasArg(F("update_startup")))
   {
-    config.update_startup = server.arg("update_startup").toInt();
+    config.update_startup = server.arg(F("update_startup")).toInt();
     DEBUGF("Enabled: %d\n", config.update_startup);
     saveConfig();
   }
-  else if (server.hasArg("boiler"))
+  else if (server.hasArg(F("boiler")))
   {
     // ?
   }
-  else if (server.hasArg("sonnen"))
+  else if (server.hasArg(F("sonnen")))
   {
-    setConfigStr(config, sonnenHostname, server.arg("sn_host").c_str());
-    setConfigStr(config, sonnenApiToken, server.arg("sn_token").c_str());
-    config.gridMin_W = MAX(50, MAX(0, server.arg("sn_grdmin").toInt()));
-    config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg("sn_cap_min").toInt()));
+    setConfigStr(config, sonnenHostname, server.arg(F("sn_host")).c_str());
+    setConfigStr(config, sonnenApiToken, server.arg(F("sn_token")).c_str());
+    config.gridMin_W = MAX(50, MAX(0, server.arg(F("sn_grdmin")).toInt()));
+    config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg(F("sn_cap_min")).toInt()));
     saveConfig();
     systemData.skipUpdateCountSysten = 0;
   }
-  else if (server.hasArg("location"))
+  else if (server.hasArg(F("location")))
   {
-    config.lon = MAX(0, server.arg("lc_lon").toDouble());
-    config.lat = MAX(0, server.arg("lc_lat").toDouble());
-    config.kWp = MAX(0, server.arg("lc_kWp").toDouble());
-    config.az = MIN(360, MAX(0, server.arg("lc_az").toInt()));
-    config.dec = MIN(90, MAX(0, server.arg("lc_dec").toInt()));
+    config.lon = MAX(0, server.arg(F("lc_lon")).toDouble());
+    config.lat = MAX(0, server.arg(F("lc_lat")).toDouble());
+    config.kWp = MAX(0, server.arg(F("lc_kWp")).toDouble());
+    config.az = MIN(360, MAX(0, server.arg(F("lc_az")).toInt()));
+    config.dec = MIN(90, MAX(0, server.arg(F("lc_dec")).toInt()));
     systemData.pv_forecast_ts = 0; // force fetch new data
     saveConfig();
   }
-  else if (server.hasArg("hostname"))
+  else if (server.hasArg(F("hostname")))
   {
-    setConfigStr(config, hostname, server.arg("hostname").c_str());
+    setConfigStr(config, hostname, server.arg(F("hostname")).c_str());
     doRestart = saveConfig();
   }
-  else if (server.hasArg("restart"))
+  else if (server.hasArg(F("restart")))
   {
     doRestart = saveConfig();
   }
-  else if (server.hasArg("reset"))
+  else if (server.hasArg(F("reset")))
   {
-    if (server.arg("reset").toInt())
+    if (server.arg(F("reset")).toInt())
     {
       configDefaults();
       wifiManager.resetSettings(); // reset wifi settings
       doRestart = saveConfig();
     }
   }
-  else if (server.hasArg("update"))
+  else if (server.hasArg(F("update")))
   {
     handleGithubUpdate();
     return;
   }
 
-  server.sendHeader("location", "/");
+  server.sendHeader(F("location"), F("/"));
   server.send(303);
 
   if (doRestart)
@@ -568,7 +570,7 @@ void handleAPI()
 
 void handleNotFound()
 {
-  server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
+  server.send_P(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
 
 void restart()
@@ -589,7 +591,7 @@ void sendUpdateStatus(int code, char *status)
 {
   char buffer[256];
   snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
-  server.send(code, "text/html;charset=utf-8", buffer);
+  server.send_P(code, "text/html;charset=utf-8", buffer);
 }
 
 void handleGithubUpdate()
@@ -726,6 +728,7 @@ void calibrate(bool validData)
   {
     config.loadPower_W = MAX(0, (load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV) * 103 / 100); // +3%
     saveConfig();
+
     char event[64];
     snprintf(event, sizeof(event), "load calibrated on avg %dW off avg %dW => %dW", load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
     putEvent(event);
@@ -755,16 +758,33 @@ void calibrate(bool validData)
   }
 }
 
+uint16_t updateSystemCount = 0;
+
+bool isUpdateSystemData()
+{
+  return updateSystemCount == 0;
+}
+
+void updateSystemCounter()
+{
+  if (updateSystemCount-- == 0)
+  {
+    updateSystemCount = 4 * 60 * SYSTEM_UPDATE_INTERVAL_MS / 1000; // every 4 hours
+  }
+}
+
 // main loop
 void loop()
 {
-
   if (doUpdateFlag)
   {
-    static uint16_t updateSystimeCount = 0;
-    if (updateSystimeCount-- == 0)
+#ifdef ESP32
+// esp_task_wdt_reset();
+#elif ESP8266
+    ESP.wdtFeed();
+#endif
+    if (isUpdateSystemData() && ensureConnected())
     {
-      updateSystimeCount = 4 * 60 * SYSTEM_UPDATE_INTERVAL_MS / 1000;
       configTime(0, 0, "pool.ntp.org", "time.nist.gov");
       DEBUGLN("systime configured.");
     }
@@ -788,15 +808,11 @@ void loop()
 
     DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), validData);
 
+    updateSystemCounter();
+
     doUpdateFlag = false;
   }
   server.handleClient();
-
-#ifdef ESP32
-  // esp_task_wdt_reset();
-#elif ESP8266
-  ESP.wdtFeed();
-#endif
 }
 
 void buildInLED(bool onOff)
@@ -856,7 +872,7 @@ bool ensureConnected()
   return status == WL_CONNECTED;
 }
 
-bool fetchBatteryData(String uri, JsonDocument &json)
+bool fetchApiData(String uri, JsonDocument &json)
 {
 
   bool r = false;
@@ -870,6 +886,7 @@ bool fetchBatteryData(String uri, JsonDocument &json)
     r = restClient.fetch(String(url), json, NULL, "auth-token", config.sonnenApiToken);
     if (!r)
     {
+      DEBUGF("ERROR: fetchApiData(%s)\n", uri.c_str());
       putBatteryError(restClient.lastError());
     }
   }
@@ -897,31 +914,28 @@ bool updateSystemData()
 
   if (systemData.inv_max_w == -1)
   {
-    if ((ok &= fetchBatteryData(SONNEN_API_CONFIGURATIONS, json)))
+    if ((ok &= fetchApiData(SONNEN_API_CONFIGURATIONS, json)))
     {
       systemData.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
       DEBUGF("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
     }
-    else
-    {
-      DEBUGF("ERROR: fetchSystemData(%s)\n", SONNEN_API_CONFIGURATIONS);
-    }
   }
-  if (systemData.cap_bat_max_Wh == 0)
+  if (systemData.cap_bat_max_Wh == 0 || isUpdateSystemData())
   {
-    if ((ok &= fetchBatteryData(SONNEN_API_LATEST_DATA, json)))
+    if (ok && (ok &= fetchApiData(SONNEN_API_BATTERY, json)))
     {
-      systemData.cap_bat_max_Wh = json[F("FullChargeCapacity")].as<uint16_t>();
-      systemData.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
-      DEBUGF("FullChargeCapacity %d\n", systemData.cap_bat_max_Wh);
-    }
-    else
-    {
-      DEBUGF("ERROR: fetchSystemData(%s)\n", SONNEN_API_LATEST_DATA);
+      systemData.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
+      systemData.bat_cycles = json[F("cyclecount")].as<uint16_t>();
+      DEBUGF("FullChargeCapacity %d, cycles: %d\n", systemData.cap_bat_max_Wh, systemData.bat_cycles);
     }
   }
-
-  if ((ok &= fetchBatteryData(SONNEN_API_STATUS, json)))
+  if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json)))
+  {
+    systemData.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
+    systemData.fullChargeRequest = json[F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
+    DEBUGF("UTC offset %d, discharge not allowed: %d\n", systemData.utc_offset, systemData.fullChargeRequest);
+  }
+  if (ok && (ok &= fetchApiData(SONNEN_API_STATUS, json)))
   {
     systemData.usoc = json[F("USOC")].as<uint8_t>();
     systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
@@ -929,7 +943,6 @@ bool updateSystemData()
     systemData.prod_W = json[F("Production_W")].as<uint16_t>();
     systemData.cons_W = json[F("Consumption_W")].as<uint16_t>();
     systemData.cons_avg_W = json[F("Consumption_Avg")].as<uint16_t>();
-    systemData.dischargeNotAllowed = json[F("dischargeNotAllowed")].as<bool>();
     systemData.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
     systemData.charge = json[F("BatteryCharging")].as<short>() - json[F("BatteryDischarging")].as<short>();
 
@@ -955,7 +968,7 @@ bool updateSystemData()
   if (ok)
   {
     clearBatteryError();
-    errorLoopBackoff = 1; // reset back off on success
+    errorLoopBackoff = 1; // reset backoff
   }
   else
   {
@@ -968,6 +981,13 @@ bool updateSystemData()
 
   return ok;
 }
+
+typedef struct
+{
+  bool *fnConstraint;
+  String message;
+
+} constraint;
 
 const String CONSTRAINTS[] = {
     "",
@@ -989,15 +1009,15 @@ void updateSwitch(bool validData)
   uint8_t constraint = 0;
 
   float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.8; // ~0.8 °C heater "afterglow"
-  float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_DELTA;
+  float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
 
   bool desiredState = (constraint = 1) && validData &&
                       // aware of max system power (production + max inverter power)
-                      ((constraint = 2) && (systemData.prod_W + (systemData.dischargeNotAllowed ? 0 : systemData.inv_max_w) - systemData.cons_W_norm - config.loadPower_W) >= config.gridMin_W) &&
+                      ((constraint = 2) && (systemData.prod_W + (systemData.fullChargeRequest ? 0 : systemData.inv_max_w) - systemData.cons_W_norm - config.loadPower_W) >= config.gridMin_W) &&
                       // if surplus ("waste") exceeds load
                       (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) ||
                        // forecast battery capacity and be aware of discharge allowed
-                       ((constraint = 4) && systemData.dischargeNotAllowed == false && (constraint = 5) && batteryCapacityTargetFulfilled(&config, &systemData, &ts))) &&
+                       ((constraint = 4) && systemData.fullChargeRequest == false && (constraint = 5) && batteryCapacityTargetFulfilled(&config, &systemData, &ts))) &&
                       (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) ||
                        ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
 
@@ -1007,7 +1027,7 @@ void updateSwitch(bool validData)
     {
       if (systemData.switchEnabled) // already on?
       {
-        inverterLatencyCnt = (systemData.gridFeedIn_W < -config.gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
+        inverterLatencyCnt += (systemData.gridFeedIn_W < -config.gridMin_W) ? 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
         desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
         if (!desiredState)
         {

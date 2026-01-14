@@ -51,6 +51,7 @@
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
 #define SONNEN_API_LATEST_DATA "latestdata"
+#define SONNEN_API_BATTERY "battery"
 #define SONNEN_API_STATUS "status"
 #define SONNEN_INVERTER_LATENCY_MS 5000  // battery inverter latency until load is compensated - sonnen battery 10 specific
 #define SONNEN_INVERTER_LATENCY_COUNT (uint8_t) MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
@@ -66,7 +67,7 @@
 #define SYSTEM_UPDATE_INTERVAL_MS 2000  //update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
 
-#define BOILER_TEMPERATURE_DELTA 2
+#define BOILER_TEMPERATURE_HYSTERESIS 2
 #define BOILER_UPDATE_INTERVAL_MS 15 * 1000
 
 #define CFG_SZ_HOSTNAME 32
@@ -77,9 +78,9 @@
 #define CFG_SZ_TZ 32
 #define SZ_LOG_ENTRY 256
 
-#define CALIBRATE_LOOP_CNT (1<<5)
-#define CALIBRATE_ONOFF_TOGGLE 8
-#define CALIBRATE_MEASURE (CALIBRATE_ONOFF_TOGGLE / 2)
+#define CALIBRATE_LOOP_CNT 1<<5
+#define CALIBRATE_ONOFF_TOGGLE CALIBRATE_LOOP_CNT>>1
+#define CALIBRATE_MEASURE CALIBRATE_ONOFF_TOGGLE >> 1
 #define CALIBRATE_AVG_DIV (CALIBRATE_LOOP_CNT / CALIBRATE_ONOFF_TOGGLE / 2 * CALIBRATE_MEASURE)
 
 #define SIZE_EVENT_BUFFER 16
@@ -122,29 +123,30 @@ typedef struct {
 } logEntry;
 
 typedef struct {
-  uint32_t start_ts; // system start timestamp
-  uint32_t ts;       // current system time (UTC) - taken from battery status
-  uint16_t tm_yday;  // day of year
-  uint16_t utc_offset; // UTC to local time offset in seconds
-  bool switchEnabled = false;  // state of the load switch
+  uint32_t start_ts;  // system start timestamp
+  uint32_t ts;        // current system time (UTC) - taken from battery status
+  uint16_t tm_yday;   // day of year
+  int16_t utc_offset; // UTC to local time offset in seconds
+  bool switchEnabled; // state of the load switch
 
   float boiler_T_cur;
   float boiler_T_nom;
   float boiler_T_min;
   float boiler_T_max;
 
-  int inv_max_w = -1;        // inverter power max
+  int inv_max_w;             // inverter power max
   uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
   uint16_t prod_W;           // prodcution (Watt)
   uint16_t cons_W;           // consumption (Watt)
   uint16_t cons_W_nom;       // consumption rounded as multiple of 10 (Watt)
   uint16_t cons_W_norm;      // normalized consumption without load
   uint16_t cons_avg_W;       // consumption average (W)
+  uint16_t bat_cycles;       // Number of charge/discharge cycles
   uint16_t cap_bat_Wh;       // current capacity
   uint16_t cap_bat_max_Wh;   // max battery capacity (system)
   int pac_total_W;           // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
   int gridFeedIn_W;          // current grid feed in - negative is consumption, positive is fedd in
-  bool dischargeNotAllowed;  // e.g. true due to battery maintenance
+  bool fullChargeRequest;    // e.g. true during battery maintenance
   short charge;              // battery charge state 0 - none, 1 - charge, -1 - discharge
 
   long pv_forecast_ts;               // last update timestamp in ms since mcu start

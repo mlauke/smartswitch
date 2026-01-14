@@ -52,21 +52,21 @@
       </div>
       <div class="battery-container">
         <div class="battery">
-          <input hidden name="usoc" id="usoc">
           <div class="charge" id="charge"></div>
+          <div class="cycles"><span name="sn_cycles">0</span> cl</div>
           <span class="charge-lvl" id="charge-lvl">0%</span>
         </div>
       </div>
     </div>
   </fieldset>
   <fieldset>
-    <legend>Events (<a href="javascript:showLog();">Log</a>)</legend>
+    <legend>Events (<a href="#" onclick="showLog()">Log</a>)</legend>
     <div class="fgs">
       <div class="events" name="events"></div>
-      <div id="overlay" class="overlay">
+      <div id="logOverlay" class="overlay">
         <div class="overlay-content">
           <div id="eventLog" class="eventLog"></div>
-          <button id="closeOverlay" onclick="javascript:closeLog();">Close</button>
+          <button onclick="closeOverlay(this)">Close</button>
         </div>
       </div>
     </div>
