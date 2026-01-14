@@ -34,6 +34,7 @@
 #include "GithubOTA.h"
 #include "RestClient.h"
 #include "LPB.h"
+#include "Util.h"
 
 #include "app_js.h"
 #include "app_css.h"
@@ -380,7 +381,7 @@ void jsonToConfig(JsonDocument &json)
   config.version = json[F("version")].as<uint16_t>();
 }
 
-void configToJson(JsonDocument &json)
+void configToJson(JsonDocument &json, bool confidential)
 {
   json[F("mode")] = config.mode;
   json[F("release_tag")] = config.release_tag;
@@ -390,7 +391,10 @@ void configToJson(JsonDocument &json)
   json[F("hostname")] = config.hostname;
 
   json[F("sn_host")] = config.sonnenHostname;
-  json[F("sn_token")] = config.sonnenApiToken;
+  if (!confidential)
+  {
+    json[F("sn_token")] = config.sonnenApiToken;
+  }
   json[F("sn_grdmin")] = config.gridMin_W;
   json[F("sn_loadpower")] = config.loadPower_W;
   json[F("sn_cap_min")] = config.cap_bat_min_Wh;
@@ -432,7 +436,7 @@ void handleData()
 {
   JsonDocument json;
 
-  configToJson(json);
+  configToJson(json, true);
   json[F("start_ts")] = toLocalDate(&systemData, systemData.start_ts);
   sendJson("data", json);
 }
@@ -519,7 +523,11 @@ void handleAPI()
   else if (server.hasArg(F("sonnen")))
   {
     setConfigStr(config, sonnenHostname, server.arg(F("sn_host")).c_str());
-    setConfigStr(config, sonnenApiToken, server.arg(F("sn_token")).c_str());
+    String apiToken = server.arg(F("sn_token"));
+    if (apiToken.length() > 0)
+    {
+      setConfigStr(config, sonnenApiToken, apiToken.c_str());
+    }
     config.gridMin_W = MAX(50, MAX(0, server.arg(F("sn_grdmin")).toInt()));
     config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg(F("sn_cap_min")).toInt()));
     saveConfig();
@@ -714,8 +722,8 @@ bool updateBoilerData()
 void calibrate(bool validData)
 {
   static uint8_t cnt = CALIBRATE_LOOP_CNT;
-  static uint32_t load_on = 0;
-  static uint32_t load_off = 0;
+  static uint16_t load_on[CALIBRATE_MEASURE];
+  static uint16_t load_off[CALIBRATE_MEASURE];
 
   if (!validData)
   {
@@ -726,15 +734,15 @@ void calibrate(bool validData)
 
   if (cnt == 0)
   {
-    config.loadPower_W = MAX(0, (load_on / CALIBRATE_AVG_DIV - load_off / CALIBRATE_AVG_DIV) * 103 / 100); // +3%
+    config.loadPower_W = MAX(0, (median_uint16(load_on, CALIBRATE_MEASURE) - median_uint16(load_off, CALIBRATE_MEASURE)) * 103 / 100); // +3%
     saveConfig();
 
     char event[64];
-    snprintf(event, sizeof(event), "load calibrated on avg %dW off avg %dW => %dW", load_on / CALIBRATE_AVG_DIV, load_off / CALIBRATE_AVG_DIV, config.loadPower_W);
+    snprintf(event, sizeof(event), "load calibrated, on %dW / off %dW => %dW", median_uint16(load_on, CALIBRATE_MEASURE), median_uint16(load_off, CALIBRATE_MEASURE), config.loadPower_W);
     putEvent(event);
 
-    load_on = 0;
-    load_off = 0;
+    memset(load_on, 0, sizeof(load_on));
+    memset(load_off, 0, sizeof(load_off));
     cnt = CALIBRATE_LOOP_CNT;
     calibrateLoad = false;
 
@@ -747,11 +755,11 @@ void calibrate(bool validData)
     {
       if (on)
       {
-        load_on += systemData.cons_W;
+        load_on[cnt & (CALIBRATE_MEASURE - 1)] = systemData.cons_W;
       }
       else
       {
-        load_off += systemData.cons_W;
+        load_off[cnt & (CALIBRATE_MEASURE - 1)] = systemData.cons_W;
       }
     }
     systemData.switchEnabled = on;
@@ -959,7 +967,7 @@ bool updateSystemData()
     updateConsumption(&config, &systemData);
   }
 
-  if (ok && config.loadPower_W <= 0)
+  if (ok && !(ok &= (config.loadPower_W > 0)))
   {
     // TODO wrong error category
     putBatteryError("Load not properly configured! Must be > 0!");
@@ -1154,7 +1162,7 @@ bool saveConfig()
   config.version++; // update version
 
   JsonDocument json;
-  configToJson(json);
+  configToJson(json, false);
   DEBUGLN("saveConfig() => ");
   serializeJsonPretty(json, Serial);
   serializeJson(json, f);
