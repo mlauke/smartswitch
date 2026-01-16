@@ -1035,8 +1035,11 @@ void updateSwitch(bool validData)
     {
       if (systemData.switchEnabled) // already on?
       {
-        inverterLatencyCnt += (systemData.gridFeedIn_W < -config.gridMin_W) ? 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
-        desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT;
+        if (systemData.gridFeedIn_W < -config.gridMin_W)
+        { // grid purchase active? (negative grid feed in denotes purchase)
+          inverterLatencyCnt++;
+        }
+        desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT; // keep on if latency count is not reached
         if (!desiredState)
         {
           constraint = 8;

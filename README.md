@@ -48,9 +48,9 @@ as mentioned above, a SSR which can drive the 3,3kW load will become very hot if
 
 # TODOs
   - ❌ bug: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
-  - ❌ bug: discharge not allowed but switch is triggered due to boiler min
-  - ❌ detect battery training mode - support ticket at sonnen opened
-  - ❌ battery system data update every day or from time to time
+  - ✅ bug: discharge not allowed but switch is triggered due to boiler min
+  - ✅ detect battery training mode - support ticket at sonnen opened - workaround implemented "Set Point Priority" "Full Charge Request"
+  - ✅ battery system data update every day or from time to time
   - ❌ feat: skip updateSwitch if not set to Auto
   - ❌ feat: wait or delay on reset/restart requests, make sure response is send
   - ❌ feat: suspend/sleep for a while (or double the amount of sleep)
