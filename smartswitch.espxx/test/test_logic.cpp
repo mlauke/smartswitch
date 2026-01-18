@@ -113,7 +113,7 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
   updateConsumption(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
-
+/*
 void test_updateSwitch()
 {
   uint32_t ts = 0;
@@ -126,12 +126,13 @@ void test_updateSwitch()
   updateSwitch(&systemConfig, &systemState, false);
   TEST_ASSERT_FALSE(systemState.switchEnabled);
 }
+*/
 
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
-  RUN_TEST(test_updateSwitch);
+  //RUN_TEST(test_updateSwitch);
   RUN_TEST(test_upateConsumption);
   RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);

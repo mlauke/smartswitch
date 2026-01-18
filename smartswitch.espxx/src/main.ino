@@ -812,7 +812,6 @@ void loop()
     else
     {
       updateSwitch(&config, &systemState, validData);
-      // putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" (C") + constraint + F(" - ") + msg + F(")"));
     }
     toggleSwitch(systemState.switchEnabled);
 

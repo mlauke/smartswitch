@@ -27,13 +27,18 @@
 #include "debug.h"
 
 static char tsfmt[30];
-static char *toDate(uint32_t utc_ts, int16_t offset)
+char *toDate(uint32_t utc_ts, int16_t offset)
 {
   time_t time = (time_t)(utc_ts + offset);
   tm timeinfo;
   gmtime_r(&time, &timeinfo);
   strftime(tsfmt, sizeof(tsfmt), "%Y-%m-%d %H:%M:%S", &timeinfo);
   return tsfmt;
+}
+
+char *toDate(uint32_t utc_ts)
+{
+  return toDate(utc_ts, 0);
 }
 
 static char *toLocalDate(SystemState *systemState, uint32_t utc_ts)
