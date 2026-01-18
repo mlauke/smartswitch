@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>
+#include <stdint.h>
 
 static int cmp_uint16(const void *a, const void *b)
 {
@@ -41,8 +42,8 @@ struct Arg
 
 // esp8266 does not support positional printf
 static void format_indexed(char *out, size_t out_size,
-                    const char *fmt,
-                    struct Arg *args)
+                           const char *fmt,
+                           struct Arg *args)
 {
     char *dst = out;
     const char *p = fmt;
@@ -55,22 +56,18 @@ static void format_indexed(char *out, size_t out_size,
             int idx = p[1] - '0';
             struct Arg *a = &args[idx];
 
-            if (a->type == ARG_INT)
+            switch (a->type)
             {
-                dst += snprintf(dst, out_size - (dst - out),
-                                "%d", *(int *)a->value);
+            case ARG_INT:
+                dst += snprintf(dst, out_size - (dst - out), "%d", *(unsigned int *)a->value);
+                break;
+            case ARG_FLT:
+                dst += snprintf(dst, out_size - (dst - out), "%.2f", *(float *)a->value);
+                break;
+            case ARG_STR:
+                dst += snprintf(dst, out_size - (dst - out), "%s", (const char *)a->value);
+                break;
             }
-            else if (a->type == ARG_FLT)
-            {
-                dst += snprintf(dst, out_size - (dst - out),
-                                "%.2f", *(float *)a->value);
-            }
-            else if (a->type == ARG_STR)
-            {
-                dst += snprintf(dst, out_size - (dst - out),
-                                "%s", (const char *)a->value);
-            }
-
             p += 2;
         }
         else

@@ -103,8 +103,8 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
   return foundPvData && cap_bat_Wh >= cap_bat_min_Wh;
 }
 
-const char *CONSTRAINTS[] = {
-    "",
+const char *const CONSTRAINTS[] PROGMEM = {
+    NULL,
     "invalid data",
     "load exceeds system capacity %0W",
     "surplus greater load",
@@ -117,7 +117,7 @@ const char *CONSTRAINTS[] = {
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
 
-  static uint8_t inverterLatencyCnt = 0;
+  static uint16_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 
   uint32_t ts = 0;
@@ -172,7 +172,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_FLT, &temp_on,
         ARG_FLT, &temp_off,
         ARG_INT, &inverterLatencyCnt,
-        ARG_FLT, &systemConfig->cap_bat_min_Wh};
+        ARG_INT, &systemConfig->cap_bat_min_Wh};
 
     format_indexed(msg, len, CONSTRAINTS[constraint], args);
   }
