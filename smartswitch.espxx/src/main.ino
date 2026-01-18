@@ -994,82 +994,14 @@ bool updateSystemData()
   return ok;
 }
 
-const String CONSTRAINTS[] = {
-    "",
-    "invalid data",
-    "load exceeds system capacity %0W",
-    "surplus greater load",
-    "battery maintenance, discharge not allowed",
-    "battery min capacity %5Wh reached at %1",
-    "boiler temperature min %2°C reached",
-    "boiler temperature max %3°C reached",
-    "latency count reached %4"};
-
 static void updateSwitch(SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
-
-  static uint8_t inverterLatencyCnt = 0;
-  static uint8_t stableOnCnt = 0;
-
-  uint32_t ts = 0;
-  uint8_t constraint = 0;
-
-  float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 0.8f; // ~0.8 °C heater "afterglow"
-  float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
-
-  bool desiredState = (constraint = 1) && validData &&
-                      // aware of max system power (production + max inverter power)
-                      ((constraint = 2) && (systemState->system_W - systemState->cons_W_norm - systemConfig->loadPower_W) >= systemConfig->gridMin_W) &&
-                      // if surplus ("waste") exceeds load
-                      (((constraint = 3) && !systemState->switchEnabled && systemState->gridFeedIn_W > systemConfig->loadPower_W) ||
-                       // forecast battery capacity and be aware of discharge allowed
-                       ((constraint = 4) && systemState->fullChargeRequest == false && (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))) &&
-                      (((constraint = 6) && !systemState->switchEnabled && systemState->boiler_T_cur < temp_on) ||
-                       ((constraint = 7) && systemState->switchEnabled && systemState->boiler_T_cur < temp_off));
-
-  if (desiredState) // on?
-  {
-    if (stableOnCnt == SYSTEM_ON_COUNT)
-    {
-      if (systemState->switchEnabled) // already on?
-      {
-        inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
-        if (!(desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT))                                // keep on if latency count is not reached
-        {
-          constraint = 8; // otherwise switch off and error
-        }
-      }
-      else
-      { // off, but on desired, reset latency counter
-        inverterLatencyCnt = 0;
-      }
-    }
-    else
-    {
-      stableOnCnt++;
-      DEBUGF("stable count %d\n", stableOnCnt);
-    }
-  }
-  else
-  {
-    stableOnCnt = 0;
-  }
+  char msg[80];
+  bool desiredState = determineDesiredState(msg, systemConfig, systemState, validData);
 
   if (systemConfig->mode == SMODE_AUTO && systemState->switchEnabled != desiredState)
   {
-    char msg[80];
-    Arg args[] = {
-        ARG_INT, &systemState->system_W,
-        ARG_STR, toLocalDate(systemState, ts),
-        ARG_FLT, &temp_on,
-        ARG_FLT, &temp_off,
-        ARG_INT, &inverterLatencyCnt,
-        ARG_FLT, &systemConfig->cap_bat_min_Wh
-
-    };
-    format_indexed(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), args);
-
-    putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" (C") + constraint + F(" - ") + msg + F(")"));
+    putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" - ") + msg);
   }
   systemState->switchEnabled = (desiredState && systemConfig->mode == SMODE_AUTO) || (systemConfig->mode == SMODE_ON); // combine with mode
 
