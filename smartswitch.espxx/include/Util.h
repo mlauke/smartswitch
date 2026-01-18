@@ -13,13 +13,70 @@ static uint16_t median_uint16(uint16_t *values, size_t count)
 
     qsort(values, count, sizeof(uint16_t), cmp_uint16);
 
-    if (count & 1) {
+    if (count & 1)
+    {
         median = values[count / 2];
-    } else {
-        median = (uint16_t)(
-            ((uint16_t)values[count / 2 - 1] +
-             (uint16_t)values[count / 2]) / 2
-        );
+    }
+    else
+    {
+        median = (uint16_t)(((uint16_t)values[count / 2 - 1] +
+                             (uint16_t)values[count / 2]) /
+                            2);
     }
     return median;
+}
+
+enum ArgType
+{
+    ARG_INT,
+    ARG_FLT,
+    ARG_STR,
+};
+
+struct Arg
+{
+    enum ArgType type;
+    void *value;
+};
+
+// esp8266 does not support positional printf
+static void format_indexed(char *out, size_t out_size,
+                    const char *fmt,
+                    struct Arg *args)
+{
+    char *dst = out;
+    const char *p = fmt;
+
+    while (*p && (dst - out) < (int)(out_size - 1))
+    {
+
+        if (*p == '%' && p[1] >= '0' && p[1] <= '9')
+        {
+            int idx = p[1] - '0';
+            struct Arg *a = &args[idx];
+
+            if (a->type == ARG_INT)
+            {
+                dst += snprintf(dst, out_size - (dst - out),
+                                "%d", *(int *)a->value);
+            }
+            else if (a->type == ARG_FLT)
+            {
+                dst += snprintf(dst, out_size - (dst - out),
+                                "%.2f", *(float *)a->value);
+            }
+            else if (a->type == ARG_STR)
+            {
+                dst += snprintf(dst, out_size - (dst - out),
+                                "%s", (const char *)a->value);
+            }
+
+            p += 2;
+        }
+        else
+        {
+            *dst++ = *p++;
+        }
+    }
+    *dst = '\0';
 }

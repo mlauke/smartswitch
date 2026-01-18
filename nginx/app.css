@@ -155,14 +155,12 @@ input {
 }
 
 .battery-container {
-  text-align: center;
-  font-family: Arial, sans-serif;
   justify-self: center;
 }
 
 .battery {
-  width: 80px;
-  height: 160px;
+  width: 92px;
+  height: 168px;
   border: 4px solid #333;
   border-radius: 8px;
   position: relative;

@@ -71,7 +71,7 @@ volatile bool doUpdateFlag = false;
 LPB *lpb;
 WiFiManager wifiManager;
 Ticker timer;
-SystemData systemData;
+SystemState systemState;
 SystemConfig config;
 bool saveConfigFile = false;
 bool calibrateLoad = false;
@@ -202,14 +202,14 @@ void onOTAEnd(bool success)
 
 void systemDefaults()
 {
-  systemData.start_ts = 0;
-  systemData.pv_forecast_ts = 0;
-  memset(systemData.pv_forecast_wh_h, 0, sizeof(systemData.pv_forecast_wh_h));
-  systemData.eventIx = 0;
-  systemData.inv_max_w = -1;
-  systemData.utc_offset = -1;
-  systemData.switchEnabled = false;
-  systemData.skipUpdateCountSysten = 0;
+  systemState.start_ts = 0;
+  systemState.pv_forecast_ts = 0;
+  memset(systemState.pv_forecast_wh_h, 0, sizeof(systemState.pv_forecast_wh_h));
+  systemState.eventIx = 0;
+  systemState.inv_max_w = -1;
+  systemState.utc_offset = -1;
+  systemState.switchEnabled = false;
+  systemState.skipUpdateCountSysten = 0;
 }
 
 void configDefaults()
@@ -250,7 +250,7 @@ bool updateSolarForecast()
   static bool lastResult = false;
 
   long ms = millis();
-  if (config.lat != 0.0 && config.lon != 0.0 && (systemData.pv_forecast_ts == 0 || (systemData.pv_forecast_ts + SOLAR_FORECAST_INTERVAL_MS) < ms))
+  if (config.lat != 0.0 && config.lon != 0.0 && (systemState.pv_forecast_ts == 0 || (systemState.pv_forecast_ts + SOLAR_FORECAST_INTERVAL_MS) < ms))
   {
 
     RestClient restClient;
@@ -269,10 +269,10 @@ bool updateSolarForecast()
       {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
-        if (i < sizeof(systemData.pv_forecast_wh_h) / sizeof(systemData.pv_forecast_wh_h[0]))
+        if (i < sizeof(systemState.pv_forecast_wh_h) / sizeof(systemState.pv_forecast_wh_h[0]))
         {
-          systemData.pv_forecast_wh_h[i][0] = ts;
-          systemData.pv_forecast_wh_h[i][1] = wh;
+          systemState.pv_forecast_wh_h[i][0] = ts;
+          systemState.pv_forecast_wh_h[i][1] = wh;
           i++;
         }
         else
@@ -289,7 +289,7 @@ bool updateSolarForecast()
     {
       putLocationError(String(F("WARN solar forecast ")) + restClient.lastError());
     }
-    systemData.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
+    systemState.pv_forecast_ts = restClient.lastResponseCode() > 0 ? ms : 0;
   }
   return lastResult;
 }
@@ -437,7 +437,7 @@ void handleData()
   JsonDocument json;
 
   configToJson(json, true);
-  json[F("start_ts")] = toLocalDate(&systemData, systemData.start_ts);
+  json[F("start_ts")] = toLocalDate(&systemState, systemState.start_ts);
   sendJson("data", json);
 }
 
@@ -446,16 +446,17 @@ void handleStatus()
 {
   JsonDocument json;
 
-  json[F("cons_w")] = systemData.cons_W;
-  json[F("cons_avg_w")] = systemData.cons_avg_W;
-  json[F("prod")] = systemData.prod_W;
-  json[F("grid")] = systemData.gridFeedIn_W;
-  json[F("usoc")] = systemData.usoc;
-  json[F("chrg")] = systemData.charge;
-  json[F("pac_total_w")] = systemData.pac_total_W * -1; // invert - positive means discharge, we invert for display
-  json[F("switch")] = systemData.switchEnabled;
-  json[F("sn_cap_max")] = systemData.cap_bat_max_Wh;
-  json[F("sn_cycles")] = systemData.bat_cycles;
+  json[F("cons_w")] = systemState.cons_W;
+  json[F("cons_avg_w")] = systemState.cons_avg_W;
+  json[F("prod")] = systemState.prod_W;
+  json[F("grid")] = systemState.gridFeedIn_W;
+  json[F("usoc")] = systemState.usoc;
+  json[F("chrg")] = systemState.charge;
+  json[F("pac_total_w")] = systemState.pac_total_W * -1; // invert - positive means discharge, we invert for display
+  json[F("switch")] = systemState.switchEnabled;
+  json[F("sn_cap_max")] = systemState.cap_bat_max_Wh;
+  json[F("sn_cycles")] = systemState.bat_cycles;
+  json[F("sn_cap_max_use")] = systemState.cap_bat_max_use;
 
   char devid[40] = "unknown";
   device_map *device = lpb->getDestDevice();
@@ -464,21 +465,21 @@ void handleStatus()
     snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
   json[F("bs_devid")] = devid;
-  json[F("bs_t_cur")] = systemData.boiler_T_cur;
-  json[F("bs_t_max")] = systemData.boiler_T_max;
-  json[F("bs_t_min")] = systemData.boiler_T_min;
-  json[F("bs_t_nom")] = systemData.boiler_T_nom;
+  json[F("bs_t_cur")] = systemState.boiler_T_cur;
+  json[F("bs_t_max")] = systemState.boiler_T_max;
+  json[F("bs_t_min")] = systemState.boiler_T_min;
+  json[F("bs_t_nom")] = systemState.boiler_T_nom;
 
   JsonArray errors = json[F("errors")].to<JsonArray>();
-  addLog(errors, systemData.error_bt);
-  addLog(errors, systemData.error_bs);
-  addLog(errors, systemData.error_lc);
+  addLog(errors, systemState.error_bt);
+  addLog(errors, systemState.error_bs);
+  addLog(errors, systemState.error_lc);
 
   JsonArray events = json[F("events")].to<JsonArray>();
   unsigned short i = SIZE_EVENT_BUFFER;
   while (i-- > 0)
   {
-    logEntry log = systemData.events[(systemData.eventIx + i) % SIZE_EVENT_BUFFER];
+    logEntry log = systemState.events[(systemState.eventIx + i) % SIZE_EVENT_BUFFER];
     addLog(events, log);
   }
 
@@ -529,9 +530,9 @@ void handleAPI()
       setConfigStr(config, sonnenApiToken, apiToken.c_str());
     }
     config.gridMin_W = MAX(50, MAX(0, server.arg(F("sn_grdmin")).toInt()));
-    config.cap_bat_min_Wh = MIN(systemData.cap_bat_max_Wh, MAX(0, server.arg(F("sn_cap_min")).toInt()));
+    config.cap_bat_min_Wh = MIN(systemState.cap_bat_max_Wh, MAX(0, server.arg(F("sn_cap_min")).toInt()));
     saveConfig();
-    systemData.skipUpdateCountSysten = 0;
+    systemState.skipUpdateCountSysten = 0;
   }
   else if (server.hasArg(F("location")))
   {
@@ -540,7 +541,7 @@ void handleAPI()
     config.kWp = MAX(0, server.arg(F("lc_kWp")).toDouble());
     config.az = MIN(360, MAX(0, server.arg(F("lc_az")).toInt()));
     config.dec = MIN(90, MAX(0, server.arg(F("lc_dec")).toInt()));
-    systemData.pv_forecast_ts = 0; // force fetch new data
+    systemState.pv_forecast_ts = 0; // force fetch new data
     saveConfig();
   }
   else if (server.hasArg(F("hostname")))
@@ -645,44 +646,44 @@ void handleGithubUpdate()
 
 void clearLocationError()
 {
-  systemData.error_lc.msg[0] = '\0';
+  systemState.error_lc.msg[0] = '\0';
 }
 
 void putLocationError(String event)
 {
-  putLog(systemData.error_lc, event.c_str());
+  putLog(systemState.error_lc, event.c_str());
 }
 
 void clearBatteryError()
 {
-  systemData.error_bt.msg[0] = '\0';
+  systemState.error_bt.msg[0] = '\0';
 }
 
 void putBatteryError(String event)
 {
-  putLog(systemData.error_bt, event.c_str());
+  putLog(systemState.error_bt, event.c_str());
 }
 
 void putBoilerError(String event)
 {
-  putLog(systemData.error_bs, event.c_str());
+  putLog(systemState.error_bs, event.c_str());
 }
 
 void clearBoilerError()
 {
-  systemData.error_bs.msg[0] = '\0';
+  systemState.error_bs.msg[0] = '\0';
 }
 
 void putLog(logEntry &log, const char *event)
 {
   strncpy(log.msg, event, sizeof(log.msg));
-  log.ts = systemData.ts;
-  DEBUGF("log %u: %s\n", systemData.ts, event);
+  log.ts = systemState.ts;
+  DEBUGF("log %u: %s\n", systemState.ts, event);
 }
 
 void putEvent(const char *event)
 {
-  putLog(systemData.events[systemData.eventIx++ % SIZE_EVENT_BUFFER], event);
+  putLog(systemState.events[systemState.eventIx++ % SIZE_EVENT_BUFFER], event);
 }
 
 void putEvent(String event)
@@ -704,10 +705,10 @@ bool updateBoilerData()
     boiler_t boilerData;
     if ((lastResult = lpb->update(&boilerData, isDevMode())))
     {
-      systemData.boiler_T_cur = boilerData.t_cur;
-      systemData.boiler_T_nom = boilerData.t_nom;
-      systemData.boiler_T_min = boilerData.t_min;
-      systemData.boiler_T_max = boilerData.t_max;
+      systemState.boiler_T_cur = boilerData.t_cur;
+      systemState.boiler_T_nom = boilerData.t_nom;
+      systemState.boiler_T_min = boilerData.t_min;
+      systemState.boiler_T_max = boilerData.t_max;
 
       clearBoilerError();
     }
@@ -746,7 +747,7 @@ void calibrate(bool validData)
     cnt = CALIBRATE_LOOP_CNT;
     calibrateLoad = false;
 
-    systemData.switchEnabled = false;
+    systemState.switchEnabled = false;
   }
   else
   {
@@ -755,14 +756,14 @@ void calibrate(bool validData)
     {
       if (on)
       {
-        load_on[cnt & (CALIBRATE_MEASURE - 1)] = systemData.cons_W;
+        load_on[cnt & (CALIBRATE_MEASURE - 1)] = systemState.cons_W;
       }
       else
       {
-        load_off[cnt & (CALIBRATE_MEASURE - 1)] = systemData.cons_W;
+        load_off[cnt & (CALIBRATE_MEASURE - 1)] = systemState.cons_W;
       }
     }
-    systemData.switchEnabled = on;
+    systemState.switchEnabled = on;
   }
 }
 
@@ -810,9 +811,10 @@ void loop()
     }
     else
     {
-      updateSwitch(validData);
+      updateSwitch(&config, &systemState, validData);
+      // putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" (C") + constraint + F(" - ") + msg + F(")"));
     }
-    toggleSwitch(systemData.switchEnabled);
+    toggleSwitch(systemState.switchEnabled);
 
     DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), validData);
 
@@ -912,59 +914,62 @@ bool updateSystemData()
 
   JsonDocument json;
 
-  if (systemData.skipUpdateCountSysten > 0)
+  if (systemState.skipUpdateCountSysten > 0)
   {
-    systemData.skipUpdateCountSysten--;
+    systemState.skipUpdateCountSysten--;
     return false;
   }
 
   bool ok = true;
 
-  if (systemData.inv_max_w == -1)
+  if (systemState.inv_max_w == -1)
   {
     if ((ok &= fetchApiData(SONNEN_API_CONFIGURATIONS, json)))
     {
-      systemData.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
-      DEBUGF("IC_InverterMaxPower_w %d\n", systemData.inv_max_w);
+      systemState.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
+      systemState.cap_bat_max_new_Wh = json[F("CM_MarketingModuleCapacity")].as<int>() * json[F("IC_BatteryModules")].as<int>() * 90 / 100;
+      DEBUGF("IC_InverterMaxPower_w %d, max battery capacity %d\n", systemState.inv_max_w, systemState.cap_bat_max);
     }
   }
-  if (systemData.cap_bat_max_Wh == 0 || isUpdateSystemData())
+  if (systemState.cap_bat_max_Wh == 0 || isUpdateSystemData())
   {
     if (ok && (ok &= fetchApiData(SONNEN_API_BATTERY, json)))
     {
-      systemData.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
-      systemData.bat_cycles = json[F("cyclecount")].as<uint16_t>();
-      DEBUGF("FullChargeCapacity %d, cycles: %d\n", systemData.cap_bat_max_Wh, systemData.bat_cycles);
+      systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
+      systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
+      systemState.cap_bat_max_use = systemState.cap_bat_max_Wh / systemState.cap_bat_max_new_Wh;
+      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %.2f\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_max);
     }
   }
   if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json)))
   {
-    systemData.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
-    systemData.fullChargeRequest = json[F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
-    DEBUGF("UTC offset %d, discharge not allowed: %d\n", systemData.utc_offset, systemData.fullChargeRequest);
+    systemState.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
+    systemState.fullChargeRequest = json[F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
+    DEBUGF("UTC offset %d, discharge not allowed: %d\n", systemState.utc_offset, systemState.fullChargeRequest);
   }
   if (ok && (ok &= fetchApiData(SONNEN_API_STATUS, json)))
   {
-    systemData.usoc = json[F("USOC")].as<uint8_t>();
-    systemData.cap_bat_Wh = systemData.cap_bat_max_Wh * systemData.usoc / 100;
-    systemData.gridFeedIn_W = json[F("GridFeedIn_W")].as<int>();
-    systemData.prod_W = json[F("Production_W")].as<uint16_t>();
-    systemData.cons_W = json[F("Consumption_W")].as<uint16_t>();
-    systemData.cons_avg_W = json[F("Consumption_Avg")].as<uint16_t>();
-    systemData.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
-    systemData.charge = json[F("BatteryCharging")].as<short>() - json[F("BatteryDischarging")].as<short>();
+    systemState.usoc = json[F("USOC")].as<uint8_t>();
+    systemState.cap_bat_Wh = systemState.cap_bat_max_Wh * systemState.usoc / 100;
+    systemState.gridFeedIn_W = json[F("GridFeedIn_W")].as<int>();
+    systemState.prod_W = json[F("Production_W")].as<uint16_t>();
+    systemState.system_W = systemState.prod_W + (systemState.fullChargeRequest ? 0 : systemState.inv_max_w);
+    systemState.cons_W = json[F("Consumption_W")].as<uint16_t>();
+    systemState.cons_avg_W = json[F("Consumption_Avg")].as<uint16_t>();
+    systemState.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
+    systemState.charge = json[F("BatteryCharging")].as<short>() - json[F("BatteryDischarging")].as<short>();
 
     struct tm time;
     strptime(json[F("Timestamp")].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
 
-    systemData.ts = mktime(&time) - systemData.utc_offset; // to UTC
-    if (systemData.start_ts == 0)
+    systemState.ts = mktime(&time) - systemState.utc_offset; // to UTC
+    if (systemState.start_ts == 0)
     {
-      systemData.start_ts = systemData.ts;
+      systemState.start_ts = systemState.ts;
     }
-    systemData.tm_yday = time.tm_yday;
+    systemState.tm_yday = time.tm_yday;
 
-    updateConsumption(&config, &systemData);
+    updateConsumption(&config, &systemState);
   }
 
   if (ok && !(ok &= (config.loadPower_W > 0)))
@@ -980,7 +985,7 @@ bool updateSystemData()
   }
   else
   {
-    systemData.skipUpdateCountSysten = errorLoopBackoff; // error loop back off
+    systemState.skipUpdateCountSysten = errorLoopBackoff; // error loop back off
     if (errorLoopBackoff != (1 << 7))
     {
       errorLoopBackoff <<= 1;
@@ -990,59 +995,49 @@ bool updateSystemData()
   return ok;
 }
 
-typedef struct
-{
-  bool *fnConstraint;
-  String message;
-
-} constraint;
-
 const String CONSTRAINTS[] = {
     "",
     "invalid data",
-    "load consumption would exceed system capacity",
+    "load exceeds system capacity %0W",
     "surplus greater load",
-    "battery discharge not allowed",
-    "battery min capacity reached at %s",
-    "boiler temperature min reached",
-    "boiler temperature max reached",
-    "latency count reached %d/%d"};
+    "battery maintenance, discharge not allowed",
+    "battery min capacity %5Wh reached at %1",
+    "boiler temperature min %2°C reached",
+    "boiler temperature max %3°C reached",
+    "latency count reached %4"};
 
-void updateSwitch(bool validData)
+static void updateSwitch(SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
+
   static uint8_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 
   uint32_t ts = 0;
   uint8_t constraint = 0;
 
-  float temp_off = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - 0.8; // ~0.8 °C heater "afterglow"
-  float temp_on = (systemData.boiler_T_max + systemData.boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
+  float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 0.8f; // ~0.8 °C heater "afterglow"
+  float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
 
   bool desiredState = (constraint = 1) && validData &&
                       // aware of max system power (production + max inverter power)
-                      ((constraint = 2) && (systemData.prod_W + (systemData.fullChargeRequest ? 0 : systemData.inv_max_w) - systemData.cons_W_norm - config.loadPower_W) >= config.gridMin_W) &&
+                      ((constraint = 2) && (systemState->system_W - systemState->cons_W_norm - systemConfig->loadPower_W) >= systemConfig->gridMin_W) &&
                       // if surplus ("waste") exceeds load
-                      (((constraint = 3) && !systemData.switchEnabled && systemData.gridFeedIn_W > config.loadPower_W) ||
+                      (((constraint = 3) && !systemState->switchEnabled && systemState->gridFeedIn_W > systemConfig->loadPower_W) ||
                        // forecast battery capacity and be aware of discharge allowed
-                       ((constraint = 4) && systemData.fullChargeRequest == false && (constraint = 5) && batteryCapacityTargetFulfilled(&config, &systemData, &ts))) &&
-                      (((constraint = 6) && !systemData.switchEnabled && systemData.boiler_T_cur < temp_on) ||
-                       ((constraint = 7) && systemData.switchEnabled && systemData.boiler_T_cur < temp_off));
+                       ((constraint = 4) && systemState->fullChargeRequest == false && (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))) &&
+                      (((constraint = 6) && !systemState->switchEnabled && systemState->boiler_T_cur < temp_on) ||
+                       ((constraint = 7) && systemState->switchEnabled && systemState->boiler_T_cur < temp_off));
 
   if (desiredState) // on?
   {
     if (stableOnCnt == SYSTEM_ON_COUNT)
     {
-      if (systemData.switchEnabled) // already on?
+      if (systemState->switchEnabled) // already on?
       {
-        if (systemData.gridFeedIn_W < -config.gridMin_W)
-        { // grid purchase active? (negative grid feed in denotes purchase)
-          inverterLatencyCnt++;
-        }
-        desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT; // keep on if latency count is not reached
-        if (!desiredState)
+        inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
+        if (!(desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT))                                // keep on if latency count is not reached
         {
-          constraint = 8;
+          constraint = 8; // otherwise switch off and error
         }
       }
       else
@@ -1061,62 +1056,31 @@ void updateSwitch(bool validData)
     stableOnCnt = 0;
   }
 
-  if (config.mode == SMODE_AUTO && systemData.switchEnabled != desiredState)
+  if (systemConfig->mode == SMODE_AUTO && systemState->switchEnabled != desiredState)
   {
     char msg[80];
-    switch (constraint)
-    {
-    case 5:
-      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), toLocalDate(&systemData, ts));
-      break;
-    case 8:
-      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), inverterLatencyCnt, SONNEN_INVERTER_LATENCY_COUNT);
-      break;
-    default:
-      snprintf(msg, sizeof(msg), CONSTRAINTS[constraint].c_str());
-    }
+    Arg args[] = {
+        ARG_INT, &systemState->system_W,
+        ARG_STR, toLocalDate(systemState, ts),
+        ARG_FLT, &temp_on,
+        ARG_FLT, &temp_off,
+        ARG_INT, &inverterLatencyCnt,
+        ARG_FLT, &systemConfig->cap_bat_min_Wh
+
+    };
+    format_indexed(msg, sizeof(msg), CONSTRAINTS[constraint].c_str(), args);
+
     putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" (C") + constraint + F(" - ") + msg + F(")"));
   }
-  systemData.switchEnabled = (desiredState && config.mode == SMODE_AUTO) || (config.mode == SMODE_ON); // combine with mode
+  systemState->switchEnabled = (desiredState && systemConfig->mode == SMODE_AUTO) || (systemConfig->mode == SMODE_ON); // combine with mode
 
-  DEBUGF("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemData.ts), systemData.ts, systemData.usoc, systemData.prod_W, systemData.cons_W, systemData.cons_W, systemData.cons_avg_W, systemData.gridFeedIn_W, config.mode, systemData.switchEnabled);
+  DEBUGF("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemState->ts), systemState->ts, systemState->usoc, systemState->prod_W, systemState->cons_W, systemState->cons_W, systemState->cons_avg_W, systemState->gridFeedIn_W, systemConfig->mode, systemState->switchEnabled);
 }
 
 void toggleSwitch(bool switchEnabled)
 {
   digitalWrite(PIN_SSR, switchEnabled ? HIGH : LOW);
   buildInLED(switchEnabled);
-}
-
-/*
- * return true if summer time
- */
-bool isDST(struct tm *timeinfo)
-{
-  int year = timeinfo->tm_year + 1900;
-
-  struct tm lastMarchSunday;
-  lastMarchSunday.tm_min = 0;
-  lastMarchSunday.tm_sec = 0;
-  lastMarchSunday.tm_year = year - 1900;
-  lastMarchSunday.tm_mon = 2; // März
-  lastMarchSunday.tm_mday = 31;
-  lastMarchSunday.tm_hour = 2;
-  mktime(&lastMarchSunday);
-  lastMarchSunday.tm_mday -= lastMarchSunday.tm_wday;
-
-  struct tm lastOctoberSunday;
-  lastOctoberSunday.tm_min = 0;
-  lastOctoberSunday.tm_sec = 0;
-  lastOctoberSunday.tm_year = year - 1900;
-  lastOctoberSunday.tm_mon = 9;
-  lastOctoberSunday.tm_mday = 31;
-  lastOctoberSunday.tm_hour = 3;
-  mktime(&lastOctoberSunday);
-  lastOctoberSunday.tm_mday -= lastOctoberSunday.tm_wday;
-
-  time_t now = mktime(timeinfo);
-  return (now >= mktime(&lastMarchSunday) && now < mktime(&lastOctoberSunday));
 }
 
 bool loadConfig()

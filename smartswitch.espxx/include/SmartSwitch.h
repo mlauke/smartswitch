@@ -32,9 +32,9 @@
 
 #elif ESP8266
 #define LED_BUILTIN 2
-#define PIN_LPB_TX 5  // GPIO5 (D1)
-#define PIN_LPB_RX 4  // GPIO4 (D2)
-#define PIN_SSR 13    // GPIO13 (D7)
+#define PIN_LPB_TX 5 // GPIO5 (D1)
+#define PIN_LPB_RX 4 // GPIO4 (D2)
+#define PIN_SSR 13   // GPIO13 (D7)
 #endif
 
 #define HOSTNAME "smartswitch"
@@ -53,18 +53,18 @@
 #define SONNEN_API_LATEST_DATA "latestdata"
 #define SONNEN_API_BATTERY "battery"
 #define SONNEN_API_STATUS "status"
-#define SONNEN_INVERTER_LATENCY_MS 5000  // battery inverter latency until load is compensated - sonnen battery 10 specific
-#define SONNEN_INVERTER_LATENCY_COUNT (uint8_t) MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
+#define SONNEN_INVERTER_LATENCY_MS 5000 // battery inverter latency until load is compensated - sonnen battery 10 specific
+#define SONNEN_INVERTER_LATENCY_COUNT (uint8_t)MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
-#define SOLAR_FORECAST_INTERVAL_MS 12 * 60 * 1000  // every 10min
-#define URL_SOLAR_FORECAST      "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
-#define URL_SOLAR_FORECAST_DEV  "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
+#define SOLAR_FORECAST_INTERVAL_MS 12 * 60 * 1000 // every 10min
+#define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
+#define URL_SOLAR_FORECAST_DEV "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
-#define SYSTEM_UPDATE_INTERVAL_MS 2000  //update intervall millis
+#define SYSTEM_UPDATE_INTERVAL_MS 2000 // update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
 
 #define BOILER_TEMPERATURE_HYSTERESIS 2
@@ -78,7 +78,7 @@
 #define CFG_SZ_TZ 32
 #define SZ_LOG_ENTRY 256
 
-#define CALIBRATE_LOOP_CNT (1<<5)
+#define CALIBRATE_LOOP_CNT (1 << 5)
 #define CALIBRATE_ONOFF_TOGGLE (CALIBRATE_LOOP_CNT >> 1)
 #define CALIBRATE_MEASURE (CALIBRATE_ONOFF_TOGGLE >> 1)
 #define CALIBRATE_AVG_DIV (CALIBRATE_LOOP_CNT / CALIBRATE_ONOFF_TOGGLE / 2 * CALIBRATE_MEASURE)
@@ -88,14 +88,16 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-#define _cs(a) sizeof(((SystemConfig*)0)->a)
-#define setConfigStr(cfg, property, str) \
-  if (strlen(str)) { \
+#define _cs(a) sizeof(((SystemConfig *)0)->a)
+#define setConfigStr(cfg, property, str)                               \
+  if (strlen(str))                                                     \
+  {                                                                    \
     strncpy((cfg).property, (str), MIN(_cs(property), strlen((str)))); \
-  } \
+  }                                                                    \
   (cfg).property[MIN(_cs(property) - 1, strlen((str)))] = '\0';
 
-typedef struct {
+typedef struct
+{
 
   char hostname[CFG_SZ_HOSTNAME];
   char release_tag[CFG_SZ_REL_TAG];
@@ -103,26 +105,28 @@ typedef struct {
   char sonnenApiToken[CFG_SZ_SONNENTOKEN];
 
   uint16_t loadPower_W;
-  uint16_t cap_bat_min_Wh;  // battery min capacity - custom min capacity
+  uint16_t cap_bat_min_Wh; // battery min capacity - custom min capacity
   uint16_t gridMin_W;
   float lat;
   float lon;
-  float kWp;    // installed PV power
-  uint8_t dec;  // PV panel declination (0..90°)
-  uint16_t az;  // PV panel Azimuth 0..360°
+  float kWp;   // installed PV power
+  uint8_t dec; // PV panel declination (0..90°)
+  uint16_t az; // PV panel Azimuth 0..360°
   char location[CFG_SZ_LOCATION];
   char tz[CFG_SZ_TZ + 1];
-  uint8_t mode;         // 0 - off, 1 - on, 2 - automatic
-  bool update_startup;  // release update check on startup
-  uint16_t version;     //
+  uint8_t mode;        // 0 - off, 1 - on, 2 - automatic
+  bool update_startup; // release update check on startup
+  uint16_t version;    //
 } SystemConfig;
 
-typedef struct {
+typedef struct
+{
   uint32_t ts;
   char msg[SZ_LOG_ENTRY];
 } logEntry;
 
-typedef struct {
+typedef struct
+{
   uint32_t start_ts;  // system start timestamp
   uint32_t ts;        // current system time (UTC) - taken from battery status
   uint16_t tm_yday;   // day of year
@@ -134,37 +138,41 @@ typedef struct {
   float boiler_T_min;
   float boiler_T_max;
 
-  int inv_max_w;             // inverter power max
-  uint8_t usoc;              // 0..100 user state of charge - battery capacity in %
-  uint16_t prod_W;           // prodcution (Watt)
-  uint16_t cons_W;           // consumption (Watt)
-  uint16_t cons_W_nom;       // consumption rounded as multiple of 10 (Watt)
-  uint16_t cons_W_norm;      // normalized consumption without load
-  uint16_t cons_avg_W;       // consumption average (W)
-  uint16_t bat_cycles;       // Number of charge/discharge cycles
-  uint16_t cap_bat_Wh;       // current capacity
-  uint16_t cap_bat_max_Wh;   // max battery capacity (system)
-  int pac_total_W;           // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
-  int gridFeedIn_W;          // current grid feed in - negative is consumption, positive is fedd in
-  bool fullChargeRequest;    // e.g. true during battery maintenance
-  short charge;              // battery charge state 0 - none, 1 - charge, -1 - discharge
+  int inv_max_w;               // inverter power max
+  uint8_t usoc;                // 0..100 user state of charge - battery capacity in %
+  uint16_t system_W;           // production + inverter max power(Watt)
+  uint16_t prod_W;             // production (Watt)
+  uint16_t cons_W;             // consumption (Watt)
+  uint16_t cons_W_nom;         // consumption rounded as multiple of 10 (Watt)
+  uint16_t cons_W_norm;        // normalized consumption without load
+  uint16_t cons_avg_W;         // consumption average (W)
+  uint16_t bat_cycles;         // Number of charge/discharge cycles
+  uint16_t cap_bat_max_new_Wh; // max usable battery capacity for new battery
+  float cap_bat_max_use;       // percentage of usable battery capacity
+  uint16_t cap_bat_Wh;         // current capacity
+  uint16_t cap_bat_max_Wh;     // max battery capacity (system)
+  int pac_total_W;             // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
+  int gridFeedIn_W;            // current grid feed in - negative is consumption, positive is fedd in
+  bool fullChargeRequest;      // e.g. true during battery maintenance
+  short charge;                // battery charge state 0 - none, 1 - charge, -1 - discharge
 
-  long pv_forecast_ts;               // last update timestamp in ms since mcu start
-  uint32_t pv_forecast_wh_h[49][2];  // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
+  long pv_forecast_ts;              // last update timestamp in ms since mcu start
+  uint32_t pv_forecast_wh_h[49][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
 
-  logEntry events[SIZE_EVENT_BUFFER];  // event buffer
+  logEntry events[SIZE_EVENT_BUFFER]; // event buffer
   uint8_t eventIx = 0;
 
-  uint8_t skipUpdateCountSysten;  // skip update on error count
+  uint8_t skipUpdateCountSysten; // skip update on error count
 
-  logEntry error_bs;  // last boiler system error
-  logEntry error_bt;  // last battery error
-  logEntry error_lc;  // last solar forecast or location error
+  logEntry error_bs; // last boiler system error
+  logEntry error_bt; // last battery error
+  logEntry error_lc; // last solar forecast or location error
   uint8_t errorIx = 0;
 
-} SystemData;
+} SystemState;
 
-enum SwitchMode {
+enum SwitchMode
+{
   SMODE_OFF,
   SMODE_ON,
   SMODE_AUTO
