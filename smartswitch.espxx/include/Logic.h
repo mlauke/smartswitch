@@ -103,7 +103,7 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
   return foundPvData && cap_bat_Wh >= cap_bat_min_Wh;
 }
 
-const char *const CONSTRAINTS[] PROGMEM = {
+const char *const CONSTRAINTS[] = {
     NULL,
     "invalid data",
     "load exceeds system capacity %0W",
