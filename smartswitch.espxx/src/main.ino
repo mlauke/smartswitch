@@ -936,8 +936,8 @@ bool updateSystemData()
     {
       systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
       systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
-      systemState.cap_bat_max_use = systemState.cap_bat_max_Wh / systemState.cap_bat_max_new_Wh;
-      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %.2f\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_max);
+      systemState.cap_bat_max_use = systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_max_new_Wh;
+      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_max);
     }
   }
   if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json)))
@@ -997,7 +997,7 @@ bool updateSystemData()
 static void updateSwitch(SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
   char msg[80];
-  bool desiredState = determineDesiredState(msg, systemConfig, systemState, validData);
+  bool desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
 
   if (systemConfig->mode == SMODE_AUTO && systemState->switchEnabled != desiredState)
   {

@@ -148,7 +148,7 @@ typedef struct
   uint16_t cons_avg_W;         // consumption average (W)
   uint16_t bat_cycles;         // Number of charge/discharge cycles
   uint16_t cap_bat_max_new_Wh; // max usable battery capacity for new battery
-  float cap_bat_max_use;       // percentage of usable battery capacity
+  uint8_t cap_bat_max_use;     // percentage of usable battery capacity
   uint16_t cap_bat_Wh;         // current capacity
   uint16_t cap_bat_max_Wh;     // max battery capacity (system)
   int pac_total_W;             // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging

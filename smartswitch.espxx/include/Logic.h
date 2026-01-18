@@ -103,7 +103,7 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
   return foundPvData && cap_bat_Wh >= cap_bat_min_Wh;
 }
 
-const char* CONSTRAINTS[] = {
+const char *CONSTRAINTS[] = {
     "",
     "invalid data",
     "load exceeds system capacity %0W",
@@ -114,7 +114,7 @@ const char* CONSTRAINTS[] = {
     "boiler temperature max %3°C reached",
     "latency count reached %4"};
 
-static bool determineDesiredState(char *msg, SystemConfig *systemConfig, SystemState *systemState, bool validData)
+static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
 
   static uint8_t inverterLatencyCnt = 0;
@@ -174,7 +174,7 @@ static bool determineDesiredState(char *msg, SystemConfig *systemConfig, SystemS
         ARG_INT, &inverterLatencyCnt,
         ARG_FLT, &systemConfig->cap_bat_min_Wh};
 
-    format_indexed(msg, sizeof(msg), CONSTRAINTS[constraint], args);
+    format_indexed(msg, len, CONSTRAINTS[constraint], args);
   }
   return desiredState;
 }
