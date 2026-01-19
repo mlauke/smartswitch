@@ -258,10 +258,10 @@ bool LPB::update(boiler_t *p, bool simulate)
 
   if (simulate)
   {
-    p->t_cur = 52.0f;
-    p->t_max = 65.0f;
-    p->t_min = 45.0f;
-    p->t_nom = 55.0f;
+    p->t_cur = 52.18f;
+    p->t_max = 65.01f;
+    p->t_min = 45.00f;
+    p->t_nom = 55.30f;
     return true;
   }
 

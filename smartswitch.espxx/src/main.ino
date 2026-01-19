@@ -465,10 +465,10 @@ void handleStatus()
     snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
   json[F("bs_devid")] = devid;
-  json[F("bs_t_cur")] = systemState.boiler_T_cur;
-  json[F("bs_t_max")] = systemState.boiler_T_max;
-  json[F("bs_t_min")] = systemState.boiler_T_min;
-  json[F("bs_t_nom")] = systemState.boiler_T_nom;
+  json[F("bs_t_cur")] = String(systemState.boiler_T_cur);
+  json[F("bs_t_max")] = String(systemState.boiler_T_max);
+  json[F("bs_t_min")] = String(systemState.boiler_T_min);
+  json[F("bs_t_nom")] = String(systemState.boiler_T_nom);
 
   JsonArray errors = json[F("errors")].to<JsonArray>();
   addLog(errors, systemState.error_bt);

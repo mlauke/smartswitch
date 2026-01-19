@@ -20,9 +20,7 @@ static uint16_t median_uint16(uint16_t *values, size_t count)
     }
     else
     {
-        median = (uint16_t)(((uint16_t)values[count / 2 - 1] +
-                             (uint16_t)values[count / 2]) /
-                            2);
+        median = (uint16_t)(((uint16_t)values[count / 2 - 1] + (uint16_t)values[count / 2]) / 2);
     }
     return median;
 }
@@ -62,7 +60,7 @@ static void format_indexed(char *out, size_t out_size,
                 dst += snprintf(dst, out_size - (dst - out), "%d", *(uint16_t *)a->value);
                 break;
             case ARG_FLT:
-                dst += snprintf(dst, out_size - (dst - out), "%0.2f", *(float *)a->value);
+                dst += snprintf(dst, out_size - (dst - out), "%.2f", *(float *)a->value);
                 break;
             case ARG_STR:
                 dst += snprintf(dst, out_size - (dst - out), "%s", (const char *)a->value);
