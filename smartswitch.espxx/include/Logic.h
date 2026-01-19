@@ -112,11 +112,12 @@ const char *const CONSTRAINTS[] = {
     "battery min capacity %5Wh reached at %1",
     "boiler temperature min %2°C reached",
     "boiler temperature max %3°C reached",
-    "latency count reached %4"};
+    "latency count reached %4"
+
+};
 
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
-
   static uint16_t inverterLatencyCnt = 0;
   static uint8_t stableOnCnt = 0;
 

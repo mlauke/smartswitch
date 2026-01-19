@@ -113,26 +113,32 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
   updateConsumption(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
-/*
-void test_updateSwitch()
+
+void test_determineDesiredState()
 {
-  uint32_t ts = 0;
-  SystemState systemState;
-  SystemConfig systemConfig;
+  systemConfig.loadPower_W = 3249;
+  systemState.inv_max_w = 4600;
+  systemState.cap_bat_Wh = 3100;
+  systemState.system_W = systemState.prod_W + systemState.inv_max_w;
+  systemState.boiler_T_max = 65.0f;
+  systemState.boiler_T_nom = 55.0f;
+  systemState.boiler_T_cur = 54.0f;
 
-  updateSwitch(&systemConfig, &systemState, true);
-  TEST_ASSERT_TRUE(systemState.switchEnabled);
+  updateConsumption(&systemConfig, &systemState);
 
-  updateSwitch(&systemConfig, &systemState, false);
-  TEST_ASSERT_FALSE(systemState.switchEnabled);
+  char msg[80];
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  printf("%s\n", msg);
+  TEST_ASSERT_TRUE(state);
+
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state);
 }
-*/
 
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
-  //RUN_TEST(test_updateSwitch);
   RUN_TEST(test_upateConsumption);
   RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
@@ -140,6 +146,8 @@ int main(int argc, char **argv)
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
+
+  RUN_TEST(test_determineDesiredState);
 
   return UNITY_END();
 }

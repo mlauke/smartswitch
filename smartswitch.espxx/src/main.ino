@@ -997,6 +997,7 @@ bool updateSystemData()
 static void updateSwitch(SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
   char msg[80];
+
   bool desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
 
   if (systemConfig->mode == SMODE_AUTO && systemState->switchEnabled != desiredState)

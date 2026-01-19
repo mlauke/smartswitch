@@ -59,10 +59,10 @@ static void format_indexed(char *out, size_t out_size,
             switch (a->type)
             {
             case ARG_INT:
-                dst += snprintf(dst, out_size - (dst - out), "%d", *(unsigned int *)a->value);
+                dst += snprintf(dst, out_size - (dst - out), "%d", *(uint16_t *)a->value);
                 break;
             case ARG_FLT:
-                dst += snprintf(dst, out_size - (dst - out), "%.2f", *(float *)a->value);
+                dst += snprintf(dst, out_size - (dst - out), "%0.2f", *(float *)a->value);
                 break;
             case ARG_STR:
                 dst += snprintf(dst, out_size - (dst - out), "%s", (const char *)a->value);
