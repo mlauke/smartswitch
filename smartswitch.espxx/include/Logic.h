@@ -51,9 +51,7 @@ void updateConsumption(SystemConfig *systemConfig, SystemState *systemState)
 {
   systemState->cons_W_nom = (systemState->cons_W + 5) / 10 * 10; // round up multiple of 10W
   // consumption without load
-  systemState->cons_W_norm = (systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W)
-                                 ? systemState->cons_W_nom - systemConfig->loadPower_W
-                                 : systemState->cons_W_nom;
+  systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled ? systemConfig->loadPower_W : 0);
 }
 
 static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemState *systemState, uint32_t *ts)
@@ -116,6 +114,28 @@ const char *const CONSTRAINTS[] = {
 
 };
 
+// aware of max system power (production + max inverter power)
+static bool isEnoughPowerAvailable(SystemConfig *systemConfig, SystemState *systemState)
+{
+  return (systemState->system_W - systemState->cons_W_nom) >= systemConfig->gridMin_W;
+}
+
+// if surplus ("waste") exceeds load
+static bool isEnoughSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
+{
+  return systemState->gridFeedIn_W > systemConfig->loadPower_W;
+}
+
+static bool isBoilerLowerOnThreshold(SystemState *systemState, float temperature_on)
+{
+  return systemState->boiler_T_cur < temperature_on;
+}
+
+static bool isBoilerLowerOffThreshold(SystemState *systemState, float temperature_off)
+{
+  return systemState->boiler_T_cur < temperature_off;
+}
+
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
   static uint16_t inverterLatencyCnt = 0;
@@ -124,18 +144,17 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   uint32_t ts = 0;
   uint8_t constraint = 0;
 
-  float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 0.8f; // ~0.8 °C heater "afterglow"
   float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
+  float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 0.8f; // ~0.8 °C heater "afterglow"
 
   bool desiredState = (constraint = 1) && validData &&
-                      // aware of max system power (production + max inverter power)
-                      ((constraint = 2) && (systemState->system_W - systemState->cons_W_norm - systemConfig->loadPower_W) >= systemConfig->gridMin_W) &&
-                      // if surplus ("waste") exceeds load
-                      (((constraint = 3) && !systemState->switchEnabled && systemState->gridFeedIn_W > systemConfig->loadPower_W) ||
-                       // forecast battery capacity and be aware of discharge allowed
-                       ((constraint = 4) && systemState->fullChargeRequest == false && (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))) &&
-                      (((constraint = 6) && !systemState->switchEnabled && systemState->boiler_T_cur < temp_on) ||
-                       ((constraint = 7) && systemState->switchEnabled && systemState->boiler_T_cur < temp_off));
+                      ((constraint = 2) && isEnoughPowerAvailable(systemConfig, systemState)) &&
+                      (((constraint = 3) && !systemState->switchEnabled && isEnoughSurplusAvailable(systemConfig, systemState)) ||
+                       // forecast battery capacity and be aware of full charge requests
+                       ((constraint = 4) && systemState->fullChargeRequest == false &&
+                        (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))) &&
+                      (((constraint = 6) && !systemState->switchEnabled && isBoilerLowerOnThreshold(systemState, temp_on)) ||
+                       ((constraint = 7) && systemState->switchEnabled && isBoilerLowerOffThreshold(systemState, temp_off)));
 
   if (desiredState) // on?
   {
