@@ -104,7 +104,7 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
 const char *const CONSTRAINTS[] = {
     NULL,
     "invalid data",
-    "load exceeds system capacity %0W",
+    "load %6W exceeds system capacity %0W",
     "surplus greater load",
     "battery maintenance, discharge not allowed",
     "battery min capacity %5Wh reached at %1",
@@ -117,13 +117,7 @@ const char *const CONSTRAINTS[] = {
 // aware of max system power (production + max inverter power)
 static bool isEnoughPowerAvailable(SystemConfig *systemConfig, SystemState *systemState)
 {
-  return (systemState->system_W - systemState->cons_W_nom) >= systemConfig->gridMin_W;
-}
-
-// if surplus ("waste") exceeds load
-static bool isEnoughSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
-{
-  return systemState->gridFeedIn_W > systemConfig->loadPower_W;
+  return (systemState->system_W - systemState->cons_W_norm - (systemState->switchEnabled ? systemConfig->loadPower_W : 0)) >= systemConfig->gridMin_W;
 }
 
 static bool isBoilerLowerOnThreshold(SystemState *systemState, float temperature_on)
@@ -149,10 +143,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   bool desiredState = (constraint = 1) && validData &&
                       ((constraint = 2) && isEnoughPowerAvailable(systemConfig, systemState)) &&
-                      (((constraint = 3) && !systemState->switchEnabled && isEnoughSurplusAvailable(systemConfig, systemState)) ||
-                       // forecast battery capacity and be aware of full charge requests
-                       ((constraint = 4) && systemState->fullChargeRequest == false &&
-                        (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))) &&
+                      // forecast battery capacity and be aware of full charge requests
+                      ((constraint = 4) && systemState->fullChargeRequest == false &&
+                       (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)) &&
                       (((constraint = 6) && !systemState->switchEnabled && isBoilerLowerOnThreshold(systemState, temp_on)) ||
                        ((constraint = 7) && systemState->switchEnabled && isBoilerLowerOffThreshold(systemState, temp_off)));
 
@@ -192,7 +185,10 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_FLT, &temp_on,
         ARG_FLT, &temp_off,
         ARG_INT, &inverterLatencyCnt,
-        ARG_INT, &systemConfig->cap_bat_min_Wh};
+        ARG_INT, &systemConfig->cap_bat_min_Wh,
+        ARG_INT, &systemState->cons_W_nom
+
+    };
 
     format_indexed(msg, len, CONSTRAINTS[constraint], args);
   }

@@ -114,24 +114,37 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
-void test_determineDesiredState()
+void test_determineDesiredStateBatteryTargetFulfilled()
 {
+  systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemConfig.loadPower_W = 3249;
-  systemState.inv_max_w = 4600;
-  systemState.cap_bat_Wh = 3100;
+  systemState.cap_bat_Wh = 4100;
+  systemState.cons_W = 247;
+  systemState.prod_W = 1850;
   systemState.system_W = systemState.prod_W + systemState.inv_max_w;
-  systemState.boiler_T_max = 65.0f;
-  systemState.boiler_T_nom = 55.0f;
-  systemState.boiler_T_cur = 54.0f;
-
-  updateConsumption(&systemConfig, &systemState);
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+  systemState.switchEnabled = false;
 
   char msg[80];
+  updateConsumption(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);
 
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state); // assert stable
+
+  systemState.switchEnabled = state;
+  systemState.cons_W = 247 + systemConfig.loadPower_W + 30;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
+  updateConsumption(&systemConfig, &systemState);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  printf("%s\n", msg);
+  TEST_ASSERT_TRUE(state);
+
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);
 }
 
@@ -147,7 +160,7 @@ int main(int argc, char **argv)
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
 
-  RUN_TEST(test_determineDesiredState);
+  RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
 
   return UNITY_END();
 }
@@ -158,8 +171,12 @@ void setUp(void)
   systemConfig.gridMin_W = 100;
   systemConfig.cap_bat_min_Wh = 2500;
   systemState.cap_bat_max_Wh = 9900;
-  systemState.inv_max_w = 4500;
+  systemState.inv_max_w = 4600;
   systemState.utc_offset = 3600;
+
+  systemState.boiler_T_max = 65.0f;
+  systemState.boiler_T_nom = 55.0f;
+  systemState.boiler_T_cur = 54.0f;
 
   int r = 0;
   systemState.pv_forecast_wh_h[r][0] = 1762556400;
