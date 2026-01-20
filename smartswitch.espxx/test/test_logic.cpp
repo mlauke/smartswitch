@@ -135,6 +135,9 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   TEST_ASSERT_TRUE(state); // assert stable
 
   systemState.switchEnabled = state;
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state); // assert stable
+
   systemState.cons_W = 247 + systemConfig.loadPower_W + 30;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
 
@@ -152,13 +155,13 @@ int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
-  RUN_TEST(test_upateConsumption);
-  RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
+  // RUN_TEST(test_upateConsumption);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
+  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
 
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
 

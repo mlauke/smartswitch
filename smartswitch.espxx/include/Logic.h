@@ -104,36 +104,32 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
 const char *const CONSTRAINTS[] = {
     NULL,
     "invalid data",
-    "load %6W exceeds system capacity %0W",
-    "surplus greater load",
-    "battery maintenance, discharge not allowed",
-    "battery min capacity %5Wh reached at %1",
-    "boiler temperature min %2°C reached",
+    "latency count reached %0",
+    "battery min capacity %1Wh reached at %2",
     "boiler temperature max %3°C reached",
-    "latency count reached %4"
-
-};
+    "boiler temperature min %4°C reached"};
 
 // aware of max system power (production + max inverter power)
 static bool isEnoughPowerAvailable(SystemConfig *systemConfig, SystemState *systemState)
 {
-  return (systemState->system_W - systemState->cons_W_norm - (systemState->switchEnabled ? systemConfig->loadPower_W : 0)) >= systemConfig->gridMin_W;
+  return (systemState->system_W - systemState->cons_W_nom - systemConfig->loadPower_W) >= systemConfig->gridMin_W;
 }
 
-static bool isBoilerLowerOnThreshold(SystemState *systemState, float temperature_on)
+static bool isBoilerOnThreshold(SystemState *systemState, float temperature_on)
 {
   return systemState->boiler_T_cur < temperature_on;
 }
 
-static bool isBoilerLowerOffThreshold(SystemState *systemState, float temperature_off)
+static bool isBoilerOffThreshold(SystemState *systemState, float temperature_off)
 {
-  return systemState->boiler_T_cur < temperature_off;
+  return systemState->boiler_T_cur >= temperature_off;
 }
 
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
   static uint16_t inverterLatencyCnt = 0;
-  static uint8_t stableOnCnt = 0;
+
+  bool desiredState = systemState->switchEnabled;
 
   uint32_t ts = 0;
   uint8_t constraint = 0;
@@ -141,54 +137,38 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
   float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 0.8f; // ~0.8 °C heater "afterglow"
 
-  bool desiredState = (constraint = 1) && validData &&
-                      ((constraint = 2) && isEnoughPowerAvailable(systemConfig, systemState)) &&
-                      // forecast battery capacity and be aware of full charge requests
-                      ((constraint = 4) && systemState->fullChargeRequest == false &&
-                       (constraint = 5) && batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)) &&
-                      (((constraint = 6) && !systemState->switchEnabled && isBoilerLowerOnThreshold(systemState, temp_on)) ||
-                       ((constraint = 7) && systemState->switchEnabled && isBoilerLowerOffThreshold(systemState, temp_off)));
-
-  if (desiredState) // on?
+  if (systemState->switchEnabled)
   {
-    if (stableOnCnt == SYSTEM_ON_COUNT)
+    inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
+
+    if (((constraint = 1) && !validData) ||
+        ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
+        // latency count reached?
+        ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) ||
+        ((constraint = 3) && !batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)))
     {
-      if (systemState->switchEnabled) // already on?
-      {
-        inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
-        if (!(desiredState = inverterLatencyCnt <= SONNEN_INVERTER_LATENCY_COUNT))                                // keep on if latency count is not reached
-        {
-          constraint = 8; // otherwise switch off and error
-        }
-      }
-      else
-      { // off, but on desired, reset latency counter
-        inverterLatencyCnt = 0;
-      }
-    }
-    else
-    {
-      stableOnCnt++;
-      DEBUGF("stable count %d\n", stableOnCnt);
+      desiredState = false;
     }
   }
   else
   {
-    stableOnCnt = 0;
+    if (((constraint = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
+        isEnoughPowerAvailable(systemConfig, systemState) &&
+        batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))
+    {
+      desiredState = true;
+      inverterLatencyCnt = 0;
+    }
   }
 
   if (constraint != 0)
   {
     Arg args[] = {
-        ARG_INT, &systemState->system_W,
-        ARG_STR, toLocalDate(systemState, ts),
-        ARG_FLT, &temp_on,
-        ARG_FLT, &temp_off,
         ARG_INT, &inverterLatencyCnt,
         ARG_INT, &systemConfig->cap_bat_min_Wh,
-        ARG_INT, &systemState->cons_W_nom
-
-    };
+        ARG_STR, toLocalDate(systemState, ts),
+        ARG_FLT, &temp_off,
+        ARG_FLT, &temp_on};
 
     format_indexed(msg, len, CONSTRAINTS[constraint], args);
   }

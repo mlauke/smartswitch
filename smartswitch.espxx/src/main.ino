@@ -181,12 +181,14 @@ void timerCallback()
 void onOTABegin()
 {
   server.close();
+
   if (timer.active())
     timer.detach();
   lpb->disableInterface();
 #if ESP8266
   ESP.wdtDisable();
 #endif
+  toggleSwitch(false);
 }
 
 void onOTAEnd(bool success)
