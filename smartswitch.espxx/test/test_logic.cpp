@@ -14,30 +14,30 @@ void tearDown(void)
 void test_upateConsumption()
 {
   systemState.cons_W = 33;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
 
   TEST_ASSERT_EQUAL(30, systemState.cons_W_nom);
   TEST_ASSERT_EQUAL(30, systemState.cons_W_norm);
 
   systemState.cons_W = 103;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_EQUAL(100, systemState.cons_W_nom);
   TEST_ASSERT_EQUAL(100, systemState.cons_W_norm);
 
   systemState.cons_W = 199;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_EQUAL(200, systemState.cons_W_nom);
   TEST_ASSERT_EQUAL(200, systemState.cons_W_norm);
 
   systemState.cons_W = 207;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_EQUAL(210, systemState.cons_W_nom);
   TEST_ASSERT_EQUAL(210, systemState.cons_W_norm);
 }
 
 void test_batteryCapacityTargetFulfilledNoData()
 {
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_FALSE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
@@ -48,7 +48,7 @@ void test_batteryCapacityTargetFulfilledSwitchOff()
   systemState.cons_W = 397;
   systemState.switchEnabled = true;
 
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_FALSE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
@@ -59,7 +59,7 @@ void test_batteryCapacityTargetFulfilledSwitchOn()
   systemState.cons_W = 298;
   systemState.switchEnabled = false;
 
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
@@ -69,12 +69,12 @@ void test_batteryCapacityTargetFulfilledSwitchOffOn()
   systemState.cap_bat_Wh = 3200;
   systemState.cons_W = 246;
   systemState.switchEnabled = false;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 
   systemState.switchEnabled = true;
   systemState.cons_W = systemConfig.loadPower_W + 253;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
@@ -85,13 +85,13 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresis()
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemState.cons_W = 245;
   systemState.switchEnabled = false;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 
   systemState.ts = 1762598185 + 26 * 3600 + 10 * 60; // 10 min
   systemState.cons_W = systemConfig.loadPower_W + 261;
   systemState.switchEnabled = true;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
@@ -103,13 +103,13 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemState.cons_W = 342;
   systemState.switchEnabled = false;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 
   systemState.ts = 1762598185 + 26 * 3600 - 44 + 10; // 10s later
   systemState.cons_W = systemConfig.loadPower_W + 352;
   systemState.switchEnabled = true;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
 
@@ -120,51 +120,82 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   systemState.cap_bat_Wh = 4100;
   systemState.cons_W = 247;
   systemState.prod_W = 1850;
-  systemState.system_W = systemState.prod_W + systemState.inv_max_w;
+  // systemState.system_W = systemState.prod_W + systemState.inv_max_w;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
   systemState.switchEnabled = false;
 
   char msg[80];
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);
 
+  updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_TRUE(state); // assert stable
 
   systemState.switchEnabled = state;
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_TRUE(state); // assert stable
 
   systemState.cons_W = 247 + systemConfig.loadPower_W + 30;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
 
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);
 
-  updateConsumption(&systemConfig, &systemState);
+  updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);
+}
+
+void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
+{
+  systemState.ts = 1762556400 + 47 * 3600; // reach min capacity + hysteresis
+  systemConfig.loadPower_W = 3249;
+  systemState.cap_bat_Wh = 4500;
+  systemState.cons_W = 1447;
+  systemState.prod_W = 2150;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+  systemState.switchEnabled = false;
+
+  char msg[80];
+  systemState.ts += 5;
+  updateSystemState(&systemConfig, &systemState);
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  printf("%s\n", msg);
+  TEST_ASSERT_TRUE(state);
+
+  systemState.switchEnabled = state;
+  systemState.fullChargeRequest = true;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W - systemConfig.loadPower_W;
+  updateSystemState(&systemConfig, &systemState);
+
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  printf("%s\n", msg);
+  TEST_ASSERT_FALSE(state); // assert stable
 }
 
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
-  // RUN_TEST(test_upateConsumption);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
-  // RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
-
+  RUN_TEST(test_upateConsumption);
+  RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
+  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
+  RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
 
   return UNITY_END();
 }

@@ -47,11 +47,12 @@ static char *toLocalDate(SystemState *systemState, uint32_t utc_ts)
   return toDate(utc_ts, (systemState->utc_offset));
 }
 
-void updateConsumption(SystemConfig *systemConfig, SystemState *systemState)
+void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
 {
   systemState->cons_W_nom = (systemState->cons_W + 5) / 10 * 10; // round up multiple of 10W
   // consumption without load
   systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W ? systemConfig->loadPower_W : 0);
+  systemState->system_W = systemState->prod_W + (systemState->fullChargeRequest ? 0 : systemState->inv_max_w);
 }
 
 static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemState *systemState, uint32_t *ts)

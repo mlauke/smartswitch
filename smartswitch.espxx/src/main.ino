@@ -954,7 +954,6 @@ bool updateSystemData()
     systemState.cap_bat_Wh = systemState.cap_bat_max_Wh * systemState.usoc / 100;
     systemState.gridFeedIn_W = json[F("GridFeedIn_W")].as<int>();
     systemState.prod_W = json[F("Production_W")].as<uint16_t>();
-    systemState.system_W = systemState.prod_W + (systemState.fullChargeRequest ? 0 : systemState.inv_max_w);
     systemState.cons_W = json[F("Consumption_W")].as<uint16_t>();
     systemState.cons_avg_W = json[F("Consumption_Avg")].as<uint16_t>();
     systemState.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
@@ -970,7 +969,7 @@ bool updateSystemData()
     }
     systemState.tm_yday = time.tm_yday;
 
-    updateConsumption(&config, &systemState);
+    updateSystemState(&config, &systemState);
   }
 
   if (ok && !(ok &= (config.loadPower_W > 0)))
