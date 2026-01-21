@@ -332,28 +332,28 @@ void commonHeader()
 void handleFavicon()
 {
   cacheControlHeader(true);
-  server.send_P(200, "image/x-icon", app_icon, sizeof(app_icon));
+  server.send(200, "image/x-icon", app_icon, sizeof(app_icon));
 }
 
 void handleAppJs()
 {
   commonHeader();
   cacheControlHeader(true);
-  server.send_P(200, "text/javascript", app_js, sizeof(app_js));
+  server.send(200, "text/javascript", app_js, sizeof(app_js));
 }
 
 void handleAppCss()
 {
   commonHeader();
   cacheControlHeader(true);
-  server.send_P(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
+  server.send(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
 }
 
 void handleRoot()
 {
   commonHeader();
   cacheControlHeader(false);
-  server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
+  server.send(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
 }
 
 void jsonToConfig(JsonDocument &json)
@@ -464,7 +464,7 @@ void handleStatus()
   device_map *device = lpb->getDestDevice();
   if (device != NULL)
   {
-    snprintf(devid, sizeof(devid), "%d - %s (%d/%d)", device->dev_id, device->name, device->dev_fam, device->dev_var);
+    snprintf_P(devid, sizeof(devid), PSTR("%d - %s (%d/%d)"), device->dev_id, device->name, device->dev_fam, device->dev_var);
   }
   json[F("bs_devid")] = devid;
   json[F("bs_t_cur")] = String(systemState.boiler_T_cur);
@@ -598,16 +598,15 @@ String userAgent()
 
 const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equiv='refresh' content='30;url=/'></head><body><h1>%s</h1><p>Redirect in 30s...</p></body></html>";
 
-void sendUpdateStatus(int code, char *status)
+void sendUpdateStatus(int code, const char *status)
 {
   char buffer[256];
   snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
-  server.send_P(code, "text/html;charset=utf-8", buffer);
+  server.send(code, F("text/html;charset=utf-8"), buffer);
 }
 
 void handleGithubUpdate()
 {
-
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
   if (!gh_updater.checkUpdate(config.release_tag))
@@ -615,7 +614,7 @@ void handleGithubUpdate()
     if (server.client() && server.client().connected())
     {
       char msg[128];
-      snprintf(msg, sizeof(msg), "Update failed: %s", gh_updater.getUpdateStatus().c_str());
+      snprintf_P(msg, sizeof(msg), PSTR("Update failed: %s"), gh_updater.getUpdateStatus().c_str());
       sendUpdateStatus(404, msg);
     }
     return;
@@ -624,7 +623,7 @@ void handleGithubUpdate()
   if (server.client() && server.client().connected())
   {
     char msg[128];
-    snprintf(msg, sizeof(msg), "Update found: Going to install Release %s.", gh_updater.release_tag.c_str());
+    snprintf_P(msg, sizeof(msg), PSTR("Update found: Going to install Release %s."), gh_updater.release_tag.c_str());
     sendUpdateStatus(200, msg);
   }
   if (gh_updater.doUpdate(userAgent(), &onOTABegin, &onOTAEnd))
@@ -632,7 +631,7 @@ void handleGithubUpdate()
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig())
     {
-      putEvent(String(F("error saving config with release tag ")) + gh_updater.release_tag);
+      putEvent(F("error saving config with release tag ") + gh_updater.release_tag);
     }
     else
     {
@@ -741,7 +740,7 @@ void calibrate(bool validData)
     saveConfig();
 
     char event[64];
-    snprintf(event, sizeof(event), "load calibrated, on %dW / off %dW => %dW", median_uint16(load_on, CALIBRATE_MEASURE), median_uint16(load_off, CALIBRATE_MEASURE), config.loadPower_W);
+    snprintf_P(event, sizeof(event), PSTR("load calibrated, on %dW / off %dW => %dW"), median_uint16(load_on, CALIBRATE_MEASURE), median_uint16(load_off, CALIBRATE_MEASURE), config.loadPower_W);
     putEvent(event);
 
     memset(load_on, 0, sizeof(load_on));
@@ -893,7 +892,7 @@ bool fetchApiData(String uri, JsonDocument &json)
   if (strlen(config.sonnenHostname) && strlen(config.sonnenApiToken))
   {
     char url[128];
-    snprintf(url, sizeof(url), "http://%.31s/%s/%s", config.sonnenHostname, SONNEN_API_URI, uri.c_str());
+    snprintf_P(url, sizeof(url), PSTR("http://%.31s/%s/%s"), config.sonnenHostname, SONNEN_API_URI, uri.c_str());
     r = restClient.fetch(String(url), json, NULL, "auth-token", config.sonnenApiToken);
     if (!r)
     {
