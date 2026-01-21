@@ -332,28 +332,28 @@ void commonHeader()
 void handleFavicon()
 {
   cacheControlHeader(true);
-  server.send(200, "image/x-icon", app_icon, sizeof(app_icon));
+  server.send_P(200, "image/x-icon", app_icon, sizeof(app_icon));
 }
 
 void handleAppJs()
 {
   commonHeader();
   cacheControlHeader(true);
-  server.send(200, "text/javascript", app_js, sizeof(app_js));
+  server.send_P(200, "text/javascript", app_js, sizeof(app_js));
 }
 
 void handleAppCss()
 {
   commonHeader();
   cacheControlHeader(true);
-  server.send(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
+  server.send_P(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
 }
 
 void handleRoot()
 {
   commonHeader();
   cacheControlHeader(false);
-  server.send(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
+  server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
 }
 
 void jsonToConfig(JsonDocument &json)
@@ -572,6 +572,7 @@ void handleAPI()
 
   server.sendHeader(F("location"), F("/"));
   server.send(303);
+  server.client().flush();
 
   if (doRestart)
   {
@@ -601,7 +602,7 @@ const char STRING_HTML_UPDATE[] PROGMEM = "<html lang='en'><head><meta http-equi
 void sendUpdateStatus(int code, const char *status)
 {
   char buffer[256];
-  snprintf(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
+  snprintf_P(buffer, sizeof(buffer), STRING_HTML_UPDATE, status);
   server.send(code, F("text/html;charset=utf-8"), buffer);
 }
 
@@ -631,7 +632,7 @@ void handleGithubUpdate()
     setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
     if (!saveConfig())
     {
-      putEvent(F("error saving config with release tag ") + gh_updater.release_tag);
+      putEvent(String(F("error saving config with release tag ")) + gh_updater.release_tag);
     }
     else
     {
