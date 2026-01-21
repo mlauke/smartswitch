@@ -928,8 +928,8 @@ bool updateSystemData()
     if ((ok &= fetchApiData(SONNEN_API_CONFIGURATIONS, json)))
     {
       systemState.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
-      systemState.cap_bat_max_new_Wh = json[F("CM_MarketingModuleCapacity")].as<int>() * json[F("IC_BatteryModules")].as<int>() * 90 / 100;
-      DEBUGF("IC_InverterMaxPower_w %d, max battery capacity %d\n", systemState.inv_max_w, systemState.cap_bat_max);
+      systemState.cap_bat_new_Wh = json[F("CM_MarketingModuleCapacity")].as<int>() * json[F("IC_BatteryModules")].as<int>() * 90 / 100;
+      DEBUGF("IC_InverterMaxPower_w %d, max battery capacity %d\n", systemState.inv_max_w, systemState.cap_bat_new_Wh);
     }
   }
   if (systemState.cap_bat_max_Wh == 0 || isUpdateSystemData())
@@ -938,8 +938,8 @@ bool updateSystemData()
     {
       systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
       systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
-      systemState.cap_bat_max_use = systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_max_new_Wh;
-      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_max);
+      systemState.cap_bat_max_use = systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_new_Wh;
+      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_max_use);
     }
   }
   if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json)))

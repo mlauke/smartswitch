@@ -138,23 +138,23 @@ typedef struct
   float boiler_T_min;
   float boiler_T_max;
 
-  int inv_max_w;               // inverter power max
-  uint8_t usoc;                // 0..100 user state of charge - battery capacity in %
-  uint16_t system_W;           // production + inverter max power(Watt)
-  uint16_t prod_W;             // production (Watt)
-  uint16_t cons_W;             // consumption (Watt)
-  uint16_t cons_W_nom;         // consumption rounded as multiple of 10 (Watt)
-  uint16_t cons_W_norm;        // normalized consumption without load
-  uint16_t cons_avg_W;         // consumption average (W)
-  uint16_t bat_cycles;         // Number of charge/discharge cycles
-  uint16_t cap_bat_max_new_Wh; // max usable battery capacity for new battery
-  uint8_t cap_bat_max_use;     // percentage of usable battery capacity
-  uint16_t cap_bat_Wh;         // current capacity
-  uint16_t cap_bat_max_Wh;     // max battery capacity (system)
-  int pac_total_W;             // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
-  int gridFeedIn_W;            // current grid feed in - negative is consumption, positive is fedd in
-  bool fullChargeRequest;      // e.g. true during battery maintenance
-  short charge;                // battery charge state 0 - none, 1 - charge, -1 - discharge
+  int inv_max_w;           // inverter power max
+  uint8_t usoc;            // 0..100 user state of charge - battery capacity in %
+  uint16_t system_W;       // production + inverter max power(Watt)
+  uint16_t prod_W;         // production (Watt)
+  uint16_t cons_W;         // consumption (Watt)
+  uint16_t cons_W_nom;     // consumption rounded as multiple of 10 (Watt)
+  uint16_t cons_W_norm;    // normalized consumption without load
+  uint16_t cons_avg_W;     // consumption average (W)
+  uint16_t bat_cycles;     // Number of charge/discharge cycles
+  uint16_t cap_bat_new_Wh; // max usable battery capacity for new battery
+  uint8_t cap_bat_max_use; // percentage of usable battery capacity
+  uint16_t cap_bat_Wh;     // current capacity
+  uint16_t cap_bat_max_Wh; // max battery capacity (system)
+  int pac_total_W;         // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
+  int gridFeedIn_W;        // current grid feed in - negative is consumption, positive is fedd in
+  bool fullChargeRequest;  // e.g. true during battery maintenance
+  short charge;            // battery charge state 0 - none, 1 - charge, -1 - discharge
 
   long pv_forecast_ts;              // last update timestamp in ms since mcu start
   uint32_t pv_forecast_wh_h[49][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)

@@ -13,7 +13,6 @@ void tearDown(void)
 
 void test_upateConsumption()
 {
-
   systemState.cons_W = 33;
   updateConsumption(&systemConfig, &systemState);
 
@@ -135,6 +134,7 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   TEST_ASSERT_TRUE(state); // assert stable
 
   systemState.switchEnabled = state;
+  updateConsumption(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_TRUE(state); // assert stable
 
@@ -146,6 +146,7 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);
 
+  updateConsumption(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   printf("%s\n", msg);
   TEST_ASSERT_TRUE(state);

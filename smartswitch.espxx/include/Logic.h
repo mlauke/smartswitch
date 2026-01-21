@@ -51,7 +51,7 @@ void updateConsumption(SystemConfig *systemConfig, SystemState *systemState)
 {
   systemState->cons_W_nom = (systemState->cons_W + 5) / 10 * 10; // round up multiple of 10W
   // consumption without load
-  systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled ? systemConfig->loadPower_W : 0);
+  systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W ? systemConfig->loadPower_W : 0);
 }
 
 static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemState *systemState, uint32_t *ts)
