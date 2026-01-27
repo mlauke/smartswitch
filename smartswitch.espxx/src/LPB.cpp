@@ -20,9 +20,9 @@ LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) : rx_pin(rx), tx_
   }
 }
 
-void printToDebug(const char *format)
+void printToDebug(const char *strg)
 {
-  DEBUGP(format);
+  DEBUGP(strg);
 }
 
 void writelnToDebug()
@@ -50,22 +50,16 @@ void LPB::printTelegram(byte *msg, float line)
     DEBUGF("%.2x ", msg[getPl_start() + x]);
   }
   DEBUGF("%4.1f - \n", line);
-  /*
-  int i = findLine(line);
-  printToDebug(cmdtbl[i].desc);
-  */
   SerialPrintRAW(msg, msg[getLen_idx()] + 1);
 }
 
 static void SerialPrintRAW(byte *msg, byte len)
 {
   char outBuf[256];
-
-  size_t outBufLen = strlen(outBuf);
-
-  bin2hex(outBuf + outBufLen, msg, len, ' ');
-  printToDebug(outBuf + outBufLen);
+  // size_t outBufLen = sizeof(outBuf);
+  size_t outBufLen = bin2hex(outBuf, msg, len, ' ');
   outBuf[outBufLen] = 0;
+  printToDebug(outBuf);
 }
 
 int bin2hex(char *toBuffer, byte *fromAddr, int len, char delimiter)
@@ -86,7 +80,7 @@ int bin2hex(char *toBuffer, byte *fromAddr, int len, char delimiter)
     {
       isNotFirst = true;
     }
-    resultLen += sprintf_P(toBuffer + resultLen, "%02X", fromAddr[i]);
+    resultLen += sprintf_P(toBuffer + resultLen, PSTR("%02X"), fromAddr[i]);
   }
   return resultLen;
 }

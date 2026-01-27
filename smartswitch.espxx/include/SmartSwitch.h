@@ -26,9 +26,9 @@
 #include <stdint.h>
 
 #ifdef ESP32
-#define PIN_LPB_RX GPIO_NUM_16
 #define PIN_LPB_TX GPIO_NUM_17
-#define PIN_SSR GPIO_NUM_21
+#define PIN_LPB_RX GPIO_NUM_16
+#define PIN_SSR GPIO_NUM_23
 
 #elif ESP8266
 #define LED_BUILTIN 2

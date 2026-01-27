@@ -107,8 +107,8 @@ const char *const CONSTRAINTS[] = {
     "invalid data",
     "latency count reached %0",
     "battery min capacity %1Wh reached at %2",
-    "boiler temperature max %3°C reached",
-    "boiler temperature min %4°C reached"};
+    "boiler temperature %3°C >= %4°C (max) reached",
+    "boiler temperature %5°C < %6°C (min) reached"};
 
 // aware of max system power (production + max inverter power)
 static bool isEnoughPowerAvailable(SystemConfig *systemConfig, SystemState *systemState)
@@ -140,12 +140,14 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   if (systemState->switchEnabled)
   {
-    inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0; // grid purchase active? (negative grid feed in denotes purchase)
+    // inverters take some time until load is compensated, so we check whether grid purchase is active? (negative grid feed in denotes purchase)
+    // if so, we count until the system specific threshold is reached. if so, we switch off, because the load could not be driven
+    inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0;
 
     if (((constraint = 1) && !validData) ||
-        ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
         // latency count reached?
         ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) ||
+        ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
         ((constraint = 3) && !batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)))
     {
       desiredState = false;
@@ -168,7 +170,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_INT, &inverterLatencyCnt,
         ARG_INT, &systemConfig->cap_bat_min_Wh,
         ARG_STR, toLocalDate(systemState, ts),
+        ARG_FLT, &systemState->boiler_T_cur,
         ARG_FLT, &temp_off,
+        ARG_FLT, &systemState->boiler_T_cur,
         ARG_FLT, &temp_on};
 
     format_indexed(msg, len, CONSTRAINTS[constraint], args);
