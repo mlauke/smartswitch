@@ -152,7 +152,7 @@ typedef struct
   uint16_t cap_bat_Wh;     // current capacity
   uint16_t cap_bat_max_Wh; // max battery capacity (system)
   int pac_total_W;         // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
-  int gridFeedIn_W;        // current grid feed in - negative is consumption, positive is fedd in
+  int gridFeedIn_W;        // current grid feed in - negative is consumption, positive is feed in
   bool fullChargeRequest;  // e.g. true during battery maintenance
   short charge;            // battery charge state 0 - none, 1 - charge, -1 - discharge
 

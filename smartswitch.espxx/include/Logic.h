@@ -105,15 +105,16 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
 const char *const CONSTRAINTS[] = {
     NULL,
     "invalid data",
-    "latency count reached %0",
-    "battery min capacity %1Wh reached at %2",
-    "boiler temperature %3°C >= %4°C (max) reached",
-    "boiler temperature %5°C < %6°C (min) reached"};
+    "power consumption %0W to high, grid purchase %1W",
+    "battery min capacity %2Wh reached at %3",
+    "boiler temperature %4°C >= %5°C (max) reached",
+    "boiler temperature %6°C < %7°C (min) reached"};
 
-// aware of max system power (production + max inverter power)
+// aware of max system power (production + max inverter power) or if surplus ("waste") exceeds load
 static bool isEnoughPowerAvailable(SystemConfig *systemConfig, SystemState *systemState)
 {
-  return (systemState->system_W - systemState->cons_W_nom - systemConfig->loadPower_W) >= systemConfig->gridMin_W;
+  uint16_t consumption = systemState->cons_W_nom + systemConfig->loadPower_W; // current consumption plus load
+  return (systemState->system_W - consumption) > systemConfig->gridMin_W;
 }
 
 static bool isBoilerOnThreshold(SystemState *systemState, float temperature_on)
@@ -124,6 +125,12 @@ static bool isBoilerOnThreshold(SystemState *systemState, float temperature_on)
 static bool isBoilerOffThreshold(SystemState *systemState, float temperature_off)
 {
   return systemState->boiler_T_cur >= temperature_off;
+}
+
+static bool isWasteSurplus(SystemConfig *systemConfig, SystemState *systemState)
+{
+  return false;
+  //    systemState->gridFeedIn_W > (consumption + systemConfig->gridMin_W); // surplus waste, if battery is not loaded (summer mode)
 }
 
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
@@ -147,8 +154,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 1) && !validData) ||
         // latency count reached?
         ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) ||
-        ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((constraint = 3) && !batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)))
+        ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)))
+    //||        ((constraint = 3) && !batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)))
     {
       desiredState = false;
     }
@@ -156,8 +163,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   else
   {
     if (((constraint = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
-        isEnoughPowerAvailable(systemConfig, systemState) &&
-        batteryCapacityTargetFulfilled(systemConfig, systemState, &ts))
+            (isEnoughPowerAvailable(systemConfig, systemState) &&
+             batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)) ||
+        isWasteSurplus(systemConfig, systemState))
     {
       desiredState = true;
       inverterLatencyCnt = 0;
@@ -167,6 +175,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   if (constraint != 0)
   {
     Arg args[] = {
+        ARG_INT, &systemState->cons_W_nom,
+        ARG_INT, &systemState->gridFeedIn_W,
         ARG_INT, &inverterLatencyCnt,
         ARG_INT, &systemConfig->cap_bat_min_Wh,
         ARG_STR, toLocalDate(systemState, ts),
