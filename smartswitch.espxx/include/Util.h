@@ -28,6 +28,7 @@ static uint16_t median_uint16(uint16_t *values, size_t count)
 enum ArgType
 {
     ARG_INT,
+    ARG_UINT,
     ARG_FLT,
     ARG_STR,
 };
@@ -56,8 +57,11 @@ static void format_indexed(char *out, size_t out_size,
 
             switch (a->type)
             {
-            case ARG_INT:
+            case ARG_UINT:
                 dst += snprintf(dst, out_size - (dst - out), "%d", *(uint16_t *)a->value);
+                break;
+            case ARG_INT:
+                dst += snprintf(dst, out_size - (dst - out), "%d", *(int *)a->value);
                 break;
             case ARG_FLT:
                 dst += snprintf(dst, out_size - (dst - out), "%.2f", *(float *)a->value);

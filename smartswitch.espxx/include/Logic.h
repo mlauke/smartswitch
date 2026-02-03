@@ -176,9 +176,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   if (constraint != 0)
   {
     Arg args[] = {
-        ARG_INT, &systemState->cons_W_nom,
+        ARG_UINT, &systemState->cons_W_nom,
         ARG_INT, &systemState->gridFeedIn_W,
-        ARG_INT, &systemConfig->cap_bat_min_Wh,
+        ARG_UINT, &systemConfig->cap_bat_min_Wh,
         ARG_STR, toLocalDate(systemState, ts),
         ARG_FLT, &systemState->boiler_T_cur,
         ARG_FLT, &temp_off,
