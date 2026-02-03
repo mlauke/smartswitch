@@ -186,6 +186,32 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   TEST_ASSERT_FALSE(state); // assert stable
 }
 
+void test_determineDesiredStateSurplusWaste()
+{
+  systemState.ts = 1762556400;
+  systemConfig.loadPower_W = 3249;
+  systemState.cap_bat_Wh = 1535;
+  systemState.cons_W = 347;
+  systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W;
+  systemState.gridFeedIn_W = systemState.prod_W + 10;
+  systemState.switchEnabled = false;
+
+  char msg[80];
+  updateSystemState(&systemConfig, &systemState);
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
+  TEST_ASSERT_TRUE(state);
+
+  systemState.switchEnabled = state;
+
+  systemState.ts += 5;
+  systemState.cons_W = 347 + systemConfig.loadPower_W;
+  updateSystemState(&systemConfig, &systemState);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
+  TEST_ASSERT_TRUE(state);
+}
+
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
@@ -199,6 +225,7 @@ int main(int argc, char **argv)
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
+  // TODO RUN_TEST(test_determineDesiredStateSurplusWaste);
 
   return UNITY_END();
 }

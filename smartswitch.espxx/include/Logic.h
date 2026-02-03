@@ -114,7 +114,9 @@ const char *const CONSTRAINTS[] = {
 static bool isWasteSurplus(SystemConfig *systemConfig, SystemState *systemState)
 {
   uint16_t consumption = systemState->cons_W_nom + systemConfig->loadPower_W; // current consumption plus load
-  return systemState->gridFeedIn_W > (consumption + systemConfig->gridMin_W);
+  // systemState->gridFeedIn_W > (consumption + systemConfig->gridMin_W);
+  // TODO - how to detect waste of surplus it battery is not loaded
+  return false;
 }
 
 // aware of max system power (production + max inverter power) or if surplus ("waste") exceeds load
