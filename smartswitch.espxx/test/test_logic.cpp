@@ -127,7 +127,7 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   char msg[80];
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  printf("%s\n", msg);
+  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
   TEST_ASSERT_TRUE(state);
 
   updateSystemState(&systemConfig, &systemState);
@@ -144,12 +144,12 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  printf("%s\n", msg);
+  TEST_ASSERT_EQUAL_STRING("battery min capacity 2500Wh reached at 2025-11-10 00:00:00", msg);
   TEST_ASSERT_TRUE(state);
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  printf("%s\n", msg);
+  TEST_ASSERT_EQUAL_STRING("battery min capacity 2500Wh reached at 2025-11-10 00:00:00", msg);
   TEST_ASSERT_TRUE(state);
 }
 
@@ -167,7 +167,7 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   systemState.ts += 5;
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  printf("%s\n", msg);
+  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
   TEST_ASSERT_TRUE(state);
 
   systemState.switchEnabled = state;
@@ -176,10 +176,13 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   updateSystemState(&systemConfig, &systemState);
 
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  printf("%s\n", msg);
+  TEST_ASSERT_EQUAL_STRING("consumption 1450W too high, to much grid purchase -2546W", msg);
   TEST_ASSERT_FALSE(state); // assert stable
 }
 
