@@ -86,7 +86,7 @@ void start()
   server.begin(); // Actually start the server
   DEBUGLN("HTTP server started");
 
-  uint8_t retries = 3;
+  uint8_t retries = LPB_RETRIES;
   if (!lpb->enableInterface(retries))
   {
     putBoilerError(String("LPB: No device found after ") + retries + " retries!");

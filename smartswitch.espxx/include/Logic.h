@@ -113,7 +113,7 @@ const char *const CONSTRAINTS[] = {
 // surplus "waste" if battery is not loaded - e.g. summer mode
 static bool isWasteSurplus(SystemConfig *systemConfig, SystemState *systemState)
 {
-  uint16_t consumption = systemState->cons_W_nom + systemConfig->loadPower_W; // current consumption plus load
+  // uint16_t consumption = systemState->cons_W_nom + systemConfig->loadPower_W; // current consumption plus load
   // systemState->gridFeedIn_W > (consumption + systemConfig->gridMin_W);
   // TODO - how to detect waste of surplus it battery is not loaded
   return false;
@@ -166,9 +166,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   else
   {
     if (((constraint = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
-            (isEnoughPowerAvailable(systemConfig, systemState) &&
-             batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)) ||
-        isWasteSurplus(systemConfig, systemState))
+        ((isEnoughPowerAvailable(systemConfig, systemState) &&
+          batteryCapacityTargetFulfilled(systemConfig, systemState, &ts)) ||
+         isWasteSurplus(systemConfig, systemState)))
     {
       desiredState = true;
       inverterLatencyCnt = 0;

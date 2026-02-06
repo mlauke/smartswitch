@@ -16,7 +16,6 @@ LPB::LPB(uint8_t rx, uint8_t tx, uint8_t addr, uint8_t d_addr) : rx_pin(rx), tx_
     dev_lookup[i].dev_id = 0xFF;
     dev_lookup[i].dev_oc = 0xFF;
     dev_lookup[i].name[0] = '\0';
-    dev_lookup[i].name[17] = '\0';
   }
 }
 
@@ -126,9 +125,12 @@ const char *printError(uint16_t error)
 
 bool LPB::enableInterface(uint8_t retries)
 {
-#ifdef ESP32
-  serial = new HardwareSerial(2); // UART2
-  static_cast<HardwareSerial *>(serial)->begin(LPB_BAUDRATE, SERIAL_8N1, rx_pin, tx_pin, false);
+#if defined(ESP82)
+  HardwareSerial *hwSerial = new HardwareSerial(2); // UART2
+  hwSerial->begin(LPB_BAUDRATE, SERIAL_8O1, rx_pin, tx_pin, false);
+  hwSerial->setRxFIFOFull(1);
+  hwSerial->setRxTimeout(1);
+  serial = static_cast<HardwareSerial *>(hwSerial);
 #elif defined(ESP8266)
   serial = new SoftwareSerial();
   ((SoftwareSerial *)serial)->begin(LPB_BAUDRATE, SWSERIAL_8O1, rx_pin, tx_pin, false);
@@ -618,9 +620,9 @@ retry:
 #if DEBUG_LL
           if (c < 16)
             DEBUG("0");
-          DEBUG(c, HEX);
-          DEBUG(" ");
+          DEBUGF("$.2x ", c);
 #endif
+          c = c; // prevent compiler warning about unused variable if DEBUG_LL is not active
         }
 #if DEBUG_LL
         DEBUGLN();
@@ -640,52 +642,47 @@ retry:
     serial->flush();
 #endif
   }
-  // #if !defined(ESP32)
   serial->flush();
   unsigned long timeout = millis();
   while ((millis() - timeout < 50) && serial->available() == 0)
   {
     delay(1);
   }
-  // #endif
-  //   delay(loop_len*2+10);      // Wait up to 32 characters for the maximum number of bytes in a telegram to show up again on RX after sending it via TX.
-  if (false)
+#if !defined(ESP8266)
+  if (serial->available())
   {
-    if (serial->available())
+    for (uint8_t i = 0; i <= loop_len; i++)
     {
-      for (uint8_t i = 0; i <= loop_len; i++)
+      char readdata = readByte();
+      if (msg[i] != readdata)
       {
-        char readdata = readByte();
-        if (msg[i] != readdata)
+#if DEBUG_LL
+        DEBUGF("$%.2x\n", readdata);
+#endif
+        DEBUGLN("Collision on the bus, retrying...");
+        delay(146); // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
+        while (serial->available())
         {
+          char c = readByte();
 #if DEBUG_LL
-          DEBUGLN(readdata, HEX);
+          if (c < 16)
+            DEBUG("0");
+          DEBUGF("$%.2x", c);
 #endif
-          DEBUGLN("Collision on the bus, retrying...");
-          delay(146); // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
-          while (serial->available())
-          {
-            char c = readByte();
-#if DEBUG_LL
-            if (c < 16)
-              DEBUG("0");
-            DEBUG(c, HEX);
-#endif
-          }
-#if DEBUG_LL
-          DEBUGLN();
-#endif
-          goto retry;
         }
+#if DEBUG_LL
+        DEBUGLN();
+#endif
+        goto retry;
       }
     }
   }
+#endif
   return BUS_OK;
 }
 
 bool LPB::GetMessage(byte *msg)
 {
-
   byte i = 0;
   uint8_t read;
 
@@ -699,13 +696,6 @@ bool LPB::GetMessage(byte *msg)
       // Restore otherwise dropped SOF indicator
       msg[i++] = read;
 
-      //      	uint8_t PPS_write_enabled = myAddr;
-      //      	if (PPS_write_enabled == 1) {
-      //          return true; // PPS-Bus request byte 0x17 just contains one byte, so return
-      //      	} else {
-      //      	  len_idx = 9;
-      //	      }
-
       // Delay for more data
       if (serial->available() == 0)
       {
@@ -716,15 +706,6 @@ bool LPB::GetMessage(byte *msg)
       {
         read = readByte();
         msg[i++] = read;
-        /*
-#if DEBUG_LL
-        if(read<16){
-          DEBUG("0");
-        }
-        DEBUG(read, HEX);
-        DEBUG(" ");
-#endif
-*/
         // Break if message seems to be completely received (i==msg.length)
         if (i > len_idx)
         {
@@ -741,7 +722,6 @@ bool LPB::GetMessage(byte *msg)
       }
 
       // We should have read the message completely. Now check and return
-
       if (i == msg[len_idx] + 1)
       { // LPB msg length is one less than BSB
         // Seems to have received all data

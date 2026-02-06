@@ -48,7 +48,7 @@ typedef struct {
   uint8_t dev_id;
   uint16_t dev_oc;
   uint32_t dev_serial;
-  char name[18];
+  char name[32];
 } device_map;
 
 
@@ -98,7 +98,7 @@ private:
   uint16_t my_dev_oc = 0;
   uint32_t my_dev_serial = 0;
 
-  device_map dev_lookup[10];
+  device_map dev_lookup[4];
 
   inline int8_t _send(byte* msg);
   uint16_t CRC(byte* buffer, uint8_t length);

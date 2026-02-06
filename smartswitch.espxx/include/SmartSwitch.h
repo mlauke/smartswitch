@@ -47,6 +47,7 @@
 #define LPB_BAUDRATE 4800
 #define LPB_ADDR_SELF 2
 #define LPB_ADDR_DEST 0
+#define LPB_RETRIES 8
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
