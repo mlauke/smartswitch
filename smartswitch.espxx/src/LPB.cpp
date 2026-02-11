@@ -125,7 +125,7 @@ const char *printError(uint16_t error)
 
 bool LPB::enableInterface(uint8_t retries)
 {
-#if defined(ESP82)
+#if defined(ESP32)
   HardwareSerial *hwSerial = new HardwareSerial(2); // UART2
   hwSerial->begin(LPB_BAUDRATE, SERIAL_8O1, rx_pin, tx_pin, false);
   hwSerial->setRxFIFOFull(1);
@@ -590,7 +590,7 @@ inline int8_t LPB::_send(byte *msg)
   msg[len - 1] = (crc >> 8);
   msg[len] = (crc & 0xFF);
 
-#if DEBUG_LL
+#if DEBUG_LPB
   print(msg);
 #endif
   static const unsigned long timeoutabort = 1000; // one second timeout
@@ -610,21 +610,21 @@ retry:
       bool rx_pin = rx_pin_read();
       if (rx_pin)
       { // If there is activity on the bus / the bus has been pulled low, we have to try again and wait for 'waitfree' ms.
-#if DEBUG_LL
+#if DEBUG_LPB
         DEBUGLN("Activity on the bus while waiting, retrying...");
 #endif
         delay(146); // Wait the duration of 11 bits at 4800 bps times 32 (maximum telegram size) in ms (*1000) times 2 (because we can just keep waiting for an answer telegram)
         while (serial->available())
         {
           char c = readByte();
-#if DEBUG_LL
+#if DEBUG_LPB
           if (c < 16)
             DEBUG("0");
           DEBUGF("$.2x ", c);
 #endif
-          c = c; // prevent compiler warning about unused variable if DEBUG_LL is not active
+          c = c; // prevent compiler warning about unused variable if DEBUG_LPB is not active
         }
-#if DEBUG_LL
+#if DEBUG_LPB
         DEBUGLN();
 #endif
         goto retry;
@@ -656,7 +656,7 @@ retry:
       char readdata = readByte();
       if (msg[i] != readdata)
       {
-#if DEBUG_LL
+#if DEBUG_LPB
         DEBUGF("$%.2x\n", readdata);
 #endif
         DEBUGLN("Collision on the bus, retrying...");
@@ -664,13 +664,13 @@ retry:
         while (serial->available())
         {
           char c = readByte();
-#if DEBUG_LL
+#if DEBUG_LPB
           if (c < 16)
             DEBUG("0");
           DEBUGF("$%.2x", c);
 #endif
         }
-#if DEBUG_LL
+#if DEBUG_LPB
         DEBUGLN();
 #endif
         goto retry;
@@ -808,7 +808,7 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte *rx_msg, byte *tx_msg, const b
   {
     if (GetMessage(rx_msg))
     {
-#if DEBUG_LL
+#if DEBUG_LPB
       DEBUG(F("\r\nDuration until answer received: "));
       DEBUGLN(3000 - (timeout - millis()));
       print(rx_msg);
@@ -831,7 +831,7 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte *rx_msg, byte *tx_msg, const b
       }
       else
       {
-#if DEBUG_LL
+#if DEBUG_LPB
         DEBUGLN(F("Message received, but not for us:"));
         print(rx_msg);
 #endif
@@ -842,7 +842,7 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte *rx_msg, byte *tx_msg, const b
       delayMicroseconds(205);
     }
   }
-#if DEBUG_LL
+#if DEBUG_LPB
   DEBUGLN(F("No answer for this send telegram:"));
 #endif
   print(tx_msg);
