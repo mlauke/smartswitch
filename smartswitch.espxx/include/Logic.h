@@ -64,7 +64,7 @@ static bool batteryCapacityTargetFulfilled(SystemConfig *systemConfig, SystemSta
     return foundPvData; // no solar forecast data, assume battery will become empty
   }
 
-  uint16_t hysteresis_Wh = systemConfig->loadPower_W / 3; // required capacity (Wh) if load is switched on for 20min
+  uint16_t hysteresis_Wh = systemConfig->loadPower_W / 2; // required capacity (Wh) if load is switched on for 20min
   uint32_t cap_bat_Wh = systemState->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
 

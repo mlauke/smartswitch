@@ -55,7 +55,7 @@ void test_batteryCapacityTargetFulfilledSwitchOff()
 void test_batteryCapacityTargetFulfilledSwitchOn()
 {
   systemState.ts = 1762598185;
-  systemState.cap_bat_Wh = 3600;
+  systemState.cap_bat_Wh = 4100;
   systemState.cons_W = 298;
   systemState.switchEnabled = false;
 
@@ -66,7 +66,7 @@ void test_batteryCapacityTargetFulfilledSwitchOn()
 void test_batteryCapacityTargetFulfilledSwitchOffOn()
 {
   systemState.ts = 1762598185;
-  systemState.cap_bat_Wh = 3600;
+  systemState.cap_bat_Wh = 4100;
   systemState.cons_W = 246;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
@@ -80,7 +80,7 @@ void test_batteryCapacityTargetFulfilledSwitchOffOn()
 
 void test_batteryCapacityTargetFulfilledSwitchHysteresis()
 {
-  systemState.cap_bat_Wh = 3535;
+  systemState.cap_bat_Wh = 4051;
 
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemState.cons_W = 245;
@@ -98,7 +98,7 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresis()
 void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
 {
   systemConfig.loadPower_W = 3249;
-  systemState.cap_bat_Wh = 3600;
+  systemState.cap_bat_Wh = 4124;
 
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemState.cons_W = 342;
@@ -117,10 +117,9 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 {
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemConfig.loadPower_W = 3249;
-  systemState.cap_bat_Wh = 4100;
+  systemState.cap_bat_Wh = 4124;
   systemState.cons_W = 247;
   systemState.prod_W = 1850;
-  // systemState.system_W = systemState.prod_W + systemState.inv_max_w;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
   systemState.switchEnabled = false;
 
@@ -157,7 +156,7 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
 {
   systemState.ts = 1762556400 + 47 * 3600; // reach min capacity + hysteresis
   systemConfig.loadPower_W = 3249;
-  systemState.cap_bat_Wh = 5035;
+  systemState.cap_bat_Wh = 5575;
   systemState.cons_W = 1447;
   systemState.prod_W = 2150;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;

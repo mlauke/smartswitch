@@ -30,3 +30,26 @@
 *.exe
 *.out
 *.app
+# Backup / autosave
+*-backup.*
+_autosave-*
+
+# Plot outputs
+*.gbr
+*.drl
+*.zip
+*.pdf
+*.svg
+
+# Position / fabrication exports
+*.pos
+*.rpt
+*.csv
+
+# Simulation / temp
+*.raw
+*.net
+
+# OS junk
+.DS_Store
+Thumbs.db
