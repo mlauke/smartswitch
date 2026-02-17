@@ -244,7 +244,7 @@ input {
   transition: height 0.5s ease-in-out, background-color 0.5s;
 }
 
-.cycles {
+.btinfo {
   color: #a0a0a0;
   font-size: 0.8rem;
   position: absolute;
