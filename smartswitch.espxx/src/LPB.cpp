@@ -32,7 +32,7 @@ void writelnToDebug()
 static void SerialPrintRAW(byte *msg, byte len);
 static int bin2hex(char *toBuffer, byte *fromAddr, int len, char delimiter);
 
-void LPB::printTelegram(byte *msg, float line)
+void LPB::printTelegram(byte *msg, uint16_t line)
 {
   DEBUGF("%.2x -> %.2x: ", msg[3], msg[2]); // source => destination address
   int data_len = 0;
@@ -48,7 +48,7 @@ void LPB::printTelegram(byte *msg, float line)
   {
     DEBUGF("%.2x ", msg[getPl_start() + x]);
   }
-  DEBUGF("%4.1f - \n", line);
+  DEBUGF("%4d - \n", line);
   SerialPrintRAW(msg, msg[getLen_idx()] + 1);
 }
 
@@ -234,7 +234,7 @@ float LPB::toFIXPOINT(byte *msg, cmd_t cmd)
   return NAN;
 }
 
-float LPB::getTemperature(float line, float *r)
+float LPB::getTemperature(uint16_t line, float *r)
 {
 
   byte rx_msg[33];
@@ -406,13 +406,13 @@ bool LPB::GetDevId()
   return false;
 }
 
-int LPB::findLine(float line)
+int LPB::findLine(uint16_t line)
 {
   uint8_t found = 0;
   int i = -1;
   int save_i = 0;
   uint32_t c;
-  float l;
+  uint16_t l;
 
   for (uint16_t j = 0; j < cmdtbl_size; j++)
   {
@@ -482,7 +482,7 @@ int LPB::findLine(float line)
   return save_i;
 }
 
-uint16_t LPB::query(float line, byte *msg)
+uint16_t LPB::query(uint16_t line, byte *msg)
 { // line (ProgNr)
 
   byte tx_msg[33] = {0}; // xmit buffer

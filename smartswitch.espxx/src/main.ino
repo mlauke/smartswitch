@@ -458,7 +458,9 @@ void handleStatus()
   json[F("switch")] = systemState.switchEnabled;
   json[F("sn_cap_max")] = systemState.cap_bat_max_Wh;
   json[F("sn_cycles")] = systemState.bat_cycles;
-  json[F("sn_cap_max_use")] = systemState.cap_bat_max_use;
+  json[F("sn_cap_soh")] = systemState.cap_bat_soh;
+  char buf[16];
+  json[F("sn_fchrg_ts")] = format_duration(systemState.fullChargeRequestIn, buf, sizeof(buf));
 
   char devid[40] = "unknown";
   device_map *device = lpb->getDestDevice();
@@ -885,6 +887,11 @@ bool ensureConnected()
 
 bool fetchApiData(String uri, JsonDocument &json)
 {
+  return fetchApiData(uri, json, NULL);
+}
+
+bool fetchApiData(String uri, JsonDocument &json, JsonDocument *filter)
+{
 
   bool r = false;
 
@@ -894,7 +901,7 @@ bool fetchApiData(String uri, JsonDocument &json)
   {
     char url[128];
     snprintf_P(url, sizeof(url), PSTR("http://%.31s/%s/%s"), config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    r = restClient.fetch(String(url), json, NULL, "auth-token", config.sonnenApiToken);
+    r = restClient.fetch(String(url), json, filter, "auth-token", config.sonnenApiToken);
     if (!r)
     {
       DEBUGF("ERROR: fetchApiData(%s)\n", uri.c_str());
@@ -938,15 +945,24 @@ bool updateSystemData()
     {
       systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
       systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
-      systemState.cap_bat_max_use = systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_new_Wh;
-      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_max_use);
+      systemState.cap_bat_soh = systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_new_Wh;
+      DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_soh);
     }
   }
-  if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json)))
+  JsonDocument filter;
+  filter[F("UTC_Offet")] = true;
+  filter[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")] = true;
+  filter[F("ic_status")][F("nextfullchargestarttime")] = true;
+  filter[F("ic_status")][F("secondssincefullcharge")] = true;
+  if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json, &filter)))
   {
     systemState.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
-    systemState.fullChargeRequest = json[F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
-    DEBUGF("UTC offset %d, discharge not allowed: %d\n", systemState.utc_offset, systemState.fullChargeRequest);
+    systemState.fullChargeRequest = json[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
+    systemState.fullChargeRequestIn =
+        json[F("ic_status")][F("nextfullchargestarttime")].as<uint32_t>() -
+        json[F("ic_status")][F("secondssincefullcharge")].as<uint32_t>();
+
+    DEBUGF("UTC offset %d, discharge not allowed: %d %u\n", systemState.utc_offset, systemState.fullChargeRequest, systemState.fullChargeRequestIn);
   }
   if (ok && (ok &= fetchApiData(SONNEN_API_STATUS, json)))
   {

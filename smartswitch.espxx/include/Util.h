@@ -61,7 +61,7 @@ static void format_indexed(char *out, size_t out_size,
                 dst += snprintf(dst, out_size - (dst - out), "%d", *(uint16_t *)a->value);
                 break;
             case ARG_INT:
-                dst += snprintf(dst, out_size - (dst - out), "%d", *(int *)a->value);
+                dst += snprintf(dst, out_size - (dst - out), "%d", *(int16_t *)a->value);
                 break;
             case ARG_FLT:
                 dst += snprintf(dst, out_size - (dst - out), "%.2f", *(float *)a->value);
@@ -78,4 +78,36 @@ static void format_indexed(char *out, size_t out_size,
         }
     }
     *dst = '\0';
+}
+
+static char *format_duration(uint32_t seconds,
+                             char *buffer,
+                             size_t buffer_size)
+{
+    uint32_t days;
+    uint32_t hours;
+    uint32_t minutes;
+    uint32_t remaining;
+
+    days = seconds / 86400U;
+    remaining = seconds % 86400U;
+
+    hours = remaining / 3600U;
+    remaining = remaining % 3600U;
+
+    minutes = remaining / 60U;
+
+    if (days > 0)
+    {
+        snprintf(buffer, buffer_size, "%ud%uh%um", days, hours, minutes);
+    }
+    else if (hours > 0)
+    {
+        snprintf(buffer, buffer_size, "%uh%um", hours, minutes);
+    }
+    else
+    {
+        snprintf(buffer, buffer_size, "%um", minutes);
+    }
+    return buffer;
 }

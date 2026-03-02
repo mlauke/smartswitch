@@ -55,13 +55,15 @@
 #define SONNEN_API_BATTERY "battery"
 #define SONNEN_API_STATUS "status"
 #define SONNEN_INVERTER_LATENCY_MS 5000 // battery inverter latency until load is compensated - sonnen battery 10 specific
-#define SONNEN_INVERTER_LATENCY_COUNT (uint8_t)MAX(1, (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
+#define SONNEN_INVERTER_LATENCY_COUNT (1 + (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
 #define SOLAR_FORECAST_INTERVAL_MS 12 * 60 * 1000 // every 10min
+#define SOLAR_FORECAST_HOURS 49                   // 49h
+#define SOLAR_FORECAST_SAFETY_FACTOR 0.95f
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 #define URL_SOLAR_FORECAST_DEV "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
@@ -139,26 +141,27 @@ typedef struct
   float boiler_T_min;
   float boiler_T_max;
 
-  int inv_max_w;           // inverter power max
-  uint8_t usoc;            // 0..100 user state of charge - battery capacity in %
-  uint16_t system_W;       // production + inverter max power(Watt)
-  uint16_t prod_W;         // production (Watt)
-  uint16_t cons_W;         // consumption (Watt)
-  uint16_t cons_W_nom;     // consumption rounded as multiple of 10 (Watt)
-  uint16_t cons_W_norm;    // normalized consumption without load
-  uint16_t cons_avg_W;     // consumption average (W)
-  uint16_t bat_cycles;     // Number of charge/discharge cycles
-  uint16_t cap_bat_new_Wh; // max usable battery capacity for new battery
-  uint8_t cap_bat_max_use; // percentage of usable battery capacity
-  uint16_t cap_bat_Wh;     // current capacity
-  uint16_t cap_bat_max_Wh; // max battery capacity (system)
-  int pac_total_W;         // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
-  int gridFeedIn_W;        // current grid feed in - negative is consumption, positive is feed in
-  bool fullChargeRequest;  // e.g. true during battery maintenance
-  short charge;            // battery charge state 0 - none, 1 - charge, -1 - discharge
+  int16_t inv_max_w;            // inverter power max
+  uint8_t usoc;                 // 0..100 user state of charge - battery capacity in %
+  uint16_t system_Power_W;      // production + battery inverter max power (Watt) if battery usoc is >0
+  uint16_t prod_W;              // production (Watt)
+  uint16_t cons_W;              // consumption (Watt)
+  uint16_t cons_W_nom;          // consumption rounded as multiple of 10 (Watt)
+  uint16_t cons_W_norm;         // normalized consumption without load
+  uint16_t cons_avg_W;          // consumption average (W)
+  uint16_t bat_cycles;          // Number of charge/discharge cycles
+  uint16_t cap_bat_new_Wh;      // max usable battery capacity for new battery
+  uint8_t cap_bat_soh;          // percentage of usable battery capacity (SoH)
+  uint16_t cap_bat_Wh;          // current capacity
+  uint16_t cap_bat_max_Wh;      // max battery capacity (system)
+  int16_t pac_total_W;          // inverter ac power -   AC Power greater than ZERO is discharging Inverter AC Power less than ZERO is charging
+  int16_t gridFeedIn_W;         // current grid feed in - negative is consumption, positive is feed in
+  bool fullChargeRequest;       // e.g. true during battery maintenance
+  uint32_t fullChargeRequestIn; // next full charge request starts in given seconds
+  int8_t charge;                // battery charge state 0 - none, 1 - charge, -1 - discharge
 
-  long pv_forecast_ts;              // last update timestamp in ms since mcu start
-  uint32_t pv_forecast_wh_h[49][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
+  long pv_forecast_ts;                                // last update timestamp in ms since mcu start
+  uint32_t pv_forecast_wh_h[SOLAR_FORECAST_HOURS][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
 
   logEntry events[SIZE_EVENT_BUFFER]; // event buffer
   uint8_t eventIx = 0;

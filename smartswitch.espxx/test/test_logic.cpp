@@ -37,6 +37,8 @@ void test_upateConsumption()
 
 void test_batteryCapacityTargetFulfilledNoData()
 {
+  systemState.pv_forecast_wh_h[0][0] = 0;
+
   updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_FALSE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
 }
@@ -58,6 +60,7 @@ void test_batteryCapacityTargetFulfilledSwitchOn()
   systemState.cap_bat_Wh = 4100;
   systemState.cons_W = 298;
   systemState.switchEnabled = false;
+  systemState.prod_W = 2150;
 
   updateSystemState(&systemConfig, &systemState);
   TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
@@ -118,6 +121,7 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
   systemConfig.loadPower_W = 3249;
   systemState.cap_bat_Wh = 4124;
+  systemState.usoc = (systemState.cap_bat_Wh * 100 / systemState.cap_bat_max_Wh);
   systemState.cons_W = 247;
   systemState.prod_W = 1850;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
@@ -126,8 +130,8 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   char msg[80];
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
   TEST_ASSERT_TRUE(state);
+  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
@@ -143,12 +147,12 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery min capacity 2500Wh reached at 2025-11-10 00:00:00", msg);
+  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2500Wh", msg);
   TEST_ASSERT_TRUE(state);
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery min capacity 2500Wh reached at 2025-11-10 00:00:00", msg);
+  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2500Wh", msg);
   TEST_ASSERT_TRUE(state);
 }
 
@@ -181,34 +185,41 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_TRUE(state);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("consumption 1450W too high, to much grid purchase -2546W", msg);
+  TEST_ASSERT_TRUE(state);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_FALSE(state); // assert stable
+  TEST_ASSERT_EQUAL_STRING("consumption 1450W too high, to much grid purchase -2546W", msg);
 }
 
 void test_determineDesiredStateSurplusWaste()
 {
-  systemState.ts = 1762556400;
-  systemConfig.loadPower_W = 3249;
-  systemState.cap_bat_Wh = 1535;
+  systemState.ts = 1762556400 + 12 * 3600;
+  systemConfig.loadPower_W = 3251;
+  systemState.cap_bat_Wh = 0;
+  systemState.usoc = 0;
   systemState.cons_W = 347;
   systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W;
-  systemState.gridFeedIn_W = systemState.prod_W + 10;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
   systemState.switchEnabled = false;
 
   char msg[80];
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
   TEST_ASSERT_TRUE(state);
 
   systemState.switchEnabled = state;
 
-  systemState.ts += 5;
-  systemState.cons_W = 347 + systemConfig.loadPower_W;
+  systemState.cons_W = 440 + systemConfig.loadPower_W;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
   TEST_ASSERT_TRUE(state);
+
+  systemState.cons_W = 450 + systemConfig.loadPower_W;
+  updateSystemState(&systemConfig, &systemState);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2500Wh", msg);
+  TEST_ASSERT_FALSE(state);
 }
 
 int main(int argc, char **argv)
@@ -224,7 +235,8 @@ int main(int argc, char **argv)
   RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
-  // TODO RUN_TEST(test_determineDesiredStateSurplusWaste);
+
+  RUN_TEST(test_determineDesiredStateSurplusWaste);
 
   return UNITY_END();
 }
