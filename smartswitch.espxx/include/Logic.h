@@ -64,16 +64,17 @@ enum BatteryState
 
 static int seekToPvForecastData(SystemState *systemState)
 {
+  short i = 0;
+
   if (systemState->pv_forecast_wh_h[0][0] == 0)
   {
     return -1; // no solar forecast data
   }
 
   bool foundPvData = false;
-  short i = 0;
   uint32_t ts = systemState->ts - (systemState->ts % 3600); // start with timestamp of last full hour
 
-  for (; i < sizeof(systemState->pv_forecast_wh_h) / sizeof(systemState->pv_forecast_wh_h[0]); i++)
+  for (; i <= SOLAR_FORECAST_HOURS; i++)
   {
     if ((foundPvData = (systemState->pv_forecast_wh_h[i][0] == ts))) // seek to pv forecast upon system ts
     {
@@ -85,7 +86,7 @@ static int seekToPvForecastData(SystemState *systemState)
 
 static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, SystemState *systemState)
 {
-  int i = seekToPvForecastData(systemState);
+  short i = seekToPvForecastData(systemState);
   if (i == -1)
   {
     return BatteryState::Min; // no solar forecast data, assume battery will become empty
@@ -101,7 +102,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   uint8_t hour = 0;
   short hour_min = -1;
   short hour_max = -1;
-  for (i++; i < sizeof(systemState->pv_forecast_wh_h) / sizeof(systemState->pv_forecast_wh_h[0]); i++, hour++)
+  for (i++; i < SOLAR_FORECAST_HOURS; i++, hour++)
   {
     if (hour_min == -1 && cap_bat_sim_wh < cap_bat_min_Wh) // capacity below expected min capacity
       hour_min = hour;
@@ -133,7 +134,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   if (hour_min == -1 && hour_max != -1)
     return BatteryState::Max;
 
-  return hour_max < hour_min || ((hour_max - hour_min) < 12) ? BatteryState::Max : BatteryState::Min;
+  return hour_max < hour_min || ((hour_max - hour_min) < 12) ? BatteryState::Max : BatteryState::Min; // next 12 hours
 }
 
 const char *const CONSTRAINTS[] = {
@@ -203,7 +204,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
-          (state == BatteryState::Max && systemState->usoc >= 5 ||
+          ((state == BatteryState::Max && systemState->usoc >= 5) ||
            state == BatteryState::Balanced))))
     {
       desiredState = true;
