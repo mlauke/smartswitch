@@ -11,6 +11,19 @@ void tearDown(void)
   // clean stuff up here
 }
 
+static void assertStaysStable(bool expectedState)
+{
+  char msg[80];
+  for (int i = 0; i <= SONNEN_INVERTER_LATENCY_COUNT; i++)
+  {
+    systemState.ts += 5;
+    systemState.cons_W_nom += 10;
+    updateSystemState(&systemConfig, &systemState);
+    bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+    TEST_ASSERT_EQUAL(expectedState, state);
+  }
+}
+
 void test_upateConsumption()
 {
   systemState.cons_W = 33;
@@ -35,26 +48,26 @@ void test_upateConsumption()
   TEST_ASSERT_EQUAL(210, systemState.cons_W_norm);
 }
 
-void test_batteryCapacityTargetFulfilledNoData()
+void test_predictBatteryCapacityStateNoData()
 {
   systemState.pv_forecast_wh_h[0][0] = 0;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_FALSE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 }
 
-void test_batteryCapacityTargetFulfilledSwitchOff()
+void test_predictBatteryCapacityStateSwitchOff()
 {
   systemState.ts = 1762598185;
-  systemState.cap_bat_Wh = 2600;
+  systemState.cap_bat_Wh = 2500;
   systemState.cons_W = 397;
   systemState.switchEnabled = true;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_FALSE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 }
 
-void test_batteryCapacityTargetFulfilledSwitchOn()
+void test_predictBatteryCapacityStateSwitchOn()
 {
   systemState.ts = 1762598185;
   systemState.cap_bat_Wh = 4100;
@@ -63,25 +76,25 @@ void test_batteryCapacityTargetFulfilledSwitchOn()
   systemState.prod_W = 2150;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 }
 
-void test_batteryCapacityTargetFulfilledSwitchOffOn()
+void test_predictBatteryCapacityStateSwitchOffOn()
 {
   systemState.ts = 1762598185;
   systemState.cap_bat_Wh = 4100;
   systemState.cons_W = 246;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 
   systemState.switchEnabled = true;
   systemState.cons_W = systemConfig.loadPower_W + 253;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 }
 
-void test_batteryCapacityTargetFulfilledSwitchHysteresis()
+void test_predictBatteryCapacityStateSwitchHysteresis()
 {
   systemState.cap_bat_Wh = 4051;
 
@@ -89,16 +102,16 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresis()
   systemState.cons_W = 245;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 
   systemState.ts = 1762598185 + 26 * 3600 + 10 * 60; // 10 min
   systemState.cons_W = systemConfig.loadPower_W + 261;
   systemState.switchEnabled = true;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 }
 
-void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
+void test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker()
 {
   systemConfig.loadPower_W = 3249;
   systemState.cap_bat_Wh = 4124;
@@ -107,13 +120,13 @@ void test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker()
   systemState.cons_W = 342;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 
   systemState.ts = 1762598185 + 26 * 3600 - 44 + 10; // 10s later
   systemState.cons_W = systemConfig.loadPower_W + 352;
   systemState.switchEnabled = true;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_TRUE(batteryCapacityTargetFulfilled(&systemConfig, &systemState, &ts));
+  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
 }
 
 void test_determineDesiredStateBatteryTargetFulfilled()
@@ -187,7 +200,7 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_TRUE(state);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_FALSE(state); // assert stable
+  TEST_ASSERT_FALSE(state); // switch off, load cannot be driven
   TEST_ASSERT_EQUAL_STRING("consumption 1450W too high, to much grid purchase -2546W", msg);
 }
 
@@ -222,33 +235,71 @@ void test_determineDesiredStateSurplusWaste()
   TEST_ASSERT_FALSE(state);
 }
 
+void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
+{
+  systemState.ts = 1762556400 + 35 * 3600;
+  systemConfig.loadPower_W = 3251;
+  systemState.cap_bat_Wh = 99;
+  systemState.usoc = 1;
+  systemState.cons_W = 247;
+  systemState.prod_W = 2500;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
+  systemState.switchEnabled = false;
+
+  char msg[80];
+  updateSystemState(&systemConfig, &systemState);
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_FALSE(state);
+
+  systemState.ts = 1762556400 + 35 * 3600;
+  systemConfig.loadPower_W = 3251;
+  systemState.cap_bat_Wh = 500;
+  systemState.usoc = 5;
+
+  systemState.switchEnabled = false;
+
+  updateSystemState(&systemConfig, &systemState);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_TRUE(state);
+
+  systemState.switchEnabled = state;
+  systemState.ts += 10;
+  systemState.gridFeedIn_W = -100;
+
+  assertStaysStable(true);
+}
+
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
   RUN_TEST(test_upateConsumption);
-  RUN_TEST(test_batteryCapacityTargetFulfilledNoData);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOff);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOn);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchOffOn);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresis);
-  RUN_TEST(test_batteryCapacityTargetFulfilledSwitchHysteresisAvoidFlicker);
+  RUN_TEST(test_predictBatteryCapacityStateNoData);
+  RUN_TEST(test_predictBatteryCapacityStateSwitchOff);
+  RUN_TEST(test_predictBatteryCapacityStateSwitchOn);
+  RUN_TEST(test_predictBatteryCapacityStateSwitchOffOn);
+  RUN_TEST(test_predictBatteryCapacityStateSwitchHysteresis);
+  RUN_TEST(test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker);
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
-
   RUN_TEST(test_determineDesiredStateSurplusWaste);
+  RUN_TEST(test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity);
 
   return UNITY_END();
 }
 
 void setUp(void)
 {
+  int weatherFactor = 2;
+
   systemConfig.loadPower_W = 3100;
   systemConfig.gridMin_W = 100;
   systemConfig.cap_bat_min_Wh = 2500;
   systemState.cap_bat_max_Wh = 9900;
   systemState.inv_max_w = 4600;
   systemState.utc_offset = 3600;
+  systemState.fullChargeRequest = false;
 
   systemState.boiler_T_max = 65.0f;
   systemState.boiler_T_nom = 55.0f;
@@ -320,27 +371,27 @@ void setUp(void)
   systemState.pv_forecast_wh_h[r][0] = 1762668000;
   systemState.pv_forecast_wh_h[r++][1] = 8;
   systemState.pv_forecast_wh_h[r][0] = 1762671600;
-  systemState.pv_forecast_wh_h[r++][1] = 75;
+  systemState.pv_forecast_wh_h[r++][1] = 75 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762675200;
-  systemState.pv_forecast_wh_h[r++][1] = 271;
+  systemState.pv_forecast_wh_h[r++][1] = 271 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762678800;
-  systemState.pv_forecast_wh_h[r++][1] = 548;
+  systemState.pv_forecast_wh_h[r++][1] = 548 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762682400;
-  systemState.pv_forecast_wh_h[r++][1] = 802;
+  systemState.pv_forecast_wh_h[r++][1] = 802 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762686000;
-  systemState.pv_forecast_wh_h[r++][1] = 1011;
+  systemState.pv_forecast_wh_h[r++][1] = 1011 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762689600;
-  systemState.pv_forecast_wh_h[r++][1] = 1145;
+  systemState.pv_forecast_wh_h[r++][1] = 1145 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762693200;
-  systemState.pv_forecast_wh_h[r++][1] = 1123;
+  systemState.pv_forecast_wh_h[r++][1] = 1123 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762696800;
-  systemState.pv_forecast_wh_h[r++][1] = 1008;
+  systemState.pv_forecast_wh_h[r++][1] = 1008 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762700400;
-  systemState.pv_forecast_wh_h[r++][1] = 791;
+  systemState.pv_forecast_wh_h[r++][1] = 791 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762704000;
-  systemState.pv_forecast_wh_h[r++][1] = 363;
+  systemState.pv_forecast_wh_h[r++][1] = 363 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762707600;
-  systemState.pv_forecast_wh_h[r++][1] = 57;
+  systemState.pv_forecast_wh_h[r++][1] = 57 * weatherFactor;
   systemState.pv_forecast_wh_h[r][0] = 1762711200;
   systemState.pv_forecast_wh_h[r++][1] = 9;
   systemState.pv_forecast_wh_h[r][0] = 1762714800;

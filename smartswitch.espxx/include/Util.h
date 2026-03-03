@@ -99,7 +99,7 @@ static char *format_duration(uint32_t seconds,
 
     if (days > 0)
     {
-        snprintf(buffer, buffer_size, "%ud%uh%um", days, hours, minutes);
+        snprintf(buffer, buffer_size, "%ud%uh", days, hours);
     }
     else if (hours > 0)
     {
