@@ -226,7 +226,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.cons_W = 440 + systemConfig.loadPower_W;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_TRUE(state);
+  assertStaysStable(true);
 
   systemState.cons_W = 450 + systemConfig.loadPower_W;
   updateSystemState(&systemConfig, &systemState);

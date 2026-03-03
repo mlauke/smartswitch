@@ -104,13 +104,13 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   for (i++; i < sizeof(systemState->pv_forecast_wh_h) / sizeof(systemState->pv_forecast_wh_h[0]); i++, hour++)
   {
     if (hour_min == -1 && cap_bat_sim_wh < cap_bat_min_Wh) // capacity below expected min capacity
-    {
       hour_min = hour;
-    }
+
     if (hour_max == -1 && cap_bat_sim_wh == systemState->cap_bat_max_Wh)
-    {
       hour_max = hour;
-    }
+    if (hour_min != -1 && hour_max != -1)
+      break;
+
     /* Adaptive Gewichtung: näher = wichtiger */
     float weight = 1.0f - ((float)(hour) / (float)SOLAR_FORECAST_HOURS);
 
@@ -193,7 +193,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 1) && !validData) ||
         ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((constraint = 3) && state != BatteryState::Max && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh))
+        ((constraint = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh))
     {
       desiredState = false;
     }
