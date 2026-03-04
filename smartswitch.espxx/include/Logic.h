@@ -104,18 +104,19 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   uint8_t hour = 0;
   for (i++; i < SOLAR_FORECAST_HOURS; i++, hour++)
   {
-    /* Adaptive Gewichtung: näher = wichtiger */
+    // adaptive weight
     float weight = 1.0f - ((float)(hour) / (float)SOLAR_FORECAST_HOURS);
 
-    /* Sicherheitsfaktor + adaptive Gewichtung */
+    // safety factor + adaptive weight
     wh = wh * SOLAR_FORECAST_SAFETY_FACTOR * weight;
 
-    cap_bat_sim_previos_wh = cap_bat_sim_wh;
+    cap_bat_sim_previos_wh = cap_bat_sim_wh; // safe previous to check battery capacity trend
+
     // cumulate battery capacity upon production forecast in range [0..<bat max capacity>]
     cap_bat_sim_wh = MIN((uint16_t)MAX(0, (int)cap_bat_sim_wh + MIN(systemState->inv_max_w, (int)wh - systemState->cons_W_norm)), systemState->cap_bat_max_Wh);
     DEBUGF("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) cons %uW usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_sim_wh, systemState->cons_W_norm, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
 
-    // capacity below expected min capacity and no positive tendency
+    // capacity below expected min capacity and no positive battery capacity trend
     if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh <= cap_bat_sim_previos_wh)
     {
       return BatteryState::Min;
@@ -178,6 +179,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
   float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 1.2f; // ~0.8 °C heater "afterglow"
+
   BatteryState state = predictBatteryCapacityState(systemConfig, systemState);
 
   if (systemState->switchEnabled)
@@ -191,7 +193,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
         ((constraint = 3) &&
          ((state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh) ||
-          (state == BatteryState::Max && systemState->usoc <= 5))))
+          (state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))))
     {
       desiredState = false;
     }
@@ -201,7 +203,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
-          ((state == BatteryState::Max && systemState->usoc > 5) ||
+          ((state == BatteryState::Max && systemState->usoc > BATTERY_MAX_USOC) ||
            state == BatteryState::Balanced))))
     {
       desiredState = true;
