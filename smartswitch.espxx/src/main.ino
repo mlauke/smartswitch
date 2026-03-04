@@ -110,7 +110,7 @@ void setup()
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(PIN_SSR, OUTPUT);
 
-  toggleSwitch(false);
+  updateSwitch(false);
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
@@ -188,7 +188,7 @@ void onOTABegin()
 #if ESP8266
   ESP.wdtDisable();
 #endif
-  toggleSwitch(false);
+  updateSwitch(false);
 }
 
 void onOTAEnd(bool success)
@@ -815,9 +815,9 @@ void loop()
     }
     else
     {
-      updateSwitch(&config, &systemState, validData);
+      updateState(&config, &systemState, validData);
     }
-    toggleSwitch(systemState.switchEnabled);
+    updateSwitch(systemState.switchEnabled);
 
     DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), validData);
 
@@ -1011,7 +1011,7 @@ bool updateSystemData()
   return ok;
 }
 
-static void updateSwitch(SystemConfig *systemConfig, SystemState *systemState, bool validData)
+static void updateState(SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
   char msg[80];
 
@@ -1026,7 +1026,7 @@ static void updateSwitch(SystemConfig *systemConfig, SystemState *systemState, b
   DEBUGF("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemState->ts), systemState->ts, systemState->usoc, systemState->prod_W, systemState->cons_W, systemState->cons_W, systemState->cons_avg_W, systemState->gridFeedIn_W, systemConfig->mode, systemState->switchEnabled);
 }
 
-void toggleSwitch(bool switchEnabled)
+void updateSwitch(bool switchEnabled)
 {
   digitalWrite(PIN_SSR, switchEnabled ? HIGH : LOW);
   buildInLED(switchEnabled);
