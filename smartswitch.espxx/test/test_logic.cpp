@@ -160,12 +160,12 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2500Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2000Wh", msg);
   TEST_ASSERT_TRUE(state);
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2500Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2000Wh", msg);
   TEST_ASSERT_TRUE(state);
 }
 
@@ -231,13 +231,13 @@ void test_determineDesiredStateSurplusWaste()
   systemState.cons_W = 450 + systemConfig.loadPower_W;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2500Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2000Wh", msg);
   TEST_ASSERT_FALSE(state);
 }
 
 void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
 {
-  systemState.ts = 1762556400 + 35 * 3600;
+  systemState.ts = 1762556400 + 34 * 3600;
   systemConfig.loadPower_W = 3251;
   systemState.cap_bat_Wh = 99;
   systemState.usoc = 1;
@@ -254,8 +254,8 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
 
   systemState.ts = 1762556400 + 35 * 3600;
   systemConfig.loadPower_W = 3251;
-  systemState.cap_bat_Wh = 500;
-  systemState.usoc = 5;
+  systemState.cap_bat_Wh = 700;
+  systemState.usoc = 6;
 
   systemState.switchEnabled = false;
 
@@ -268,6 +268,12 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
   systemState.gridFeedIn_W = -100;
 
   assertStaysStable(true);
+
+  systemState.cap_bat_Wh = 500;
+  systemState.usoc = 5;
+  updateSystemState(&systemConfig, &systemState);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  assertStaysStable(false);
 }
 
 int main(int argc, char **argv)
@@ -295,7 +301,7 @@ void setUp(void)
 
   systemConfig.loadPower_W = 3100;
   systemConfig.gridMin_W = 100;
-  systemConfig.cap_bat_min_Wh = 2500;
+  systemConfig.cap_bat_min_Wh = 2000;
   systemState.cap_bat_max_Wh = 9900;
   systemState.inv_max_w = 4600;
   systemState.utc_offset = 3600;
