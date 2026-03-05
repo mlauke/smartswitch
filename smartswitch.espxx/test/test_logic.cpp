@@ -17,7 +17,7 @@ static void assertStaysStable(bool expectedState)
   for (int i = 0; i <= SONNEN_INVERTER_LATENCY_COUNT; i++)
   {
     systemState.ts += 5;
-    systemState.cons_W_nom += 10;
+    systemState.cons_W += 16;
     updateSystemState(&systemConfig, &systemState);
     bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
     TEST_ASSERT_EQUAL(expectedState, state);
@@ -144,7 +144,7 @@ void test_determineDesiredStateBatteryTargetFulfilled()
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_TRUE(state);
-  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
+  TEST_ASSERT_EQUAL_STRING("usoc 41% - boiler temperature 54.00°C < 58.00°C (min) reached", msg);
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
@@ -160,12 +160,10 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2000Wh", msg);
   TEST_ASSERT_TRUE(state);
 
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2000Wh", msg);
   TEST_ASSERT_TRUE(state);
 }
 
@@ -183,7 +181,7 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   systemState.ts += 5;
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("boiler temperature 54.00°C < 58.00°C (min) reached", msg);
+  TEST_ASSERT_EQUAL_STRING("usoc 41% - boiler temperature 54.00°C < 58.00°C (min) reached", msg);
   TEST_ASSERT_TRUE(state);
 
   systemState.switchEnabled = state;
@@ -222,32 +220,34 @@ void test_determineDesiredStateSurplusWaste()
   TEST_ASSERT_TRUE(state);
 
   systemState.switchEnabled = state;
-  systemState.cons_W = 440 + systemConfig.loadPower_W;
+  systemState.cons_W = 363 + systemConfig.loadPower_W;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   assertStaysStable(true);
 
   systemState.switchEnabled = state;
   systemState.cons_W = 450 + systemConfig.loadPower_W;
+  systemState.usoc = 25;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("battery below min capacity 2000Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("usoc 25% - battery below min capacity 2000Wh", msg);
   TEST_ASSERT_FALSE(state);
 }
 
 void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
 {
+  char msg[80];
+
   systemState.ts = 1762556400 + 34 * 3600;
   systemConfig.loadPower_W = 3251;
-  systemState.cap_bat_Wh = 99;
   systemState.cons_W = 247;
   systemState.prod_W = 2500;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
-  systemState.usoc = 1;
 
+  systemState.cap_bat_Wh = 99;
+  systemState.usoc = 1;
   systemState.switchEnabled = false;
 
-  char msg[80];
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
   TEST_ASSERT_FALSE(state);
@@ -255,7 +255,6 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
   systemState.ts = 1762556400 + 35 * 3600;
   systemState.cap_bat_Wh = 700;
   systemState.usoc = 7;
-
   systemState.switchEnabled = false;
 
   updateSystemState(&systemConfig, &systemState);
@@ -275,6 +274,7 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
   systemState.gridFeedIn_W = -50;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_EQUAL_STRING("usoc 3% - battery below min capacity 2000Wh", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }

@@ -114,10 +114,10 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
     // cumulate battery capacity upon production forecast in range [0..<bat max capacity>]
     cap_bat_sim_wh = MIN((uint16_t)MAX(0, (int)cap_bat_sim_wh + MIN(systemState->inv_max_w, (int)wh - systemState->cons_W_norm)), systemState->cap_bat_max_Wh);
-    DEBUGF("%d => %u (s) %s %u (Wh) cap_bat %u (Wh) cons %uW usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_sim_wh, systemState->cons_W_norm, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
+    DEBUGF("%d => %u (s) %s %u Wh (pv) %u Wh (bat) %u Wh (min) %u Wh (hys) %u W (cons) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
 
     // capacity below expected min capacity and no positive battery capacity trend
-    if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh <= cap_bat_sim_previos_wh)
+    if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh < cap_bat_sim_previos_wh)
     {
       return BatteryState::Min;
     }
@@ -137,9 +137,11 @@ const char *const CONSTRAINTS[] = {
     NULL,
     "invalid data",
     "consumption %0W too high, to much grid purchase %1W",
-    "battery below min capacity %2Wh",
-    "boiler temperature %3°C >= %4°C (max) reached",
-    "boiler temperature %5°C < %6°C (min) reached"};
+    "usoc %7% - battery below min capacity %2Wh",
+    "usoc %7% - boiler temperature %3°C >= %4°C (max) reached",
+    "usoc %7% - boiler temperature %5°C < %6°C (min) reached",
+    "usoc %7% - surplus will full charge, but usoc too low",
+  };
 
 static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
 {
@@ -191,9 +193,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 1) && !validData) ||
         ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((constraint = 3) &&
-         ((state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh) ||
-          (state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))))
+        ((constraint = 3) && (state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh)) ||
+        ((constraint = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
     }
@@ -220,7 +221,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_FLT, &systemState->boiler_T_cur,
         ARG_FLT, &temp_off,
         ARG_FLT, &systemState->boiler_T_cur,
-        ARG_FLT, &temp_on};
+        ARG_FLT, &temp_on,
+        ARG_UINT, &systemState->usoc};
 
     format_indexed(msg, len, CONSTRAINTS[constraint], args);
   }
