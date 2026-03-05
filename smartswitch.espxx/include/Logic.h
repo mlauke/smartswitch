@@ -141,7 +141,7 @@ const char *const CONSTRAINTS[] = {
     "usoc %7% - boiler temperature %3°C >= %4°C (max) reached",
     "usoc %7% - boiler temperature %5°C < %6°C (min) reached",
     "usoc %7% - surplus will full charge, but usoc too low",
-  };
+};
 
 static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
 {
@@ -193,7 +193,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 1) && !validData) ||
         ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((constraint = 3) && (state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh)) ||
+        ((constraint = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh) ||
         ((constraint = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
