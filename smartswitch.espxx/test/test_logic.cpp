@@ -246,15 +246,16 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
 
   systemState.cap_bat_Wh = 99;
   systemState.usoc = 1;
-  systemState.switchEnabled = false;
+  systemState.switchEnabled = true;
 
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  TEST_ASSERT_EQUAL_STRING("usoc 1% - surplus will full charge, but usoc too low", msg);
   TEST_ASSERT_FALSE(state);
 
   systemState.ts = 1762556400 + 35 * 3600;
   systemState.cap_bat_Wh = 700;
-  systemState.usoc = 7;
+  systemState.usoc = 11;
   systemState.switchEnabled = false;
 
   updateSystemState(&systemConfig, &systemState);
@@ -268,13 +269,13 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
   assertStaysStable(true);
 
   systemState.cap_bat_Wh = 400;
-  systemState.usoc = 3;
+  systemState.usoc = 5;
   systemState.ts = 1762556400 + 32 * 3600;
   systemState.prod_W = 230;
   systemState.gridFeedIn_W = -50;
   updateSystemState(&systemConfig, &systemState);
   state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
-  TEST_ASSERT_EQUAL_STRING("usoc 3% - battery below min capacity 2000Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("usoc 5% - battery below min capacity 2000Wh", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }
