@@ -466,7 +466,7 @@ void handleStatus()
   device_map *device = lpb->getDestDevice();
   if (device != NULL)
   {
-    snprintf_P(devid, sizeof(devid), PSTR("%d - %s (%d/%d)"), device->dev_id, device->name, device->dev_fam, device->dev_var);
+    snprintf_P(devid, sizeof(devid), PSTR("%d - %s (%d/%d/%04X)"), device->dev_id, device->name, device->dev_fam, device->dev_var, device->dev_serial);
   }
   json[F("bs_devid")] = devid;
   json[F("bs_t_cur")] = String(systemState.boiler_T_cur);
