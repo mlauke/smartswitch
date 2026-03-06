@@ -462,13 +462,16 @@ void handleStatus()
   char buf[16];
   json[F("sn_fchrg_ts")] = format_duration(systemState.fullChargeRequestIn, buf, sizeof(buf));
 
-  char devid[40] = "unknown";
+  char dev_id[40] = "n.a.";
+  char dev_nfo[40] = "";
   device_map *device = lpb->getDestDevice();
   if (device != NULL)
   {
-    snprintf_P(devid, sizeof(devid), PSTR("%d - %s (%d/%d/%08X)"), device->dev_id, device->name, device->dev_fam, device->dev_var, device->dev_serial);
+    snprintf_P(dev_id, sizeof(dev_id), PSTR("%d - %s"), device->dev_id, device->name);
+    snprintf_P(dev_nfo, sizeof(dev_nfo), PSTR("(Fam: %d, Var: %d, Ser: %08X)"), device->dev_fam, device->dev_var, device->dev_serial);
   }
-  json[F("bs_devid")] = devid;
+  json[F("bs_dev_id")] = dev_id;
+  json[F("bs_dev_nfo")] = dev_nfo;
   json[F("bs_t_cur")] = String(systemState.boiler_T_cur);
   json[F("bs_t_max")] = String(systemState.boiler_T_max);
   json[F("bs_t_min")] = String(systemState.boiler_T_min);

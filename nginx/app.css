@@ -298,3 +298,8 @@ button.loading .spinner {
     transform: translateY(-50%) rotate(360deg);
   }
 }
+
+.hint {
+  font-size: 0.75em;
+  color: #666;
+}
