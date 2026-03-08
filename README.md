@@ -2,12 +2,18 @@
 DIY sonnen battery controller based on ESP8266/ESP32 to drive a 3.3kW heater (Heißwasserspeicher-Einbauheizung) and integrates with the local hot water system.
 
 ## Features
-- accesses the local hot water system (boiler system) via LPB to get the hot water system data - e.g. hot water temparature
-- calculate battery capacity and surplus from solar forecast to optimize the self consumption
+- accesses the local hot water system (boiler system) via **LPB** to get the hot water system data - e.g. hot water temparature
+- calculate battery capacity and surplus from **solar forecast** to optimize the self consumption
 - local web interface to customize system parameters
 
-## Software
+## UI
+<a href="public/ui_full.png">
+<img alt="Sonnen SmartSwitch UI, best viewed in dark mode" src="public/ui_full.png" height="480px"/>
+</a>
+
+## Software / Releases
 the software supports ESP8266 and ESP32 modules, which can be build for the appropriate target platform. releases can be found at https://github.com/mlauke/smartswitch/releases/
+
 
 ## Hardware
 the reference implementation (at my home) uses the following components
@@ -20,6 +26,18 @@ the reference implementation (at my home) uses the following components
 - DIN Rail Power supply +12V
 - AC mains Triac cicuit to drive a 1NO Relay
 - 1NO Relay (Schütz) https://www.reichelt.de/de/de/shop/produkt/schaltrelais_1_s_230_v_ac_16_a-155592
+
+<details open align="center">
+<summary>Housing</summary>
+<a href="public/sss_arduibox.png">
+<img alt="Sonnen SmartSwitch wihin ArduiBox, Power Supply and Relais (Schütz) mounted on DIN rail" src="public/sss_arduibox.png" width="30%"/>
+</a>
+<!--a href="public/sss_fusebox_big.png">
+<img alt="Sonnen SmartSwitch installed in fuse box" src="public/sss_fusebox_big.png" width="30%"/-->
+<a href="public/sss_fusebox.png">
+<img alt="Sonnen SmartSwitch installed in fuse box" src="public/sss_fusebox.png" width="30%"/>
+</a>
+</details>
 
 ### Thoughts
 #### Why not using a TRIAC only solution?
@@ -40,6 +58,7 @@ R_max = 2,42K/W
 R_heatsink = R_max - R_jc = 2,42K/W - 1,7K/W
 R_heatsink = 0,7K/W !!!
 ```
+
 ... heatsink with <=0,7K/W makes no sense, because we will waste too much power wasted just for heating the environment and maybe would "blow up" the overall system design in terms of size and housing the components.
 therefore i decided to use a triac as switching device for a simple NO1 relais ("Schütz") which in turn will drive the load. the NO1 relais can directly placed next to the arduino case on our din rail.
 
