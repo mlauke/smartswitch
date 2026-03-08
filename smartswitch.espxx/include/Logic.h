@@ -92,7 +92,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     return BatteryState::Min; // no solar forecast data, assume battery will become empty
   }
 
-  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 15 / 60; // required capacity (Wh) if load is switched on for 20min
+  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 30 / 60; // required capacity (Wh) if load is switched on for 30min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint32_t cap_bat_sim_previos_wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
@@ -135,12 +135,12 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
 const char *const CONSTRAINTS[] = {
     NULL,
-    "invalid data",
-    "consumption %0W too high, to much grid purchase %1W",
-    "usoc %7% - battery below min capacity %2Wh",
-    "usoc %7% - boiler temperature %3°C >= %4°C (max) reached",
-    "usoc %7% - boiler temperature %5°C < %6°C (min) reached",
-    "usoc %7% - surplus will full charge, but usoc too low",
+    "SoC %7% - invalid data",
+    "SoC %7% - consumption %0W too high, to much grid purchase %1W",
+    "SoC %7% - battery below min capacity %2Wh",
+    "SoC %7% - boiler temperature %3°C >= %4°C (max) reached",
+    "SoC %7% - boiler temperature %5°C < %6°C (min) reached",
+    "SoC %7% - surplus will full charge, but usoc too low",
 };
 
 static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
@@ -157,7 +157,7 @@ static bool isWasteExceedsLoad(SystemConfig *systemConfig, SystemState *systemSt
 // aware of max system power (production + max inverter power) or if surplus ("waste") exceeds load
 static bool isEnoughPowerAvailable(SystemConfig *systemConfig, SystemState *systemState)
 {
-  uint16_t consumption = systemState->cons_W_nom + systemConfig->loadPower_W; // current consumption plus load
+  uint16_t consumption = systemState->cons_W_nom + systemConfig->loadPower_W;
   return (systemState->system_Power_W - consumption) > systemConfig->gridMin_W;
 }
 
@@ -197,6 +197,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ((constraint = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
+      inverterLatencyCnt = 0;
     }
   }
   else
@@ -205,7 +206,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
           ((state == BatteryState::Max && systemState->usoc > BATTERY_MAX_USOC) ||
-           state == BatteryState::Balanced))))
+           (state == BatteryState::Balanced)))) &&
+        (inverterLatencyCnt++ > SONNEN_INVERTER_LATENCY_COUNT)) // stable
     {
       desiredState = true;
       inverterLatencyCnt = 0;

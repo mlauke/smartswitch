@@ -108,9 +108,7 @@ button {
 
 .fg {
   display: grid;
-  grid-template-columns: 40% 58%;
-  align-items: center;
-  position: relative;
+  grid-template-columns: 40% 60%;
 
   .value {
     padding: 0 0 4px 4px;
@@ -302,4 +300,5 @@ button.loading .spinner {
 .hint {
   font-size: 0.75em;
   color: #666;
+  justify-self: right;
 }
