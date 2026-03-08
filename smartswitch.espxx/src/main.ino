@@ -206,7 +206,7 @@ void systemDefaults()
 {
   systemState.start_ts = 0;
   systemState.pv_forecast_ts = 0;
-  memset(systemState.pv_forecast_wh_h, 0, sizeof(systemState.pv_forecast_wh_h));
+  memset(systemState.pv_forecast_ts_wh, 0, sizeof(systemState.pv_forecast_ts_wh));
   systemState.eventIx = 0;
   systemState.inv_max_w = -1;
   systemState.utc_offset = -1;
@@ -270,10 +270,10 @@ bool updateSolarForecast()
       {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
-        if (i < sizeof(systemState.pv_forecast_wh_h) / sizeof(systemState.pv_forecast_wh_h[0]))
+        if (i < sizeof(systemState.pv_forecast_ts_wh) / sizeof(systemState.pv_forecast_ts_wh[0]))
         {
-          systemState.pv_forecast_wh_h[i][0] = ts;
-          systemState.pv_forecast_wh_h[i][1] = wh;
+          systemState.pv_forecast_ts_wh[i][0] = ts;
+          systemState.pv_forecast_ts_wh[i][1] = wh;
           i++;
         }
         else
