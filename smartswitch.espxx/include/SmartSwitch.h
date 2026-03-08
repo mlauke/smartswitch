@@ -47,7 +47,7 @@
 #define LPB_BAUDRATE 4800
 #define LPB_ADDR_SELF 2
 #define LPB_ADDR_DEST 0
-#define LPB_RETRIES 8
+#define LPB_RETRIES 3
 
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
@@ -101,6 +101,12 @@
   }                                                                    \
   (cfg).property[MIN(_cs(property) - 1, strlen((str)))] = '\0';
 
+enum SwitchMode
+{
+  SMODE_OFF,
+  SMODE_ON,
+  SMODE_AUTO
+};
 typedef struct
 {
 
@@ -119,7 +125,7 @@ typedef struct
   uint16_t az; // PV panel Azimuth 0..360°
   char location[CFG_SZ_LOCATION];
   char tz[CFG_SZ_TZ + 1];
-  uint8_t mode;        // 0 - off, 1 - on, 2 - automatic
+  enum SwitchMode mode;     // 0 - off, 1 - on, 2 - automatic
   bool update_startup; // release update check on startup
   uint16_t version;    //
 } SystemConfig;
@@ -162,7 +168,7 @@ typedef struct
   uint32_t fullChargeRequestIn; // next full charge request starts in given seconds
   int8_t charge;                // battery charge state 0 - none, 1 - charge, -1 - discharge
 
-  long pv_forecast_ts;                                // last update timestamp in ms since mcu start
+  long pv_forecast_ts;                                 // last update timestamp in ms since mcu start
   uint32_t pv_forecast_ts_wh[SOLAR_FORECAST_HOURS][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
 
   logEntry events[SIZE_EVENT_BUFFER]; // event buffer
@@ -176,12 +182,5 @@ typedef struct
   uint8_t errorIx = 0;
 
 } SystemState;
-
-enum SwitchMode
-{
-  SMODE_OFF,
-  SMODE_ON,
-  SMODE_AUTO
-};
 
 #endif

@@ -241,7 +241,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.usoc = 25;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 25% - battery below min capacity 2000Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 25% - battery min capacity 2000Wh will be reached", msg);
   TEST_ASSERT_FALSE(state);
 }
 
@@ -302,7 +302,7 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
   systemState.gridFeedIn_W = -50;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 5% - battery below min capacity 2000Wh", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 5% - battery min capacity 2000Wh will be reached", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }

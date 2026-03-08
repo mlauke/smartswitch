@@ -235,7 +235,7 @@ void configDefaults()
   config.loadPower_W = 1000; // initial assume 1kW
   config.cap_bat_min_Wh = 500;
   config.gridMin_W = GRID_PURCHASE_THRESHOLD_W;
-  config.mode = 0; // initial set to off
+  config.mode = SMODE_OFF; // initial set to off
   config.update_startup = false;
 
   config.version = 0;
@@ -357,7 +357,7 @@ void handleRoot()
 
 void jsonToConfig(JsonDocument &json)
 {
-  config.mode = json[F("mode")].as<uint8_t>();
+  config.mode = (SwitchMode)json[F("mode")].as<uint8_t>();
   setConfigStr(config, release_tag, json[F("release_tag")]);
 
   config.update_startup = json[F("update_startup")];
@@ -501,7 +501,7 @@ void handleAPI()
 
   if (server.hasArg(F("mode")))
   {
-    config.mode = server.arg(F("mode")).toInt() & 3;
+    config.mode = (SwitchMode)(server.arg(F("mode")).toInt() & 3);
     DEBUGF("Mode: %d\n", config.mode);
     saveConfig();
   }
@@ -812,9 +812,9 @@ void loop()
     }
     else
     {
-      updateState(&config, &systemState, validData);
-
       updateSolarForecast();
+
+      updateState(&config, &systemState, validData);
     }
     updateSwitch(systemState.switchEnabled);
 
@@ -1025,7 +1025,7 @@ static void updateState(SystemConfig *systemConfig, SystemState *systemState, bo
   }
   systemState->switchEnabled = (desiredState && systemConfig->mode == SMODE_AUTO) || (systemConfig->mode == SMODE_ON); // combine with mode
 
-  DEBUGF("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemState->ts), systemState->ts, systemState->usoc, systemState->prod_W, systemState->cons_W, systemState->cons_W, systemState->cons_avg_W, systemState->gridFeedIn_W, systemConfig->mode, systemState->switchEnabled);
+  DEBUGF("updateState() ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemState->ts), systemState->ts, systemState->usoc, systemState->prod_W, systemState->cons_W, systemState->cons_W, systemState->cons_avg_W, systemState->gridFeedIn_W, systemConfig->mode, systemState->switchEnabled);
 }
 
 static void updateSwitch(bool switchEnabled)

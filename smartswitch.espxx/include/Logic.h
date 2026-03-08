@@ -92,7 +92,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     return BatteryState::Min; // no solar forecast data, assume battery will become empty
   }
 
-  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 30 / 60; // required capacity (Wh) if load is switched on for 30min
+  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 15 / 60; // required capacity (Wh) if load is switched on for 15min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint32_t cap_bat_sim_previos_wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
@@ -137,7 +137,7 @@ const char *const CONSTRAINTS[] = {
     NULL,
     "SoC %7% - invalid data",
     "SoC %7% - consumption %0W too high, to much grid purchase %1W",
-    "SoC %7% - battery below min capacity %2Wh",
+    "SoC %7% - battery min capacity %2Wh will be reached",
     "SoC %7% - boiler temperature %3°C >= %4°C (max) reached",
     "SoC %7% - boiler temperature %5°C < %6°C (min) reached",
     "SoC %7% - surplus will full charge, but usoc too low",
@@ -193,7 +193,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((constraint = 1) && !validData) ||
         ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((constraint = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState) && systemState->cap_bat_Wh < systemConfig->cap_bat_min_Wh) ||
+        ((constraint = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState)) ||
         ((constraint = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
