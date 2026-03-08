@@ -66,7 +66,7 @@ static int seekToPvForecastData(SystemState *systemState)
 {
   short i = 0;
 
-  if (systemState->pv_forecast_wh_h[0][0] == 0)
+  if (systemState->pv_forecast_ts_wh[0][0] == 0)
   {
     return -1; // no solar forecast data
   }
@@ -76,7 +76,7 @@ static int seekToPvForecastData(SystemState *systemState)
 
   for (; i <= SOLAR_FORECAST_HOURS; i++)
   {
-    if ((foundPvData = (systemState->pv_forecast_wh_h[i][0] == ts))) // seek to pv forecast upon system ts
+    if ((foundPvData = (systemState->pv_forecast_ts_wh[i][0] == ts))) // seek to pv forecast upon system ts
     {
       break;
     }
@@ -99,8 +99,8 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
   uint32_t ts = systemState->ts - (systemState->ts % 3600); // full hour
 
-  uint32_t wh = (ts + 3600 - systemState->ts) * systemState->pv_forecast_wh_h[i][1] / 3600; // remaining pv production in this hour
-  DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", i, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_wh_h[i][1]);
+  uint32_t wh = (ts + 3600 - systemState->ts) * systemState->pv_forecast_ts_wh[i][1] / 3600; // remaining pv production in this hour
+  DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", i, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_ts_wh[i][1]);
   uint8_t hour = 0;
   for (i++; i < SOLAR_FORECAST_HOURS; i++, hour++)
   {
@@ -126,8 +126,8 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
       return BatteryState::Max;
     }
 
-    ts = systemState->pv_forecast_wh_h[i][0];
-    wh = systemState->pv_forecast_wh_h[i][1];
+    ts = systemState->pv_forecast_ts_wh[i][0];
+    wh = systemState->pv_forecast_ts_wh[i][1];
   }
   DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, toDate(ts));
   return BatteryState::Balanced;

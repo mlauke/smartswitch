@@ -248,7 +248,6 @@ static bool isDevMode()
 
 bool updateSolarForecast()
 {
-
   static bool lastResult = false;
 
   long ms = millis();
@@ -805,12 +804,7 @@ void loop()
       DEBUGLN("systime configured.");
     }
 
-    bool validData = ensureConnected();
-
-    //    validData &= validateConfig();
-    validData &= updateSystemData();
-    validData &= updateSolarForecast();
-    validData &= updateBoilerData();
+    bool validData = ensureConnected() && updateSystemData() && updateBoilerData();
 
     if (calibrateLoad)
     {
@@ -819,6 +813,8 @@ void loop()
     else
     {
       updateState(&config, &systemState, validData);
+
+      updateSolarForecast();
     }
     updateSwitch(systemState.switchEnabled);
 
@@ -918,7 +914,7 @@ bool fetchApiData(String uri, JsonDocument &json, JsonDocument *filter)
   return r;
 }
 
-bool updateSystemData()
+static bool updateSystemData()
 {
 
   static uint8_t errorLoopBackoff = 1;
@@ -1029,13 +1025,13 @@ static void updateState(SystemConfig *systemConfig, SystemState *systemState, bo
   DEBUGF("ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemState->ts), systemState->ts, systemState->usoc, systemState->prod_W, systemState->cons_W, systemState->cons_W, systemState->cons_avg_W, systemState->gridFeedIn_W, systemConfig->mode, systemState->switchEnabled);
 }
 
-void updateSwitch(bool switchEnabled)
+static void updateSwitch(bool switchEnabled)
 {
   digitalWrite(PIN_SSR, switchEnabled ? HIGH : LOW);
   buildInLED(switchEnabled);
 }
 
-bool loadConfig()
+static bool loadConfig()
 {
   if (!LittleFS.exists(CONFIGFILE))
   {
@@ -1069,7 +1065,7 @@ bool loadConfig()
   return true;
 }
 
-bool saveConfig()
+static bool saveConfig()
 {
   File f = LittleFS.open(CONFIGFILE, "w");
   if (!f)

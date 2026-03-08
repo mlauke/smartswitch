@@ -163,7 +163,7 @@ typedef struct
   int8_t charge;                // battery charge state 0 - none, 1 - charge, -1 - discharge
 
   long pv_forecast_ts;                                // last update timestamp in ms since mcu start
-  uint32_t pv_forecast_wh_h[SOLAR_FORECAST_HOURS][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
+  uint32_t pv_forecast_ts_wh[SOLAR_FORECAST_HOURS][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
 
   logEntry events[SIZE_EVENT_BUFFER]; // event buffer
   uint8_t eventIx = 0;
