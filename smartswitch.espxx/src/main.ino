@@ -1012,13 +1012,16 @@ static bool updateSystemData()
 
 static void updateState(SystemConfig *systemConfig, SystemState *systemState, bool validData)
 {
-  char msg[80];
+  bool desiredState = systemState->switchEnabled;
 
-  bool desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
-
-  if (systemConfig->mode == SMODE_AUTO && systemState->switchEnabled != desiredState)
+  if (systemConfig->mode == SMODE_AUTO)
   {
-    putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" - ") + msg);
+    char msg[80];
+    bool desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
+    if (systemState->switchEnabled != desiredState)
+    {
+      putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" - ") + msg);
+    }
   }
   systemState->switchEnabled = (desiredState && systemConfig->mode == SMODE_AUTO) || (systemConfig->mode == SMODE_ON); // combine with mode
 
