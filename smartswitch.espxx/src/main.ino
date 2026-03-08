@@ -1017,7 +1017,7 @@ static void updateState(SystemConfig *systemConfig, SystemState *systemState, bo
   if (systemConfig->mode == SMODE_AUTO)
   {
     char msg[80];
-    bool desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
+    desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
     if (systemState->switchEnabled != desiredState)
     {
       putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" - ") + msg);

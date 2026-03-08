@@ -148,7 +148,7 @@ const cmd_t cmdtbl[] = {
     { 0x050006b9, VT_TEMP, 7973, STR7973, 0, NULL, DEFAULT_FLAG, DEV_ALL },  // [°C ] - Diagnose Erzeuger - Trinkwasser - Speicherfühler B31
     { 0x050006b8, VT_TEMP, 8310, STR8310, 0, NULL, DEFAULT_FLAG, DEV_ALL },  // [°C ] - Diagnose Erzeuger - Kesseltemperatur
   */
-    {0x05000516, VT_TEMP, 8310, STR8310, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Diagnose Erzeuger - Kesseltemperatur
+    {0x05000516, VT_TEMP, 8310, STR8310, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Kesseltemperatur
     {0x05000532, VT_TEMP, 1610, STR1610, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Nennsollwert
     {0x050006ba, VT_TEMP, 1612, STR1612, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Reduziertsollwert
     {0x050006bc, VT_TEMP, 1645, STR1645, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Legionellenfkt. Sollwert
