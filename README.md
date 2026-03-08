@@ -46,7 +46,7 @@ therefore i decided to use a triac as switching device for a simple NO1 relais (
 #### Why not using a SSR?
 as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with the ESP controller board on a din rail inside of my houses fuse box.
 
-# TODOs
+# Features/Bugs
   - ❌ bug: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
   - ✅ bug: discharge not allowed but switch is triggered due to boiler min
   - ✅ detect battery training mode - support ticket at sonnen opened - workaround implemented "Set Point Priority" "Full Charge Request"
@@ -58,7 +58,7 @@ as mentioned above, a SSR which can drive the 3,3kW load will become very hot if
     - if boiler temp. is alread reached
   - ❌ feat: measure consumption avg per hour and week day and save to config for better long term approximation
   - ✅ feat: calibrate load automatically
-  - ❌ feat: below cap min but Production increases and remaining capacity is enough to drive load - but be aware that cap_min is never reached at this time
+  - ✅ feat: aggressive load - if battery is below min capacity, but production increases and surplus will full charge the battery during the day and remaining capacity is still enough to drive load
 
 ## Vision
 - hardware
