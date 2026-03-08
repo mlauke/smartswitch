@@ -27,6 +27,21 @@ the reference implementation (at my home) uses the following components
 - AC mains Triac cicuit to drive a 1NO Relay
 - 1NO Relay (Schütz) https://www.reichelt.de/de/de/shop/produkt/schaltrelais_1_s_230_v_ac_16_a-155592
 
+### Schematics
+
+The schematics and pcb is drawn with KiCad. The pcb uses a special layout which exactly matches the usable part of the ArduiBox's circuit board. KiCad files can be found <a href="kicad/">here.</a>
+
+<p align="center">
+<a href="public/sch.png">
+<img alt="Sonnen SmartSwitch wihin ArduiBox, Power Supply and Relais (Schütz) mounted on DIN rail" src="public/sch.png" width="30%"/>
+</a>
+<a href="public/pcb_3d.png">
+<img alt="Sonnen SmartSwitch wihin ArduiBox, Power Supply and Relais (Schütz) mounted on DIN rail" src="public/pcb_3d.png" width="30%"/>
+</a>
+</p>
+
+### Housing
+
 <details open align="center">
 <summary>Housing</summary>
 <a href="public/sss_arduibox.png">
@@ -66,7 +81,7 @@ therefore i decided to use a triac as switching device for a simple NO1 relais (
 as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with the ESP controller board on a din rail inside of my houses fuse box.
 
 # Features/Bugs
-  - ❌ bug: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysterese)
+  - ✅ bug: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysteresis)
   - ✅ bug: discharge not allowed but switch is triggered due to boiler min
   - ✅ detect battery training mode - support ticket at sonnen opened - workaround implemented "Set Point Priority" "Full Charge Request"
   - ✅ battery system data update every day or from time to time
@@ -74,7 +89,7 @@ as mentioned above, a SSR which can drive the 3,3kW load will become very hot if
   - ✅ fix: wait or delay on reset/restart requests, make sure response is send
   - ❌ feat: suspend/sleep for a while (or double the amount of sleep)
     - if switch is off and will stay off
-    - if boiler temp. is alread reached
+    - if boiler max temperature is reached already
   - ❌ feat: measure consumption avg per hour and week day and save to config for better long term approximation
   - ✅ feat: calibrate load automatically
   - ✅ feat: aggressive load - if battery is below min capacity, but production increases and surplus will full charge the battery during the day and remaining capacity is still enough to drive load
