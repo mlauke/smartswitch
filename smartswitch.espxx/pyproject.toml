@@ -5,12 +5,15 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-  "platformio"
+  "platformio>=6"
 ]
 
 # setup project
 # $ uv sync
 # $ uv venv
+
+# build
+# $ uv run pio run -e esp32 -e esp8266
 
 # run tests
 # $ uv run pio test -e native

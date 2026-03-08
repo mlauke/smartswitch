@@ -13,38 +13,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version-file: ".python-version"
 
-      - name: Install PlatformIO
-        run: |
-          python -m pip install --upgrade pip
-          pip install platformio
-
-      - name: Cache PlatformIO packages
-        uses: actions/cache@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
         with:
-          path: |
-            ~/.platformio/.cache
-            ~/.platformio/packages
-          key: ${{ runner.os }}-pio-${{ hashFiles('**/platformio.ini') }}
+          # Install a specific version of uv.
+          version: "0.10.9"
+
+      - name: Cache dependencies
+        uses: actions/cache@v5
+        with:
+          path: /tmp/.uv-cache
+          key: uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
           restore-keys: |
-            ${{ runner.os }}-pio-
+            uv-${{ runner.os }}-${{ hashFiles('uv.lock') }}
+            uv-${{ runner.os }}
+
+      - name: Install the project
+        run: |
+          cd smartswitch.espxx
+          uv sync --locked --all-extras --dev
 
       - name: Run Tests
         run: |
           cd smartswitch.espxx
-          pio test -e native
+          uv run pio test -e native
 
       - name: Build ESP32 and ESP8266 firmware
         run: |
           cd smartswitch.espxx
-          pio run -e esp32
-          pio run -e esp8266
+          uv run pio run -e esp32 -e esp8266
+
+      - name: Minimize uv cache
+        run: |
+          cd smartswitch.espxx
+          uv cache prune --ci
 
       - name: Rename firmware files
         run: |
