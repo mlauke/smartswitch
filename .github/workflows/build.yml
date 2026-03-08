@@ -51,7 +51,7 @@ jobs:
           uv cache prune --ci
 
       - name: Rename firmware files
-        run:
+        run: |
           mv .pio/build/esp8266/firmware.bin .pio/build/smartswitch.esp8266.ino.bin
           mv .pio/build/esp32/firmware.bin .pio/build/smartswitch.esp32.ino.bin
           gzip -9 -k .pio/build/smartswitch.esp8266.ino.bin
