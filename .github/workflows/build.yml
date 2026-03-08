@@ -11,6 +11,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smartswitch.espxx
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -31,28 +35,23 @@ jobs:
             uv-${{ runner.os }}
 
       - name: Install the project
-        run: |
-          cd smartswitch.espxx
+        run:
           uv sync --locked --all-extras --dev
 
       - name: Run Tests
-        run: |
-          cd smartswitch.espxx
+        run:
           uv run pio test -e native
 
       - name: Build ESP32 and ESP8266 firmware
-        run: |
-          cd smartswitch.espxx
+        run:
           uv run pio run -e esp32 -e esp8266
 
       - name: Minimize uv cache
-        run: |
-          cd smartswitch.espxx
+        run:
           uv cache prune --ci
 
       - name: Rename firmware files
-        run: |
-          cd smartswitch.espxx
+        run:
           mv .pio/build/esp8266/firmware.bin .pio/build/smartswitch.esp8266.ino.bin
           mv .pio/build/esp32/firmware.bin .pio/build/smartswitch.esp32.ino.bin
           gzip -9 -k .pio/build/smartswitch.esp8266.ino.bin
@@ -63,8 +62,8 @@ jobs:
         with:
           name: smartswitch-artifacts
           path: |
-            smartswitch.espxx/.pio/build/smartswitch.esp8266.ino.bin.gz
-            smartswitch.espxx/.pio/build/smartswitch.esp32.ino.bin
+            .pio/build/smartswitch.esp8266.ino.bin.gz
+            .pio/build/smartswitch.esp32.ino.bin
           retention-days: 1 # delete after build
 
   release:
