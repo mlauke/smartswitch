@@ -105,23 +105,22 @@ void setup()
 
   Serial.begin(SERIAL_BAUDRATE);
 
-  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
-
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(PIN_SSR, OUTPUT);
-
   updateSwitch(false);
 
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
   wifiManager.addParameter(&custom_hostname);
-  wifiManager.setConfigPortalTimeout(10);
+  wifiManager.setConfigPortalTimeout(60);
   if (!wifiManager.autoConnect("SmartSwitchAP"))
   {
     DEBUGLN("Failed to connect, restarting...");
     restart();
   }
+
+  lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
 
   DEBUGLN("Mounting FS...");
   if (!LittleFS.begin())
@@ -384,7 +383,7 @@ void jsonToConfig(JsonDocument &json)
 
 void configToJson(JsonDocument &json, bool confidential)
 {
-  json[F("mode")] = config.mode;
+  json[F("mode")] = (uint8_t)config.mode;
   json[F("release_tag")] = config.release_tag;
 
   json[F("update_startup")] = config.update_startup;
