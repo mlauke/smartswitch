@@ -1,10 +1,13 @@
 #include <unity.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <Logic.h>
 
 uint32_t ts = 0;
 SystemState systemState;
 SystemConfig systemConfig;
+
+void prepareForecast(int count, int *data);
 
 void tearDown(void)
 {
@@ -263,7 +266,7 @@ void test_determineDesiredStateSurplusWasteNoForecastData()
   TEST_ASSERT_TRUE(state);
 }
 
-void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
+void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
 {
   char msg[80];
 
@@ -307,6 +310,27 @@ void test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity()
   assertStaysStable(false);
 }
 
+void test_determineDesiredStateFinallyBelowMinCapacity()
+{
+  char msg[80];
+
+  systemState.ts = 1762556400 + (SOLAR_FORECAST_HOURS - 5) * 3600;
+  systemConfig.loadPower_W = 3251;
+  systemState.cons_W = 340;
+  systemState.prod_W = 1050;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
+  systemState.cap_bat_Wh = 1700;
+  systemState.usoc = 17;
+  systemState.switchEnabled = false;
+
+  int pvData[] = {500, 670, 500, 600, 500};
+  prepareForecast(sizeof(pvData) / sizeof(int), pvData);
+
+  bool state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_FALSE(state);
+}
+
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
@@ -322,9 +346,19 @@ int main(int argc, char **argv)
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
   RUN_TEST(test_determineDesiredStateSurplusWaste);
   RUN_TEST(test_determineDesiredStateSurplusWasteNoForecastData);
-  RUN_TEST(test_determineDesiredStateSurplusWillFullChargeBelowMinCapacity);
+  RUN_TEST(test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge);
+  RUN_TEST(test_determineDesiredStateFinallyBelowMinCapacity);
 
   return UNITY_END();
+}
+
+void prepareForecast(int count, int *data)
+{
+  for (int i = 0; i < SOLAR_FORECAST_HOURS; i++)
+  {
+    systemState.pv_forecast_ts_wh[i][0] = 1762556400 + i * 3600;
+    systemState.pv_forecast_ts_wh[i][1] = i >= (SOLAR_FORECAST_HOURS - count) ? data[count - (SOLAR_FORECAST_HOURS - i)] : 0;
+  }
 }
 
 void setUp(void)
