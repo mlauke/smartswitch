@@ -310,7 +310,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   assertStaysStable(false);
 }
 
-void test_determineDesiredStateFinallyBelowMinCapacity()
+void test_determineDesiredState_BatteryCapacityFinallyBelowMinCapacity()
 {
   char msg[80];
 
@@ -326,6 +326,29 @@ void test_determineDesiredStateFinallyBelowMinCapacity()
 
   int pvData[] = {500, 670, 500, 600, 500};
   prepareForecast(sizeof(pvData) / sizeof(int), pvData);
+
+  bool state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_FALSE(state);
+}
+
+void test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocTooLow()
+{
+  char msg[80];
+
+  int pvData[] = {500, 500, 500, 970, 1200, 1300, 1200, 1100, 1023};
+  int len = sizeof(pvData) / sizeof(int);
+
+  systemState.ts = 1762556400 + (SOLAR_FORECAST_HOURS - len) * 3600;
+  systemConfig.loadPower_W = 3251;
+  systemState.cons_W = 350;
+  systemState.prod_W = 1050;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
+  systemState.cap_bat_Wh = 100;
+  systemState.usoc = 1;
+  systemState.switchEnabled = false;
+
+  prepareForecast(len, pvData);
 
   bool state = determineState(msg, sizeof(msg));
   TEST_ASSERT_FALSE(state);
@@ -347,7 +370,9 @@ int main(int argc, char **argv)
   RUN_TEST(test_determineDesiredStateSurplusWaste);
   RUN_TEST(test_determineDesiredStateSurplusWasteNoForecastData);
   RUN_TEST(test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge);
-  RUN_TEST(test_determineDesiredStateFinallyBelowMinCapacity);
+
+  RUN_TEST(test_determineDesiredState_BatteryCapacityFinallyBelowMinCapacity);
+  RUN_TEST(test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocTooLow);
 
   return UNITY_END();
 }

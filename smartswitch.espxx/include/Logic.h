@@ -86,8 +86,8 @@ static int seekToPvForecastData(SystemState *systemState)
 
 static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, SystemState *systemState)
 {
-  short i = seekToPvForecastData(systemState);
-  if (i == -1)
+  short index = seekToPvForecastData(systemState);
+  if (index == -1)
   {
     return BatteryState::Min; // no solar forecast data, assume battery will become empty
   }
@@ -95,13 +95,13 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   uint16_t hysteresis_Wh = systemConfig->loadPower_W * 20 / 60; // required capacity (Wh) if load is switched on for 20min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
+  uint32_t ts = systemState->ts - (systemState->ts % 3600);                                      // full hour
+  uint32_t wh = (ts + 3600 - systemState->ts) * systemState->pv_forecast_ts_wh[index][1] / 3600; // remaining pv production in this hour
 
-  uint32_t ts = systemState->ts - (systemState->ts % 3600); // full hour
+  DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", index, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_ts_wh[index][1]);
 
-  uint32_t wh = (ts + 3600 - systemState->ts) * systemState->pv_forecast_ts_wh[i][1] / 3600; // remaining pv production in this hour
-  DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", i, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_ts_wh[i][1]);
   uint8_t hour = 0;
-  for (i++; i < SOLAR_FORECAST_HOURS; i++, hour++)
+  for (index++; index < SOLAR_FORECAST_HOURS; index++, hour++)
   {
     // adaptive weight
     float weight = 1.0f - ((float)(hour) / (float)SOLAR_FORECAST_HOURS);
@@ -113,7 +113,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
     // cumulate battery capacity upon production forecast in range [0..<bat max capacity>]
     cap_bat_sim_wh = MIN((uint16_t)MAX(0, (int)cap_bat_sim_wh + MIN(systemState->inv_max_w, (int)wh - systemState->cons_W_norm)), systemState->cap_bat_max_Wh);
-    DEBUGF("%d => %u (s) %s %u Wh (pv) %u Wh (bat) %u Wh (min) %u Wh (hys) %u W (cons) usoc: %u%%\n", i, ts, toDate(ts), wh, cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
+    DEBUGF("%d => %u (s) %s %u Wh (pv) %u Wh (bat) %u Wh (min) %u Wh (hys) %u W (cons) usoc: %u%%\n", index, ts, toDate(ts), wh, cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
 
     // capacity below expected min capacity and no positive battery capacity trend
     if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh < cap_bat_sim_previos_wh)
@@ -125,14 +125,14 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
       return BatteryState::Max;
     }
 
-    ts = systemState->pv_forecast_ts_wh[i][0];
-    wh = systemState->pv_forecast_ts_wh[i][1];
+    ts = systemState->pv_forecast_ts_wh[index][0];
+    wh = systemState->pv_forecast_ts_wh[index][1];
   }
   DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, toDate(ts));
   return cap_bat_sim_wh < cap_bat_min_Wh ? BatteryState::Min : BatteryState::Balanced;
 }
 
-const char *const CONSTRAINTS[] = {
+const char *const EVENTS[] = {
     NULL,
     "SoC %7% - invalid data",
     "SoC %7% - consumption %0W too high, to much grid purchase %1W",
@@ -176,7 +176,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   bool desiredState = systemState->switchEnabled;
 
-  uint8_t constraint = 0;
+  uint8_t event = 0;
 
   float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
   float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 1.2f; // ~0.8 °C heater "afterglow"
@@ -189,11 +189,11 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     // if so, we count until the system specific threshold is reached. if so, we switch off, because the load could not be driven
     inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0;
 
-    if (((constraint = 1) && !validData) ||
-        ((constraint = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
-        ((constraint = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((constraint = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState)) ||
-        ((constraint = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
+    if (((event = 1) && !validData) ||
+        ((event = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
+        ((event = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
+        ((event = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState)) ||
+        ((event = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
       inverterLatencyCnt = 0;
@@ -201,11 +201,11 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   }
   else
   {
-    if (((constraint = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
+    if (((event = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
-          ((state == BatteryState::Max && systemState->usoc > BATTERY_MAX_USOC) ||
-           (state == BatteryState::Balanced)))) &&
+          systemState->usoc > BATTERY_MAX_USOC &&
+          state != BatteryState::Min)) &&
         (inverterLatencyCnt++ > SONNEN_INVERTER_LATENCY_COUNT)) // stable
     {
       desiredState = true;
@@ -213,7 +213,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     }
   }
 
-  if (constraint != 0)
+  if (event != 0)
   {
     Arg args[] = {
         ARG_UINT, &systemState->cons_W_nom,
@@ -225,7 +225,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_FLT, &temp_on,
         ARG_UINT, &systemState->usoc};
 
-    format_indexed(msg, len, CONSTRAINTS[constraint], args);
+    format_indexed(msg, len, EVENTS[event], args);
   }
   return desiredState;
 }

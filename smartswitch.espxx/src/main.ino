@@ -46,6 +46,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <esp_task_wdt.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 
 #elif ESP8266
 #include <ESP8266HTTPClient.h>
@@ -53,7 +55,6 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266httpUpdate.h>
-
 #endif
 
 #include "SmartSwitch.h"
@@ -170,6 +171,16 @@ void setup()
   server.keepAlive(false);
 #endif
   start();
+
+  /* HTTP Server auf Core 0 */
+  // xTaskCreatePinnedToCore(
+  //     httpTask,
+  //     "HTTP",
+  //     8192,
+  //     NULL,
+  //     1,
+  //     NULL,
+  //     0);
 }
 
 void timerCallback()
