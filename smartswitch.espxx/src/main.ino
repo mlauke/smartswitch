@@ -1026,7 +1026,7 @@ static void updateState(SystemConfig *systemConfig, SystemState *systemState, bo
 
   if (systemConfig->mode == SMODE_AUTO)
   {
-    char msg[80];
+    char msg[96];
     desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
     if (systemState->switchEnabled != desiredState)
     {

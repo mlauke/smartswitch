@@ -55,12 +55,18 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
   systemState->system_Power_W = systemState->prod_W + (systemState->fullChargeRequest || systemState->usoc == 0 ? 0 : systemState->inv_max_w);
 }
 
-enum BatteryState
+enum BatteryLevel
 {
   Min,     // predicted final state will be below min capacity
   Max,     // predicted state will reach battery full capacity
   Balanced // neither min nor max will be reached
 };
+
+typedef struct
+{
+  uint8_t hours;
+  BatteryLevel level;
+} BatteryState;
 
 static int seekToPvForecastData(SystemState *systemState)
 {
@@ -89,7 +95,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   short index = seekToPvForecastData(systemState);
   if (index == -1)
   {
-    return BatteryState::Min; // no solar forecast data, assume battery will become empty
+    return BatteryState{.level = BatteryLevel::Min}; // no solar forecast data, assume battery will become empty
   }
 
   uint16_t hysteresis_Wh = systemConfig->loadPower_W * 20 / 60; // required capacity (Wh) if load is switched on for 20min
@@ -118,18 +124,21 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     // capacity below expected min capacity and no positive battery capacity trend
     if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh < cap_bat_sim_previos_wh)
     {
-      return BatteryState::Min;
+      return BatteryState{.hours = hour, .level = BatteryLevel::Min};
     }
     if (cap_bat_sim_wh == systemState->cap_bat_max_Wh)
     {
-      return BatteryState::Max;
+      return BatteryState{.hours = hour, .level = BatteryLevel::Max};
     }
 
     ts = systemState->pv_forecast_ts_wh[index][0];
     wh = systemState->pv_forecast_ts_wh[index][1];
   }
   DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, toDate(ts));
-  return cap_bat_sim_wh < cap_bat_min_Wh ? BatteryState::Min : BatteryState::Balanced;
+  return BatteryState{
+      .hours = hour,
+      .level = (cap_bat_sim_wh < cap_bat_min_Wh ? BatteryLevel::Min : BatteryLevel::Balanced),
+  };
 }
 
 const char *const EVENTS[] = {
@@ -137,9 +146,9 @@ const char *const EVENTS[] = {
     "SoC %0% - boiler temperature %1°C < %6°C (min) reached",
     "SoC %0% - invalid data",
     "SoC %0% - consumption %2W too high, to much grid purchase %3W",
-    "SoC %0% - battery min capacity %4Wh will be reached",
+    "SoC %0% - consumption %2W, battery min capacity %4Wh will be reached in ~%7h",
     "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
-    "SoC %0% - surplus will full charge, but SoC too low",
+    "SoC %0% - battery will full charge, but SoC too low",
 };
 
 static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
@@ -191,9 +200,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
     if (((event = 2) && !validData) ||
         ((event = 3) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
-        ((event = 4) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState)) ||
         ((event = 5) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((event = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
+        ((event = 4) && state.level == BatteryLevel::Min && !isSurplusAvailable(systemConfig, systemState)) ||
+        ((event = 6) && state.level == BatteryLevel::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
       inverterLatencyCnt = 0;
@@ -205,7 +214,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
           systemState->usoc > BATTERY_MAX_USOC &&
-          state != BatteryState::Min)) &&
+          state.level != BatteryLevel::Min)) &&
         (inverterLatencyCnt++ > SONNEN_INVERTER_LATENCY_COUNT)) // stable
     {
       desiredState = true;
@@ -222,7 +231,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_INT, &systemState->gridFeedIn_W,
         ARG_UINT, &systemConfig->cap_bat_min_Wh,
         ARG_FLT, &temp_off,
-        ARG_FLT, &temp_on};
+        ARG_FLT, &temp_on,
+        ARG_UINT, &state.hours};
 
     format_indexed(msg, len, EVENTS[event], args);
   }

@@ -71,7 +71,7 @@ void test_predictBatteryCapacityStateNoData()
   systemState.pv_forecast_ts_wh[0][0] = 0;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
 void test_predictBatteryCapacityStateSwitchOff()
@@ -82,7 +82,7 @@ void test_predictBatteryCapacityStateSwitchOff()
   systemState.switchEnabled = true;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
 void test_predictBatteryCapacityStateSwitchOn()
@@ -94,7 +94,7 @@ void test_predictBatteryCapacityStateSwitchOn()
   systemState.prod_W = 2150;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
 void test_predictBatteryCapacityStateSwitchOffOn()
@@ -104,12 +104,12 @@ void test_predictBatteryCapacityStateSwitchOffOn()
   systemState.cons_W = 246;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 
   systemState.switchEnabled = true;
   systemState.cons_W = systemConfig.loadPower_W + 253;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
 void test_predictBatteryCapacityStateSwitchHysteresis()
@@ -120,13 +120,13 @@ void test_predictBatteryCapacityStateSwitchHysteresis()
   systemState.cons_W = 245;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 
   systemState.ts = 1762598185 + 26 * 3600 + 10 * 60; // 10 min
   systemState.cons_W = systemConfig.loadPower_W + 261;
   systemState.switchEnabled = true;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
 void test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker()
@@ -138,13 +138,13 @@ void test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker()
   systemState.cons_W = 342;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 
   systemState.ts = 1762598185 + 26 * 3600 - 44 + 10; // 10s later
   systemState.cons_W = systemConfig.loadPower_W + 352;
   systemState.switchEnabled = true;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryState::Min, predictBatteryCapacityState(&systemConfig, &systemState));
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
 void test_determineDesiredStateBatteryTargetFulfilled()
@@ -227,7 +227,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
 
-  char msg[80];
+  char msg[90];
 
   systemState.switchEnabled = false;
   bool state = determineState(msg, sizeof(msg));
@@ -244,7 +244,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.usoc = 25;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 25% - battery min capacity 2000Wh will be reached", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 3700W, battery min capacity 2000Wh will be reached in ~12h", msg);
   TEST_ASSERT_FALSE(state);
 }
 
@@ -268,7 +268,7 @@ void test_determineDesiredStateSurplusWasteNoForecastData()
 
 void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
 {
-  char msg[80];
+  char msg[90];
 
   systemState.ts = 1762556400 + 34 * 3600;
   systemConfig.loadPower_W = 3251;
@@ -281,7 +281,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.switchEnabled = true;
 
   bool state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 1% - surplus will full charge, but SoC too low", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will full charge, but SoC too low", msg);
   TEST_ASSERT_FALSE(state);
 
   systemState.ts = 1762556400 + 35 * 3600;
@@ -305,7 +305,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.gridFeedIn_W = -50;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 5% - battery min capacity 2000Wh will be reached", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min capacity 2000Wh will be reached in ~0h", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }
