@@ -281,7 +281,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.switchEnabled = true;
 
   bool state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 1% - surplus will full charge, but usoc too low", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 1% - surplus will full charge, but SoC too low", msg);
   TEST_ASSERT_FALSE(state);
 
   systemState.ts = 1762556400 + 35 * 3600;

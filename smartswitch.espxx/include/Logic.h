@@ -134,12 +134,12 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
 const char *const EVENTS[] = {
     NULL,
-    "SoC %7% - invalid data",
-    "SoC %7% - consumption %0W too high, to much grid purchase %1W",
-    "SoC %7% - battery min capacity %2Wh will be reached",
-    "SoC %7% - boiler temperature %3°C >= %4°C (max) reached",
-    "SoC %7% - boiler temperature %5°C < %6°C (min) reached",
-    "SoC %7% - surplus will full charge, but usoc too low",
+    "SoC %0% - boiler temperature %1°C < %6°C (min) reached",
+    "SoC %0% - invalid data",
+    "SoC %0% - consumption %2W too high, to much grid purchase %3W",
+    "SoC %0% - battery min capacity %4Wh will be reached",
+    "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
+    "SoC %0% - surplus will full charge, but SoC too low",
 };
 
 static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
@@ -189,10 +189,10 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     // if so, we count until the system specific threshold is reached. if so, we switch off, because the load could not be driven
     inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0;
 
-    if (((event = 1) && !validData) ||
-        ((event = 2) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
-        ((event = 4) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((event = 3) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState)) ||
+    if (((event = 2) && !validData) ||
+        ((event = 3) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
+        ((event = 4) && state == BatteryState::Min && !isSurplusAvailable(systemConfig, systemState)) ||
+        ((event = 5) && isBoilerOffThreshold(systemState, temp_off)) ||
         ((event = 6) && state == BatteryState::Max && systemState->usoc <= BATTERY_MIN_USOC))
     {
       desiredState = false;
@@ -201,7 +201,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   }
   else
   {
-    if (((event = 5) && isBoilerOnThreshold(systemState, temp_on)) &&
+    if (((event = 1) && isBoilerOnThreshold(systemState, temp_on)) &&
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
           systemState->usoc > BATTERY_MAX_USOC &&
@@ -216,14 +216,13 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   if (event != 0)
   {
     Arg args[] = {
+        ARG_UINT, &systemState->usoc,
+        ARG_FLT, &systemState->boiler_T_cur,
         ARG_UINT, &systemState->cons_W_nom,
         ARG_INT, &systemState->gridFeedIn_W,
         ARG_UINT, &systemConfig->cap_bat_min_Wh,
-        ARG_FLT, &systemState->boiler_T_cur,
         ARG_FLT, &temp_off,
-        ARG_FLT, &systemState->boiler_T_cur,
-        ARG_FLT, &temp_on,
-        ARG_UINT, &systemState->usoc};
+        ARG_FLT, &temp_on};
 
     format_indexed(msg, len, EVENTS[event], args);
   }
