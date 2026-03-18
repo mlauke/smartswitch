@@ -120,8 +120,8 @@ button {
 span.switch {
   border-style: solid;
   border-width: 1px;
-  padding: 0px 4px;
-  border-radius: 4px;
+  padding: 1px 5px;
+  border-radius: 5px;
   background-color: #f05050;
 }
 
@@ -272,15 +272,15 @@ span.switch[data-value="true"] {
 }
 
 button.loading span {
-  visibility: hidden;
+  display: none;
 }
 
 button.loading .spinner {
-  position: absolute;
+  position: relative;
   width: 16px;
   height: 16px;
-  right: 28%;
-  top: 50%;
+  left: calc(50% - 8px);
+  top: calc(50%);
   border: 2px solid #ccc;
   border-top-color: #333;
   border-radius: 50%;
