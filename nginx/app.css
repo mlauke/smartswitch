@@ -108,12 +108,19 @@ button {
 
 .fg {
   display: grid;
+  align-items: center;
   grid-template-columns: 40% 60%;
+  padding: 0 0 4px 4px;
 
   .value {
-    padding: 0 0 4px 4px;
-    font-size: large;
     justify-self: right;
+    font-size: large;
+  }
+
+  .hint {
+    justify-self: right;
+    font-size: small;
+    color: #666;
   }
 }
 
@@ -295,10 +302,4 @@ button.loading .spinner {
   100% {
     transform: translateY(-50%) rotate(360deg);
   }
-}
-
-.hint {
-  font-size: 0.75em;
-  color: #666;
-  justify-self: right;
 }
