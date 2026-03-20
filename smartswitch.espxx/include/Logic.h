@@ -101,8 +101,11 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   uint16_t hysteresis_Wh = systemConfig->loadPower_W * 20 / 60; // required capacity (Wh) if load is switched on for 20min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
-  uint32_t ts = systemState->ts - (systemState->ts % 3600);                                      // full hour
-  uint32_t wh = (ts + 3600 - systemState->ts) * systemState->pv_forecast_ts_wh[index][1] / 3600; // remaining pv production in this hour
+  uint32_t ts = systemState->ts - (systemState->ts % 3600); // full hour
+  uint16_t seconds = ts + 3600 - systemState->ts;           // remaining seconds in this hour
+
+  uint32_t wh = seconds * systemState->pv_forecast_ts_wh[index][1] / 3600; // remaining pv production in this hour
+  uint16_t cons_wh;
 
   DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", index, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_ts_wh[index][1]);
 
@@ -112,14 +115,14 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     // adaptive weight
     float weight = 1.0f - ((float)(hour) / (float)SOLAR_FORECAST_HOURS);
 
-    // safety factor + adaptive weight
-    wh = wh * SOLAR_FORECAST_SAFETY_FACTOR * weight;
+    wh = wh * SOLAR_FORECAST_SAFETY_FACTOR * weight;     // apply safety factor + adaptive weight to production forecast
+    cons_wh = seconds * systemState->cons_W_norm / 3600; // remaining consumption in this hour
 
     uint32_t cap_bat_sim_previos_wh = cap_bat_sim_wh; // safe previous to check battery capacity trend
 
     // cumulate battery capacity upon production forecast in range [0..<bat max capacity>]
-    cap_bat_sim_wh = MIN((uint16_t)MAX(0, (int)cap_bat_sim_wh + MIN(systemState->inv_max_w, (int)wh - systemState->cons_W_norm)), systemState->cap_bat_max_Wh);
-    DEBUGF("%d => %u (s) %s %u Wh (pv) %u Wh (bat) %u Wh (min) %u Wh (hys) %u W (cons) usoc: %u%%\n", index, ts, toDate(ts), wh, cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
+    cap_bat_sim_wh = MIN((uint16_t)MAX(0, (int)cap_bat_sim_wh + MIN(systemState->inv_max_w, (int)wh - cons_wh)), systemState->cap_bat_max_Wh);
+    DEBUGF("%d => %u (s) %s %u Wh (pv) %u Wh (bat) %u Wh (min) %u Wh (hys) %u Wh (cons) usoc: %u%%\n", index, ts, toDate(ts), wh, cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, cons_wh, cap_bat_sim_wh * 100 / systemState->cap_bat_max_Wh);
 
     // capacity below expected min capacity and no positive battery capacity trend
     if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh < cap_bat_sim_previos_wh)
@@ -133,8 +136,9 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
     ts = systemState->pv_forecast_ts_wh[index][0];
     wh = systemState->pv_forecast_ts_wh[index][1];
+    seconds = 3600; // full hour
   }
-  DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u W at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, systemState->cons_W_norm, toDate(ts));
+  DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u Wh at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, cons_wh, toDate(ts));
   return BatteryState{
       .hours = hour,
       .level = (cap_bat_sim_wh < cap_bat_min_Wh ? BatteryLevel::Min : BatteryLevel::Balanced),

@@ -163,13 +163,13 @@ typedef struct
   float boiler_T_min;
   float boiler_T_max;
 
-  int16_t inv_max_w;            // inverter power max
+  int16_t inv_max_w;            // inverter power max - max charge/discharge power
   uint8_t usoc;                 // 0..100 user state of charge - battery capacity in %
   uint16_t system_Power_W;      // production + battery inverter max power (Watt) if battery usoc is >0
   uint16_t prod_W;              // production (Watt)
   uint16_t cons_W;              // consumption (Watt)
   uint16_t cons_W_nom;          // consumption rounded as multiple of 10 (Watt)
-  uint16_t cons_W_norm;         // normalized consumption without load
+  uint16_t cons_W_norm;         // normalized consumption without load (Watt)
   uint16_t cons_avg_W;          // consumption average (W)
   uint16_t bat_cycles;          // Number of charge/discharge cycles
   uint16_t cap_bat_new_Wh;      // max usable battery capacity for new battery

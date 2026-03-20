@@ -3,6 +3,8 @@
 #include <stdarg.h>
 #include <Logic.h>
 
+#define TEST_TS 1762556400
+
 uint32_t ts = 0;
 SystemState systemState;
 SystemConfig systemConfig;
@@ -217,7 +219,7 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 
 void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
 {
-  systemState.ts = 1762556400 + 47 * 3600; // reach min capacity + hysteresis
+  systemState.ts = TEST_TS + 47 * 3600; // reach min capacity + hysteresis
   systemConfig.loadPower_W = 3249;
   systemState.cap_bat_Wh = 5575;
   systemState.usoc = 41;
@@ -252,7 +254,7 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
 
 void test_determineDesiredStateSurplusWaste()
 {
-  systemState.ts = 1762556400 + 12 * 3600;
+  systemState.ts = TEST_TS + 12 * 3600;
   systemConfig.loadPower_W = 3251;
   systemState.cap_bat_Wh = 0;
   systemState.usoc = 0;
@@ -283,7 +285,7 @@ void test_determineDesiredStateSurplusWaste()
 
 void test_determineDesiredStateSurplusWasteNoForecastData()
 {
-  systemState.ts = 1762556400 + 12 * 3600;
+  systemState.ts = TEST_TS + 12 * 3600;
   systemConfig.loadPower_W = 3251;
   systemState.cap_bat_Wh = 0;
   systemState.usoc = 0;
@@ -303,7 +305,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
 {
   char msg[90];
 
-  systemState.ts = 1762556400 + 34 * 3600;
+  systemState.ts = TEST_TS + 34 * 3600;
   systemConfig.loadPower_W = 3251;
   systemState.cons_W = 247;
   systemState.prod_W = 2500;
@@ -317,7 +319,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will full charge, but SoC too low", msg);
   TEST_ASSERT_FALSE(state);
 
-  systemState.ts = 1762556400 + 35 * 3600;
+  systemState.ts = TEST_TS + 35 * 3600;
   systemState.cap_bat_Wh = 700;
   systemState.usoc = 11;
   systemState.switchEnabled = false;
@@ -333,7 +335,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
 
   systemState.cap_bat_Wh = 400;
   systemState.usoc = 5;
-  systemState.ts = 1762556400 + 32 * 3600;
+  systemState.ts = TEST_TS + 32 * 3600;
   systemState.prod_W = 230;
   systemState.gridFeedIn_W = -50;
 
@@ -343,11 +345,32 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   assertStaysStable(false);
 }
 
+void test_determineDesiredStateBelowMinCapacityAwareOfCurrentSurplus()
+{
+  char msg[80];
+
+  int pvData[] = {360, 390, 450, 800, 1100, 1400, 1700, 2000, 2300, 2500, 2600, 2400, 2100};
+  int len = sizeof(pvData) / sizeof(int);
+  prepareForecast(len, pvData);
+
+  systemState.ts = TEST_TS + (SOLAR_FORECAST_HOURS - len) * 3600 + 42 * 60; // surplus forecast in remaining time of hour (15min)
+  systemConfig.loadPower_W = 3251;
+  systemState.cons_W = 343;
+  systemState.prod_W = 590;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
+  systemState.cap_bat_Wh = 1100;
+  systemState.usoc = 11;
+  systemState.switchEnabled = false;
+
+  bool state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_TRUE(state);
+}
 void test_determineDesiredState_BatteryCapacityFinallyBelowMinCapacity()
 {
   char msg[80];
 
-  systemState.ts = 1762556400 + (SOLAR_FORECAST_HOURS - 5) * 3600;
+  systemState.ts = TEST_TS + (SOLAR_FORECAST_HOURS - 5) * 3600;
   systemConfig.loadPower_W = 3251;
   systemState.cons_W = 340;
   systemState.prod_W = 1050;
@@ -371,7 +394,7 @@ void test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocToo
   int pvData[] = {500, 500, 500, 970, 1200, 1300, 1200, 1100, 1023};
   int len = sizeof(pvData) / sizeof(int);
 
-  systemState.ts = 1762556400 + (SOLAR_FORECAST_HOURS - len) * 3600;
+  systemState.ts = TEST_TS + (SOLAR_FORECAST_HOURS - len) * 3600;
   systemConfig.loadPower_W = 3251;
   systemState.cons_W = 350;
   systemState.prod_W = 1050;
@@ -407,6 +430,8 @@ int main(int argc, char **argv)
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
   RUN_TEST(test_determineDesiredStateSurplusWaste);
   RUN_TEST(test_determineDesiredStateSurplusWasteNoForecastData);
+
+  RUN_TEST(test_determineDesiredStateBelowMinCapacityAwareOfCurrentSurplus);
   RUN_TEST(test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge);
 
   RUN_TEST(test_determineDesiredState_BatteryCapacityFinallyBelowMinCapacity);
@@ -419,7 +444,7 @@ void prepareForecast(int count, int *data)
 {
   for (int i = 0; i < SOLAR_FORECAST_HOURS; i++)
   {
-    systemState.pv_forecast_ts_wh[i][0] = 1762556400 + i * 3600;
+    systemState.pv_forecast_ts_wh[i][0] = TEST_TS + i * 3600;
     systemState.pv_forecast_ts_wh[i][1] = i >= (SOLAR_FORECAST_HOURS - count) ? data[count - (SOLAR_FORECAST_HOURS - i)] : 0;
   }
 }
@@ -444,7 +469,7 @@ void setUp(void)
   systemState.boiler_T_cur = 54.0f;
 
   int r = 0;
-  systemState.pv_forecast_ts_wh[r][0] = 1762556400;
+  systemState.pv_forecast_ts_wh[r][0] = TEST_TS;
   systemState.pv_forecast_ts_wh[r++][1] = 0;
   systemState.pv_forecast_ts_wh[r][0] = 1762560000;
   systemState.pv_forecast_ts_wh[r++][1] = 0;
