@@ -1,41 +1,45 @@
 .overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.7);
-  display: flex;
   justify-content: center;
   align-items: center;
   visibility: hidden;
   transition: opacity 0.3s ease, visibility 0.3s ease;
-  z-index: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .overlay.active {
   opacity: 1;
   visibility: visible;
+  z-index: 9999;
+}
+
+.overlay-header {
+  text-align: right;
+}
+
+.overlay-header,
+.overlay-content {
+  font-size: small;
+  padding: 4px;
+  max-width: 90%;
+  width: 100%;
+  border-radius: 10px;
 }
 
 .overlay-content {
-  font-size: small;
   background: white;
-  padding: 4px;
-  border-radius: 10px;
-  max-width: 90%;
-  width: 90%;
-  text-align: center;
+  max-height: 80dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: auto;
+  pointer-events: auto;
 
   .eventLog {
     text-align: left;
-  }
-
-  button {
-    padding: 10px 15px;
-    border: none;
-    cursor: pointer;
-    margin-top: 10px;
   }
 }
 

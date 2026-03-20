@@ -90,6 +90,7 @@ as mentioned above, a SSR which can drive the 3,3kW load will become very hot if
   - ❌ feat: suspend/sleep for a while (or double the amount of sleep)
     - if switch is off and will stay off
     - if boiler max temperature is reached already
+  - ❌ feat: capacity calculation should consider surplus difference between production and avg consumption in the current remaining hour => S+ = P - C(avg)
   - ❌ feat: measure consumption avg per hour and week day and save to config for better long term approximation
   - ✅ feat: calibrate load automatically
   - ✅ feat: aggressive load - if battery is below min capacity, but production increases and surplus will full charge the battery during the day and remaining capacity is still enough to drive load

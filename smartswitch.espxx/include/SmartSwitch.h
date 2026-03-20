@@ -101,6 +101,20 @@
   }                                                                    \
   (cfg).property[MIN(_cs(property) - 1, strlen((str)))] = '\0';
 
+enum SystemStatus
+{
+  Ok,
+  Error_Network,
+  Error_Battery,
+  Error_Boiler
+};
+
+static const char *SystemStatusLabel[4]{
+    "Ok",
+    "Network",
+    "Battery",
+    "Boilder"};
+
 enum SwitchMode
 {
   SMODE_OFF,
@@ -125,9 +139,9 @@ typedef struct
   uint16_t az; // PV panel Azimuth 0..360°
   char location[CFG_SZ_LOCATION];
   char tz[CFG_SZ_TZ + 1];
-  enum SwitchMode mode;     // 0 - off, 1 - on, 2 - automatic
-  bool update_startup; // release update check on startup
-  uint16_t version;    //
+  enum SwitchMode mode; // 0 - off, 1 - on, 2 - automatic
+  bool update_startup;  // release update check on startup
+  uint16_t version;     //
 } SystemConfig;
 
 typedef struct

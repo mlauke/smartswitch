@@ -144,9 +144,9 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 const char *const EVENTS[] = {
     NULL,
     "SoC %0% - boiler temperature %1°C < %6°C (min) reached",
-    "SoC %0% - invalid data",
+    "SoC %0% - invalid data, error was %8",
     "SoC %0% - consumption %2W too high, to much grid purchase %3W",
-    "SoC %0% - consumption %2W, battery min capacity %4Wh will be reached in ~%7h",
+    "SoC %0% - consumption %2W, battery min capacity %4Wh reached in ~%7h",
     "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
     "SoC %0% - battery will full charge, but SoC too low",
 };
@@ -179,7 +179,7 @@ static bool isBoilerOffThreshold(SystemState *systemState, float temperature_off
   return systemState->boiler_T_cur >= temperature_off;
 }
 
-static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, bool validData)
+static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, SystemStatus status)
 {
   static uint16_t inverterLatencyCnt = 0;
 
@@ -198,7 +198,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     // if so, we count until the system specific threshold is reached. if so, we switch off, because the load could not be driven
     inverterLatencyCnt = (systemState->gridFeedIn_W < -systemConfig->gridMin_W) ? inverterLatencyCnt + 1 : 0;
 
-    if (((event = 2) && !validData) ||
+    if (((event = 2) && status != SystemStatus::Ok) ||
         ((event = 3) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((event = 5) && isBoilerOffThreshold(systemState, temp_off)) ||
         ((event = 4) && state.level == BatteryLevel::Min && !isSurplusAvailable(systemConfig, systemState)) ||
@@ -227,12 +227,13 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     Arg args[] = {
         ARG_UINT, &systemState->usoc,
         ARG_FLT, &systemState->boiler_T_cur,
-        ARG_UINT, &systemState->cons_W_nom,
+        ARG_UINT, &systemState->cons_W_norm,
         ARG_INT, &systemState->gridFeedIn_W,
         ARG_UINT, &systemConfig->cap_bat_min_Wh,
         ARG_FLT, &temp_off,
         ARG_FLT, &temp_on,
-        ARG_UINT, &state.hours};
+        ARG_UINT, &state.hours,
+        ARG_STR, (void *)SystemStatusLabel[status]};
 
     format_indexed(msg, len, EVENTS[event], args);
   }

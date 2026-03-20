@@ -22,7 +22,7 @@ static void assertStaysStable(bool expectedState)
     systemState.ts += 5;
     systemState.cons_W += 16;
     updateSystemState(&systemConfig, &systemState);
-    bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+    bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
     TEST_ASSERT_EQUAL(expectedState, state);
   }
 }
@@ -33,7 +33,7 @@ static bool determineState(char *msg, size_t size)
   for (int i = 0; i <= SONNEN_INVERTER_LATENCY_COUNT + 1; i++) // +1 will switch
   {
     updateSystemState(&systemConfig, &systemState);
-    bool newState = determineDesiredState(msg, size, &systemConfig, &systemState, true);
+    bool newState = determineDesiredState(msg, size, &systemConfig, &systemState, SystemStatus::Ok);
     if (state != newState)
     {
       return newState;
@@ -147,6 +147,39 @@ void test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker()
   TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
 }
 
+void test_determineDesiredStateSwitchOffSystemStatusError_Network()
+{
+  char msg[80];
+
+  systemState.switchEnabled = true;
+  updateSystemState(&systemConfig, &systemState);
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Error_Network);
+  TEST_ASSERT_FALSE(state);
+  TEST_ASSERT_EQUAL_STRING("SoC 41% - invalid data, error was Network", msg);
+}
+
+void test_determineDesiredStateSwitchOffSystemStatusError_Battery()
+{
+  char msg[80];
+
+  systemState.switchEnabled = true;
+  updateSystemState(&systemConfig, &systemState);
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Error_Battery);
+  TEST_ASSERT_FALSE(state);
+  TEST_ASSERT_EQUAL_STRING("SoC 41% - invalid data, error was Battery", msg);
+}
+
+void test_determineDesiredStateSwitchOffSystemStatusError_Boiler()
+{
+  char msg[80];
+
+  systemState.switchEnabled = true;
+  updateSystemState(&systemConfig, &systemState);
+  bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Error_Boiler);
+  TEST_ASSERT_FALSE(state);
+  TEST_ASSERT_EQUAL_STRING("SoC 41% - invalid data, error was Boilder", msg);
+}
+
 void test_determineDesiredStateBatteryTargetFulfilled()
 {
   systemState.ts = 1762598185 + 26 * 3600 - 44; // reach min capacity + hysteresis
@@ -166,12 +199,12 @@ void test_determineDesiredStateBatteryTargetFulfilled()
 
   systemState.switchEnabled = state;
   updateSystemState(&systemConfig, &systemState);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_TRUE(state); // assert stable
 
   systemState.switchEnabled = state;
   updateSystemState(&systemConfig, &systemState);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_TRUE(state); // assert stable
 
   systemState.cons_W = 247 + systemConfig.loadPower_W + 30;
@@ -204,15 +237,15 @@ void test_determineDesiredStateFullchargeRequestedWithLatencyCount()
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W - systemConfig.loadPower_W;
 
   updateSystemState(&systemConfig, &systemState);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_TRUE(state);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_TRUE(state);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_TRUE(state);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_TRUE(state);
-  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, true);
+  state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok);
   TEST_ASSERT_FALSE(state); // switch off, load cannot be driven
   TEST_ASSERT_EQUAL_STRING("SoC 41% - consumption 1450W too high, to much grid purchase -2546W", msg);
 }
@@ -244,7 +277,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.usoc = 25;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 3700W, battery min capacity 2000Wh will be reached in ~12h", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 449W, battery min capacity 2000Wh reached in ~12h", msg);
   TEST_ASSERT_FALSE(state);
 }
 
@@ -305,7 +338,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.gridFeedIn_W = -50;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min capacity 2000Wh will be reached in ~0h", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min capacity 2000Wh reached in ~0h", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }
@@ -365,6 +398,11 @@ int main(int argc, char **argv)
   RUN_TEST(test_predictBatteryCapacityStateSwitchOffOn);
   RUN_TEST(test_predictBatteryCapacityStateSwitchHysteresis);
   RUN_TEST(test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker);
+
+  RUN_TEST(test_determineDesiredStateSwitchOffSystemStatusError_Network);
+  RUN_TEST(test_determineDesiredStateSwitchOffSystemStatusError_Battery);
+  RUN_TEST(test_determineDesiredStateSwitchOffSystemStatusError_Boiler);
+
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
   RUN_TEST(test_determineDesiredStateSurplusWaste);
@@ -393,11 +431,13 @@ void setUp(void)
   systemConfig.loadPower_W = 3100;
   systemConfig.gridMin_W = 100;
   systemConfig.cap_bat_min_Wh = 2000;
+
   systemState.cap_bat_max_Wh = 9900;
   systemState.inv_max_w = 4600;
   systemState.utc_offset = 3600;
   systemState.fullChargeRequest = false;
-  systemState.usoc = 0;
+  systemState.cap_bat_Wh = 4100;
+  systemState.usoc = 41;
 
   systemState.boiler_T_max = 65.0f;
   systemState.boiler_T_nom = 55.0f;

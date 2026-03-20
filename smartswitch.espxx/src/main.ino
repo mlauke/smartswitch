@@ -87,7 +87,7 @@ void start()
   server.begin(); // Actually start the server
   DEBUGLN("HTTP server started");
 
-  uint8_t retries = LPB_RETRIES;
+  uint8_t retries = isDevMode() ? 0 : LPB_RETRIES;
   if (!lpb->enableInterface(retries))
   {
     putBoilerError(String("LPB: No device found after ") + retries + " retries!");
@@ -707,7 +707,7 @@ void putEvent(String event)
   putEvent(event.c_str());
 }
 
-bool updateBoilerData()
+static bool updateBoilerData()
 {
 
   static long lastUpdate = 0;
@@ -736,13 +736,13 @@ bool updateBoilerData()
   return lastResult; // no new data, so still ok
 }
 
-void calibrate(bool validData)
+void calibrate(SystemStatus status)
 {
   static uint8_t cnt = CALIBRATE_LOOP_CNT;
   static uint16_t load_on[CALIBRATE_MEASURE];
   static uint16_t load_off[CALIBRATE_MEASURE];
 
-  if (!validData)
+  if (status != SystemStatus::Ok)
   {
     putEvent("invalid configuration, cannot calibrate load");
     calibrateLoad = false;
@@ -798,6 +798,17 @@ void updateSystemCounter()
   }
 }
 
+static SystemStatus determineSystemStatus()
+{
+  if (!ensureConnected())
+    return SystemStatus::Error_Network;
+  if (!updateSystemData())
+    return SystemStatus::Error_Battery;
+  if (!updateBoilerData())
+    return SystemStatus::Error_Boiler;
+  return SystemStatus::Ok;
+}
+
 // main loop
 void loop()
 {
@@ -814,21 +825,21 @@ void loop()
       DEBUGLN("systime configured.");
     }
 
-    bool validData = ensureConnected() && updateSystemData() && updateBoilerData();
+    SystemStatus status = determineSystemStatus();
 
     if (calibrateLoad)
     {
-      calibrate(validData);
+      calibrate(status);
     }
     else
     {
       updateSolarForecast();
 
-      updateState(&config, &systemState, validData);
+      updateState(&config, &systemState, status);
     }
     updateSwitch(systemState.switchEnabled);
 
-    DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), validData);
+    DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), status);
 
     updateSystemCounter();
 
@@ -858,7 +869,7 @@ void statusLED(int status)
   }
 }
 
-bool ensureConnected()
+static bool ensureConnected()
 {
   wl_status_t status = WiFi.status();
   if (status != WL_CONNECTED)
@@ -1020,14 +1031,14 @@ static bool updateSystemData()
   return ok;
 }
 
-static void updateState(SystemConfig *systemConfig, SystemState *systemState, bool validData)
+static void updateState(SystemConfig *systemConfig, SystemState *systemState, SystemStatus status)
 {
   bool desiredState = systemState->switchEnabled;
 
   if (systemConfig->mode == SMODE_AUTO)
   {
-    char msg[96];
-    desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, validData);
+    char msg[64];
+    desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, status);
     if (systemState->switchEnabled != desiredState)
     {
       putEvent(String(F("switch ")) + (desiredState ? F("on") : F("off")) + F(" - ") + msg);

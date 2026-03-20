@@ -67,12 +67,6 @@
     <legend>Events (<a href="#" onclick="showLog()">Log</a>)</legend>
     <div class="fgs">
       <div class="events" name="events"></div>
-      <div id="logOverlay" class="overlay">
-        <div class="overlay-content">
-          <div id="eventLog" class="eventLog"></div>
-          <button onclick="closeOverlay(this)">Close</button>
-        </div>
-      </div>
     </div>
   </fieldset>
   <form>
@@ -249,6 +243,15 @@
     </fieldset>
   </form>
   <script src="/app.js" defer></script>
+  <div id="logOverlay" class="overlay">
+    <div class="overlay-header">
+      <button onclick="closeOverlay(this)">Close</button>
+    </div>
+    <div class="overlay-content">
+      <div id="eventLog" class="eventLog"></div>
+    </div>
+  </div>
+
 </body>
 
 </html>
