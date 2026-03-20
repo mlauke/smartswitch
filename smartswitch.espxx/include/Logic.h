@@ -95,7 +95,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   short index = seekToPvForecastData(systemState);
   if (index == -1)
   {
-    return BatteryState{.level = BatteryLevel::Min}; // no solar forecast data, assume battery will become empty
+    return BatteryState{0, BatteryLevel::Min}; // no solar forecast data, assume battery will become empty
   }
 
   uint16_t hysteresis_Wh = systemConfig->loadPower_W * 20 / 60; // required capacity (Wh) if load is switched on for 20min
@@ -127,11 +127,11 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     // capacity below expected min capacity and no positive battery capacity trend
     if (cap_bat_sim_wh < cap_bat_min_Wh && cap_bat_sim_wh < cap_bat_sim_previos_wh)
     {
-      return BatteryState{.hours = hour, .level = BatteryLevel::Min};
+      return BatteryState{hour, BatteryLevel::Min};
     }
     if (cap_bat_sim_wh == systemState->cap_bat_max_Wh)
     {
-      return BatteryState{.hours = hour, .level = BatteryLevel::Max};
+      return BatteryState{hour, BatteryLevel::Max};
     }
 
     ts = systemState->pv_forecast_ts_wh[index][0];
@@ -140,8 +140,8 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   }
   DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u Wh at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, cons_wh, toDate(ts));
   return BatteryState{
-      .hours = hour,
-      .level = (cap_bat_sim_wh < cap_bat_min_Wh ? BatteryLevel::Min : BatteryLevel::Balanced),
+      hour,
+      (cap_bat_sim_wh < cap_bat_min_Wh ? BatteryLevel::Min : BatteryLevel::Balanced),
   };
 }
 
@@ -229,14 +229,14 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   if (event != 0)
   {
     Arg args[] = {
-        ARG_UINT, &systemState->usoc,
+        ARG_UINT8, &systemState->usoc,
         ARG_FLT, &systemState->boiler_T_cur,
         ARG_UINT, &systemState->cons_W_norm,
         ARG_INT, &systemState->gridFeedIn_W,
         ARG_UINT, &systemConfig->cap_bat_min_Wh,
         ARG_FLT, &temp_off,
         ARG_FLT, &temp_on,
-        ARG_UINT, &state.hours,
+        ARG_UINT8, &state.hours,
         ARG_STR, (void *)SystemStatusLabel[status]};
 
     format_indexed(msg, len, EVENTS[event], args);

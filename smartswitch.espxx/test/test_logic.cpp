@@ -73,7 +73,9 @@ void test_predictBatteryCapacityStateNoData()
   systemState.pv_forecast_ts_wh[0][0] = 0;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(0, state.hours);
 }
 
 void test_predictBatteryCapacityStateSwitchOff()
@@ -84,7 +86,9 @@ void test_predictBatteryCapacityStateSwitchOff()
   systemState.switchEnabled = true;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(21, state.hours);
 }
 
 void test_predictBatteryCapacityStateSwitchOn()
@@ -96,7 +100,9 @@ void test_predictBatteryCapacityStateSwitchOn()
   systemState.prod_W = 2150;
 
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(37, state.hours);
 }
 
 void test_predictBatteryCapacityStateSwitchOffOn()
@@ -106,12 +112,16 @@ void test_predictBatteryCapacityStateSwitchOffOn()
   systemState.cons_W = 246;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(5, state.hours);
 
   systemState.switchEnabled = true;
   systemState.cons_W = systemConfig.loadPower_W + 253;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(5, state.hours);
 }
 
 void test_predictBatteryCapacityStateSwitchHysteresis()
@@ -122,13 +132,16 @@ void test_predictBatteryCapacityStateSwitchHysteresis()
   systemState.cons_W = 245;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(11, state.hours);
 
   systemState.ts = 1762598185 + 26 * 3600 + 10 * 60; // 10 min
   systemState.cons_W = systemConfig.loadPower_W + 261;
   systemState.switchEnabled = true;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(11, state.hours);
 }
 
 void test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker()
@@ -140,13 +153,17 @@ void test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker()
   systemState.cons_W = 342;
   systemState.switchEnabled = false;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(11, state.hours);
 
   systemState.ts = 1762598185 + 26 * 3600 - 44 + 10; // 10s later
   systemState.cons_W = systemConfig.loadPower_W + 352;
   systemState.switchEnabled = true;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, predictBatteryCapacityState(&systemConfig, &systemState).level);
+  state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+  TEST_ASSERT_EQUAL(11, state.hours);
 }
 
 void test_determineDesiredStateSwitchOffSystemStatusError_Network()

@@ -29,6 +29,7 @@ enum ArgType
 {
     ARG_INT,
     ARG_UINT,
+    ARG_UINT8,
     ARG_FLT,
     ARG_STR,
 };
@@ -59,6 +60,9 @@ static void format_indexed(char *out, size_t out_size,
             {
             case ARG_UINT:
                 dst += snprintf(dst, out_size - (dst - out), "%d", *(uint16_t *)a->value);
+                break;
+            case ARG_UINT8:
+                dst += snprintf(dst, out_size - (dst - out), "%d", *(uint8_t *)a->value);
                 break;
             case ARG_INT:
                 dst += snprintf(dst, out_size - (dst - out), "%d", *(int16_t *)a->value);
