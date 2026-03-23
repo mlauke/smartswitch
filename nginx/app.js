@@ -50,8 +50,8 @@ function fetchData() {
   });
 }
 
-function fetchStatus() {
-  fetchAPI("/api/status", function (response, json) {
+async function fetchStatus() {
+  await fetchAPI("/api/status", function (response, json) {
     if (response !== undefined && response.ok && json !== undefined) {
       updateBattery(json["usoc"]);
       const events = json["events"];

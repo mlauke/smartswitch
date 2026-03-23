@@ -104,10 +104,10 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
   uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // full hour
-  uint16_t seconds = ts + SECONDS_PER_HOUR - systemState->ts;           // remaining seconds in this hour
 
+  uint16_t seconds = ts + SECONDS_PER_HOUR - systemState->ts;                          // remaining seconds in this hour
   uint32_t wh = seconds * systemState->pv_forecast_ts_wh[index][1] / SECONDS_PER_HOUR; // remaining pv production in this hour
-  uint16_t cons_wh;
+  uint16_t cons_wh = seconds * systemState->cons_W_norm / SECONDS_PER_HOUR;            // remaining consumption in this hour
 
   DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", index, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_ts_wh[index][1]);
 
@@ -117,8 +117,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     // adaptive weight
     float weight = 1.0f - ((float)(hour) / (float)SOLAR_FORECAST_HOURS);
 
-    wh = wh * SOLAR_FORECAST_SAFETY_FACTOR * weight;                 // apply safety factor + adaptive weight to production forecast
-    cons_wh = seconds * systemState->cons_W_norm / SECONDS_PER_HOUR; // remaining consumption in this hour
+    wh = wh * SOLAR_FORECAST_SAFETY_FACTOR * weight; // apply safety factor + adaptive weight to production forecast
 
     uint32_t cap_bat_sim_previos_wh = cap_bat_sim_wh; // safe previous to check battery capacity trend
 
@@ -138,7 +137,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
     ts = systemState->pv_forecast_ts_wh[index][0];
     wh = systemState->pv_forecast_ts_wh[index][1];
-    seconds = SECONDS_PER_HOUR; // next calculation we have a full hour
+    cons_wh = systemState->cons_W_norm; // next turn is full hour, so consumption is Wh
   }
   DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u Wh at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, cons_wh, toDate(ts));
   return BatteryState{
