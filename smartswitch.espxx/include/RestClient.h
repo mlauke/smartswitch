@@ -23,7 +23,7 @@ public:
 
   String lastError();
   int lastResponseCode();
-  bool fetch(String url, JsonDocument& doc, JsonDocument* filter, String hName = "", String hValue = "");
+  bool get(String url, JsonDocument& doc, JsonDocument* filter, String hName = "", String hValue = "");
 
 private:
   String _lastError;

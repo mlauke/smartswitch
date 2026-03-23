@@ -58,7 +58,7 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
   filter[F("assets")][0][F("browser_download_url")] = true;
 
   String url = String(update_host) + update_url;
-  if (restClient.fetch(url, json, &filter))
+  if (restClient.get(url, json, &filter))
   {
     if (!json[F("tag_name")].is<const char *>())
     {

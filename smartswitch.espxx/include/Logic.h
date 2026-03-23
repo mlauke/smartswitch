@@ -100,7 +100,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     return BatteryState{0, BatteryLevel::Min}; // no solar forecast data, assume battery will become empty
   }
 
-  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 20 / 60; // required capacity (Wh) if load is switched on for 20min
+  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 10 / 60; // required capacity (Wh) if load is switched on for 10min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
   uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // full hour

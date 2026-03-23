@@ -87,7 +87,7 @@ void start()
   server.begin(); // Actually start the server
   DEBUGLN("HTTP server started");
 
-  uint8_t retries = isDevMode() ? 0 : LPB_RETRIES;
+  uint8_t retries = isDevMode() ? 1 : LPB_RETRIES;
   if (!lpb->enableInterface(retries))
   {
     putBoilerError(String("LPB: No device found after ") + retries + " retries!");
@@ -272,7 +272,7 @@ bool updateSolarForecast()
     // solar forecast api requires azimuth with -180 north, -90 east, 0 south, 90 west
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.dec, config.az - 180, config.kWp);
 
-    if ((lastResult = restClient.fetch(String(url), json, NULL)))
+    if ((lastResult = restClient.get(String(url), json, NULL)))
     {
       serializeJsonPretty(json, Serial);
       uint8_t i = 0;
@@ -314,7 +314,7 @@ void updateLocation()
     RestClient restClient;
     JsonDocument json;
 
-    if ((saveConfigFile = restClient.fetch(URL_LOCATION, json, NULL)))
+    if ((saveConfigFile = restClient.get(URL_LOCATION, json, NULL)))
     {
       config.lon = json[F("lon")].as<double>();
       config.lat = json[F("lat")].as<double>();
@@ -336,33 +336,31 @@ void cacheControlHeader(bool cache)
 void commonHeader()
 {
   server.sendHeader(F("content-encoding"), F("gzip"));
+  cacheControlHeader(true);
 }
 
 void handleFavicon()
 {
   cacheControlHeader(true);
-  server.send_P(200, "image/x-icon", app_icon, sizeof(app_icon));
+  server.send_P(200, PSTR("image/x-icon"), app_icon, sizeof(app_icon));
 }
 
 void handleAppJs()
 {
   commonHeader();
-  cacheControlHeader(true);
-  server.send_P(200, "text/javascript", app_js, sizeof(app_js));
+  server.send_P(200, PSTR("text/javascript"), app_js, sizeof(app_js));
 }
 
 void handleAppCss()
 {
   commonHeader();
-  cacheControlHeader(true);
-  server.send_P(200, "text/css; charset=utf-8", app_css, sizeof(app_css));
+  server.send_P(200, PSTR("text/css;charset=utf-8"), app_css, sizeof(app_css));
 }
 
 void handleRoot()
 {
   commonHeader();
-  cacheControlHeader(false);
-  server.send_P(200, "text/html; charset=utf-8", index_html, sizeof(index_html));
+  server.send_P(200, PSTR("text/html;charset=utf-8"), index_html, sizeof(index_html));
 }
 
 void jsonToConfig(JsonDocument &json)
@@ -430,7 +428,7 @@ void sendJson(String from, JsonDocument &json)
   DEBUGF("%s - json %s\n", from.c_str(), jsonString.c_str());
 
   cacheControlHeader(false);
-  server.send(200, "application/json", jsonString);
+  server.send(200, F("application/json"), jsonString);
 }
 
 void addLog(JsonArray &array, logEntry &log)
@@ -596,7 +594,7 @@ void handleAPI()
 
 void handleNotFound()
 {
-  server.send_P(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
+  server.send_P(404, PSTR("text/plain"), PSTR("404: Not found")); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
 
 void restart()
@@ -905,12 +903,12 @@ static bool ensureConnected()
   return status == WL_CONNECTED;
 }
 
-bool fetchApiData(String uri, JsonDocument &json)
+bool fetchBatteryApi(String uri, JsonDocument &json)
 {
-  return fetchApiData(uri, json, NULL);
+  return fetchBatteryApi(uri, json, NULL);
 }
 
-bool fetchApiData(String uri, JsonDocument &json, JsonDocument *filter)
+bool fetchBatteryApi(String uri, JsonDocument &json, JsonDocument *filter)
 {
 
   bool r = false;
@@ -921,10 +919,10 @@ bool fetchApiData(String uri, JsonDocument &json, JsonDocument *filter)
   {
     char url[128];
     snprintf_P(url, sizeof(url), PSTR("http://%.31s/%s/%s"), config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    r = restClient.fetch(String(url), json, filter, "auth-token", config.sonnenApiToken);
+    r = restClient.get(String(url), json, filter, "auth-token", config.sonnenApiToken);
     if (!r)
     {
-      DEBUGF("ERROR: fetchApiData(%s)\n", uri.c_str());
+      DEBUGF("ERROR: fetchBatteryApi(%s)\n", uri.c_str());
       putBatteryError(restClient.lastError());
     }
   }
@@ -952,7 +950,7 @@ static bool updateSystemData()
 
   if (systemState.inv_max_w == -1)
   {
-    if ((ok &= fetchApiData(SONNEN_API_CONFIGURATIONS, json)))
+    if ((ok &= fetchBatteryApi(SONNEN_API_CONFIGURATIONS, json)))
     {
       systemState.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
       systemState.cap_bat_new_Wh = json[F("CM_MarketingModuleCapacity")].as<int>() * json[F("IC_BatteryModules")].as<int>() * 90 / 100;
@@ -961,7 +959,7 @@ static bool updateSystemData()
   }
   if (systemState.cap_bat_max_Wh == 0 || isUpdateSystemData())
   {
-    if (ok && (ok &= fetchApiData(SONNEN_API_BATTERY, json)))
+    if (ok && (ok &= fetchBatteryApi(SONNEN_API_BATTERY, json)))
     {
       systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
       systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
@@ -974,7 +972,7 @@ static bool updateSystemData()
   filter[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")] = true;
   filter[F("ic_status")][F("nextfullchargestarttime")] = true;
   filter[F("ic_status")][F("secondssincefullcharge")] = true;
-  if (ok && (ok &= fetchApiData(SONNEN_API_LATEST_DATA, json, &filter)))
+  if (ok && (ok &= fetchBatteryApi(SONNEN_API_LATEST_DATA, json, &filter)))
   {
     systemState.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
     systemState.fullChargeRequest = json[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
@@ -984,7 +982,7 @@ static bool updateSystemData()
 
     DEBUGF("UTC offset %d, discharge not allowed: %d %u\n", systemState.utc_offset, systemState.fullChargeRequest, systemState.fullChargeRequestIn);
   }
-  if (ok && (ok &= fetchApiData(SONNEN_API_STATUS, json)))
+  if (ok && (ok &= fetchBatteryApi(SONNEN_API_STATUS, json)))
   {
     systemState.usoc = json[F("USOC")].as<uint8_t>();
     systemState.cap_bat_Wh = systemState.cap_bat_max_Wh * systemState.usoc / 100;

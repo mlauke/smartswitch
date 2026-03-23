@@ -34,7 +34,7 @@ int RestClient::lastResponseCode()
   return _lastResponseCode;
 }
 
-bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, String hName, String hValue)
+bool RestClient::get(String url, JsonDocument &doc, JsonDocument *filter, String hName, String hValue)
 {
 
   HTTPClient http;
@@ -79,7 +79,7 @@ bool RestClient::fetch(String url, JsonDocument &doc, JsonDocument *filter, Stri
     }
     else
     {
-      _lastError.concat(url + " code: " + _lastResponseCode + " " + http.errorToString(_lastResponseCode));
+      _lastError.concat(url + F(" code: ") + _lastResponseCode + " " + http.errorToString(_lastResponseCode));
       DEBUGF("%s\n", _lastError.c_str());
     }
   }
