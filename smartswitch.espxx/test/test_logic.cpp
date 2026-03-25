@@ -357,7 +357,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.gridFeedIn_W = -50;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min capacity 2000Wh reached in ~0h", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min capacity 2000Wh reached", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }

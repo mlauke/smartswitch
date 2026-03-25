@@ -100,7 +100,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
     return BatteryState{0, BatteryLevel::Min}; // no solar forecast data, assume battery will become empty
   }
 
-  uint16_t hysteresis_Wh = systemConfig->loadPower_W * 10 / 60; // required capacity (Wh) if load is switched on for 10min
+  uint16_t hysteresis_Wh = systemConfig->loadPower_W >> 2; // required capacity (Wh) if load is switched on for 15min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
   uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
   uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // full hour
@@ -151,7 +151,7 @@ const char *const EVENTS[] = {
     "SoC %0% - boiler temperature %1°C < %6°C (min) reached",
     "SoC %0% - invalid data, error was %8",
     "SoC %0% - consumption %2W too high, to much grid purchase %3W",
-    "SoC %0% - consumption %2W, battery min capacity %4Wh reached in ~%7h",
+    "SoC %0% - consumption %2W, battery min capacity %4Wh reached%7",
     "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
     "SoC %0% - battery will full charge, but SoC too low",
 };
@@ -229,6 +229,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   if (event != 0)
   {
+    char label[16];
+    snprintf(label, sizeof(label), state.hours > 0 ? " in ~%dh" : "", state.hours);
+
     Arg args[] = {
         ARG_UINT8, &systemState->usoc,
         ARG_FLT, &systemState->boiler_T_cur,
@@ -237,7 +240,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_UINT, &systemConfig->cap_bat_min_Wh,
         ARG_FLT, &temp_off,
         ARG_FLT, &temp_on,
-        ARG_UINT8, &state.hours,
+        ARG_STR, &label,
         ARG_STR, (void *)SystemStatusLabel[status]};
 
     format_indexed(msg, len, EVENTS[event], args);
