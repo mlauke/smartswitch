@@ -307,10 +307,8 @@ bool updateSolarForecast()
 
 void updateLocation()
 {
-
   if (config.lat == 0.0 && config.lon == 0.0)
   {
-
     RestClient restClient;
     JsonDocument json;
 
@@ -318,7 +316,7 @@ void updateLocation()
     {
       config.lon = json[F("lon")].as<double>();
       config.lat = json[F("lat")].as<double>();
-      snprintf(config.location, CFG_SZ_LOCATION, "%s %s", json[F("zip")].as<const char *>(), json[F("city")].as<const char *>());
+      snprintf_P(config.location, CFG_SZ_LOCATION, PSTR("%s %s"), json[F("zip")].as<const char *>(), json[F("city")].as<const char *>());
       setConfigStr(config, tz, json[F("timezone")]);
       DEBUGF("Location: %f/%f - tz: %s loc: %s\n", config.lon, config.lat, config.tz, config.location);
     }
@@ -556,6 +554,7 @@ void handleAPI()
     config.az = MIN(360, MAX(0, server.arg(F("lc_az")).toInt()));
     config.dec = MIN(90, MAX(0, server.arg(F("lc_dec")).toInt()));
     systemState.pv_forecast_ts = 0; // force fetch new data
+    setConfigStr(config, location, PSTR("Location will be updated..."));
     saveConfig();
   }
   else if (server.hasArg(F("hostname")))
@@ -690,7 +689,7 @@ void clearBoilerError()
 
 void putLog(logEntry &log, const char *event)
 {
-  strncpy(log.msg, event, sizeof(log.msg));
+  snprintf(log.msg, sizeof(log.msg), "%s", event);
   log.ts = systemState.ts;
   DEBUGF("log %u: %s\n", systemState.ts, event);
 }
@@ -708,13 +707,13 @@ void putEvent(String event)
 static bool updateBoilerData()
 {
 
-  static long lastUpdate = 0;
+  static long long lastUpdateSeconds = 0;
   static long lastResult = false;
 
-  long ms = millis();
-  if (lastUpdate == 0 || ms > lastUpdate + BOILER_UPDATE_INTERVAL_MS)
+  long seconds = millis() / 1000;
+  if (lastUpdateSeconds == 0 || seconds > lastUpdateSeconds + BOILER_UPDATE_INTERVAL_SECONDS)
   {
-    lastUpdate = ms;
+    lastUpdateSeconds = seconds;
 
     boiler_t boilerData;
     if ((lastResult = lpb->update(&boilerData, isDevMode())))
@@ -781,7 +780,7 @@ void calibrate(SystemStatus status)
   }
 }
 
-uint16_t updateSystemCount = 0;
+uint16_t updateSystemCount = 0; // initially do update
 
 bool isUpdateSystemData()
 {
@@ -963,7 +962,7 @@ static bool updateSystemData()
     {
       systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
       systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
-      systemState.cap_bat_soh = systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_new_Wh;
+      systemState.cap_bat_soh = systemState.cap_bat_new_Wh == 0 ? 0 : systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_new_Wh;
       DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_soh);
     }
   }
@@ -974,7 +973,7 @@ static bool updateSystemData()
   filter[F("ic_status")][F("secondssincefullcharge")] = true;
   if (ok && (ok &= fetchBatteryApi(SONNEN_API_LATEST_DATA, json, &filter)))
   {
-    systemState.utc_offset = json[F("UTC_Offet")].as<uint8_t>() * 3600;
+    systemState.utc_offset = json[F("UTC_Offet")].as<int16_t>() * 3600;
     systemState.fullChargeRequest = json[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
     systemState.fullChargeRequestIn =
         json[F("ic_status")][F("nextfullchargestarttime")].as<uint32_t>() -

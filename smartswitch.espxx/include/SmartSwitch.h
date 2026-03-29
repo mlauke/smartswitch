@@ -61,8 +61,8 @@
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
-#define SOLAR_FORECAST_INTERVAL_MS 12 * 60 * 1000 // every 10min
-#define SOLAR_FORECAST_HOURS 49                   // 49h
+#define SOLAR_FORECAST_INTERVAL_MS (12 * 60 * 1000) // update intervall every 12min
+#define SOLAR_FORECAST_HOURS 49                     // 49h
 #define SOLAR_FORECAST_SAFETY_FACTOR 0.95f
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 #define URL_SOLAR_FORECAST_DEV "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
@@ -73,7 +73,7 @@
 #define BATTERY_MIN_USOC 3
 
 #define BOILER_TEMPERATURE_HYSTERESIS 2
-#define BOILER_UPDATE_INTERVAL_MS 15 * 1000
+#define BOILER_UPDATE_INTERVAL_SECONDS 15
 
 #define CFG_SZ_HOSTNAME 32
 #define CFG_SZ_REL_TAG 5
@@ -94,12 +94,14 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 #define _cs(a) sizeof(((SystemConfig *)0)->a)
-#define setConfigStr(cfg, property, str)                               \
-  if (strlen(str))                                                     \
-  {                                                                    \
-    strncpy((cfg).property, (str), MIN(_cs(property), strlen((str)))); \
-  }                                                                    \
-  (cfg).property[MIN(_cs(property) - 1, strlen((str)))] = '\0';
+#define setConfigStr(cfg, property, str)                          \
+  {                                                               \
+    const char *tmp = str;                                        \
+    if (tmp && *tmp)                                              \
+    {                                                             \
+      snprintf_P((cfg).property, _cs(property), PSTR("%s"), tmp); \
+    }                                                             \
+  }
 
 enum SystemStatus
 {
@@ -113,7 +115,7 @@ static const char *SystemStatusLabel[4]{
     "Ok",
     "Network",
     "Battery",
-    "Boilder"};
+    "Boiler"};
 
 enum SwitchMode
 {

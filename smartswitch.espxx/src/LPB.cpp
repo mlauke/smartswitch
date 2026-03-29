@@ -266,7 +266,10 @@ bool LPB::update(boiler_t *p, bool simulate)
     return false;
   }
 
-  if (getTemperature(8310, &boilerData.t_cur) == NAN || getTemperature(1610, &boilerData.t_nom) == NAN || getTemperature(1612, &boilerData.t_min) == NAN || getTemperature(1645, &boilerData.t_max) == NAN)
+  if (isnan(getTemperature(CMD_KESSEL_TEMPERATURE_CUR, &boilerData.t_cur)) ||
+      isnan(getTemperature(CMD_KESSEL_TEMPERATURE_NOM, &boilerData.t_nom)) ||
+      isnan(getTemperature(CMD_KESSEL_TEMPERATURE_MIN, &boilerData.t_min)) ||
+      isnan(getTemperature(CMD_KESSEL_TEMPERATURE_MAX, &boilerData.t_max)))
   {
     return false;
   }
@@ -815,7 +818,7 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte *rx_msg, byte *tx_msg, const b
 #endif
       i--;
       byte msg_type = rx_msg[4 + offset];
-      if (rx_msg[2] == myAddr && ((type == 0x12 && msg_type == 0x13) || (type = 0x14 && msg_type == 0x15)))
+      if (rx_msg[2] == myAddr && ((type == 0x12 && msg_type == 0x13) || (type == 0x14 && msg_type == 0x15)))
       {
         return BUS_OK;
       }

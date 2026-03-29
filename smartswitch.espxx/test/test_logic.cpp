@@ -196,7 +196,7 @@ void test_determineDesiredStateSwitchOffSystemStatusError_Boiler()
   updateSystemState(&systemConfig, &systemState);
   bool state = determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Error_Boiler);
   TEST_ASSERT_FALSE(state);
-  TEST_ASSERT_EQUAL_STRING("SoC 41% - invalid data, error was Boilder", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 41% - invalid data, error was Boiler", msg);
 }
 
 void test_determineDesiredStateBatteryTargetFulfilled()
@@ -470,6 +470,7 @@ void setUp(void)
 {
   int weatherFactor = 2;
 
+  inverterLatencyCnt = 0;
   systemConfig.loadPower_W = 3100;
   systemConfig.gridMin_W = 100;
   systemConfig.cap_bat_min_Wh = 2000;

@@ -129,6 +129,11 @@ const units optbl[] = {
     {VT_UNKNOWN, 1.0, 0, 0, DT_STRN, 1, U_NONE, sizeof(U_NONE), STR_UNKNOWN},
 };
 
+#define CMD_KESSEL_TEMPERATURE_CUR 8310
+#define CMD_KESSEL_TEMPERATURE_NOM 1610
+#define CMD_KESSEL_TEMPERATURE_MIN 1612
+#define CMD_KESSEL_TEMPERATURE_MAX 1645
+
 const cmd_t cmdtbl[] = {
     // Uhrzeit und Datum
     {0x053D000B, VT_DATETIME, 0, STR0, 0, NULL, DEFAULT_FLAG, DEV_ALL},     // [ ] - Uhrzeit und Datum
@@ -148,10 +153,10 @@ const cmd_t cmdtbl[] = {
     { 0x050006b9, VT_TEMP, 7973, STR7973, 0, NULL, DEFAULT_FLAG, DEV_ALL },  // [°C ] - Diagnose Erzeuger - Trinkwasser - Speicherfühler B31
     { 0x050006b8, VT_TEMP, 8310, STR8310, 0, NULL, DEFAULT_FLAG, DEV_ALL },  // [°C ] - Diagnose Erzeuger - Kesseltemperatur
   */
-    {0x05000516, VT_TEMP, 8310, STR8310, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Kesseltemperatur
-    {0x05000532, VT_TEMP, 1610, STR1610, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Nennsollwert
-    {0x050006ba, VT_TEMP, 1612, STR1612, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Reduziertsollwert
-    {0x050006bc, VT_TEMP, 1645, STR1645, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Legionellenfkt. Sollwert
+    {0x05000516, VT_TEMP, CMD_KESSEL_TEMPERATURE_CUR, STR8310, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Kesseltemperatur
+    {0x05000532, VT_TEMP, CMD_KESSEL_TEMPERATURE_NOM, STR1610, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Nennsollwert
+    {0x050006ba, VT_TEMP, CMD_KESSEL_TEMPERATURE_MIN, STR1612, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Reduziertsollwert
+    {0x050006bc, VT_TEMP, CMD_KESSEL_TEMPERATURE_MAX, STR1645, 0, NULL, DEFAULT_FLAG, DEV_ALL}, // [°C ] - Trinkwasser - Legionellenfkt. Sollwert
 
 };
 

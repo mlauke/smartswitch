@@ -50,7 +50,6 @@ static void format_indexed(char *out, size_t out_size,
 
     while (*p && (dst - out) < (int)(out_size - 1))
     {
-
         if (*p == '%' && p[1] >= '0' && p[1] <= '9')
         {
             int idx = p[1] - '0';

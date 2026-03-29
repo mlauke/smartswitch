@@ -29,7 +29,7 @@
 
 #define SECONDS_PER_HOUR 3600
 
-static char tsfmt[30];
+char tsfmt[30];
 char *toDate(uint32_t utc_ts, int16_t offset)
 {
   time_t time = (time_t)(utc_ts + offset);
@@ -82,7 +82,7 @@ static int findPvForecastData(SystemState *systemState)
   bool foundPvData = false;
   uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // start with timestamp of last full hour
 
-  for (; i <= SOLAR_FORECAST_HOURS; i++)
+  for (; i < SOLAR_FORECAST_HOURS; i++)
   {
     if ((foundPvData = (systemState->pv_forecast_ts_wh[i][0] == ts))) // seek to pv forecast upon system ts
     {
@@ -184,9 +184,10 @@ static bool isBoilerOffThreshold(SystemState *systemState, float temperature_off
   return systemState->boiler_T_cur >= temperature_off;
 }
 
+static uint16_t inverterLatencyCnt = 0;
+
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, SystemStatus status)
 {
-  static uint16_t inverterLatencyCnt = 0;
 
   bool desiredState = systemState->switchEnabled;
 

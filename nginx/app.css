@@ -120,9 +120,10 @@ button {
   align-items: center;
   grid-template-columns: 40% 60%;
   padding: 0 0 4px 4px;
+  font-size: large;
 
   .value {
-    justify-self: right;
+    text-align: right;
     font-size: large;
   }
 
