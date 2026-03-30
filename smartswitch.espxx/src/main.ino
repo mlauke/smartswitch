@@ -1026,7 +1026,7 @@ static bool updateSystemData()
     updateSystemState(&config, &systemState);
     if (systemState.stat_hour_key != prev_stat_key && prev_stat_key != -1)
     {
-      saveConfig(false); // persist stats on hour change, no version bump
+      saveConfig();
     }
   }
 
