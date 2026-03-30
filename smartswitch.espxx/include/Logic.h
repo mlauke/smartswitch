@@ -56,16 +56,31 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
   systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W ? systemConfig->loadPower_W : 0);
   systemState->system_Power_W = systemState->prod_W + (systemState->fullChargeRequest || systemState->usoc == 0 ? 0 : systemState->inv_max_w);
 
-  // Update per-hour-per-weekday consumption statistics (EMA α=0.1)
+  // Update per-hour-per-weekday consumption statistics (true hourly mean, cross-week EMA α=0.1)
   if (systemState->ts > 0)
   {
     time_t local_ts = (time_t)(systemState->ts + systemState->utc_offset);
     struct tm lt;
     gmtime_r(&local_ts, &lt);
     int16_t key = (int16_t)(lt.tm_wday * 24 + lt.tm_hour);
-    uint16_t *slot = &systemConfig->cons_stats_Wh[lt.tm_wday][lt.tm_hour];
-    *slot = (*slot == 0) ? systemState->cons_W_norm
-                         : (uint16_t)(((uint32_t)*slot * 9 + systemState->cons_W_norm) / 10);
+
+    // On hour rollover: compute true mean and blend into slot via EMA, then reset accumulators
+    if (key != systemState->stat_hour_key && systemState->stat_hour_key >= 0 && systemState->cons_count > 0)
+    {
+      uint8_t slot_day  = (uint8_t)(systemState->stat_hour_key / 24); // day of the hour being closed out (differs from current day at midnight)
+      uint8_t slot_hour = (uint8_t)(systemState->stat_hour_key % 24);
+      uint16_t *slot = &systemConfig->cons_stats_Wh[slot_day][slot_hour];
+      uint16_t hour_mean = (uint16_t)(systemState->cons_sum_W / systemState->cons_count);
+      *slot = (*slot == 0) ? hour_mean
+                           : (uint16_t)(((uint32_t)*slot * 9 + hour_mean) / 10);
+      systemState->cons_sum_W = 0;
+      systemState->cons_count = 0;
+    }
+
+    // Accumulate current sample into the (possibly just-reset) hour bucket
+    systemState->cons_sum_W += systemState->cons_W_norm;
+    systemState->cons_count++;
+
     systemState->stat_hour_key = key;
   }
 }
@@ -125,7 +140,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
   uint16_t hysteresis_Wh = systemConfig->loadPower_W >> 2; // required capacity (Wh) if load is switched on for 15min
   uint32_t cap_bat_sim_wh = systemState->cap_bat_Wh;
-  uint16_t cap_bat_min_Wh = systemConfig->cap_bat_min_Wh + (systemState->switchEnabled ? 0 : hysteresis_Wh);
+  uint16_t cap_bat_min_Wh = (systemConfig->bat_soc_min * systemState->cap_bat_max_Wh / 100) + (systemState->switchEnabled ? 0 : hysteresis_Wh);
   uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // full hour
 
   uint16_t seconds = ts + SECONDS_PER_HOUR - systemState->ts;                          // remaining seconds in this hour
@@ -174,7 +189,7 @@ const char *const EVENTS[] = {
     "SoC %0% - boiler temperature %1°C < %6°C (min) reached",
     "SoC %0% - invalid data, error was %8",
     "SoC %0% - consumption %2W too high, to much grid purchase %3W",
-    "SoC %0% - consumption %2W, battery min capacity %4Wh reached%7",
+    "SoC %0% - consumption %2W, battery min SoC %4% reached%7",
     "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
     "SoC %0% - battery will full charge, but SoC too low",
 };
@@ -261,7 +276,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_FLT, &systemState->boiler_T_cur,
         ARG_UINT, &systemState->cons_W_norm,
         ARG_INT, &systemState->gridFeedIn_W,
-        ARG_UINT, &systemConfig->cap_bat_min_Wh,
+        ARG_UINT8, &systemConfig->bat_soc_min,
         ARG_FLT, &temp_off,
         ARG_FLT, &temp_on,
         ARG_STR, &label,

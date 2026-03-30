@@ -53,3 +53,6 @@ _autosave-*
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Git worktrees
+.worktrees/

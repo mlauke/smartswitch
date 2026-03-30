@@ -132,7 +132,7 @@ typedef struct
   char sonnenApiToken[CFG_SZ_SONNENTOKEN];
 
   uint16_t loadPower_W;
-  uint16_t cap_bat_min_Wh; // battery min capacity - custom min capacity
+  uint8_t bat_soc_min; // battery min capacity as SoC (0..100%) - custom min capacity
   uint16_t gridMin_W;
   float lat;
   float lon;
@@ -141,10 +141,10 @@ typedef struct
   uint16_t az; // PV panel Azimuth 0..360°
   char location[CFG_SZ_LOCATION];
   char tz[CFG_SZ_TZ + 1];
-  enum SwitchMode mode; // 0 - off, 1 - on, 2 - automatic
-  bool update_startup;  // release update check on startup
-  uint16_t cons_stats_Wh[7][24]; // avg consumption per weekday (0=Sun) x hour (Watt), EMA
-  uint16_t version;     //
+  enum SwitchMode mode;          // 0 - off, 1 - on, 2 - automatic
+  bool update_startup;           // release update check on startup
+  uint16_t cons_stats_Wh[7][24]; // avg consumption per weekday (0=Sun) x hour (Watt), true hourly mean blended via cross-week EMA α=0.1
+  uint16_t version;              //
 } SystemConfig;
 
 typedef struct
@@ -199,6 +199,9 @@ typedef struct
   uint8_t errorIx = 0;
 
   int16_t stat_hour_key = -1; // weekday*24+hour key of last stats update, -1 = uninitialized
+
+  uint32_t cons_sum_W = 0; // running sum of cons_W_norm within current hour
+  uint16_t cons_count = 0; // number of samples accumulated in current hour
 
 } SystemState;
 

@@ -136,7 +136,7 @@ button {
 }
 
 .fg-s {
-  grid-template-columns: 60% 40%;
+  grid-template-columns: 50% 50%;
 }
 
 span.switch {
@@ -352,7 +352,7 @@ button.loading .spinner {
 
 .x-axis-spacer {
   flex-shrink: 0;
-  width: 32px; /* matches y-axis min-width + padding + border + margin */
+  width: 32px;
 }
 
 .stats-x-axis {

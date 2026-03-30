@@ -1,30 +1,32 @@
 #pragma once
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include "certs.h"
 
-#if defined(ESP8266)
-//static X509List *ROOT_CA_x509 = new X509List(ROOT_CA);
-#endif
+inline WiFiClient *newWiFiClient(String url)
+{
 
-inline WiFiClient* newWiFiClient(String url) {
+  WiFiClient *wifiClient;
 
-  WiFiClient* wifiClient;
-
-  if (url.startsWith("https")) {
+  if (url.startsWith("https"))
+  {
     wifiClient = new WiFiClientSecure();
-    ((WiFiClientSecure*)wifiClient)->setInsecure();
-    #if defined(ESP8266)
-    ((WiFiClientSecure*)wifiClient)->setBufferSizes(1024, 1024);
-    #elif defined(ESP32)
-    //((WiFiClientSecure*)wifiClient)->setCACert(ROOT_CA);
-    #endif
-  } else {
+#if defined(ESP32)
+    ((WiFiClientSecure *)wifiClient)->setCACert(ROOT_CA_BUNDLE);
+#elif defined(ESP8266)
+    ((WiFiClientSecure *)wifiClient)->setInsecure();
+    ((WiFiClientSecure *)wifiClient)->setBufferSizes(1024, 1024);
+#endif
+  }
+  else
+  {
     wifiClient = new WiFiClient();
   }
   return wifiClient;
 }
 
-inline void releaseWiFiClient(WiFiClient *client) {
+inline void releaseWiFiClient(WiFiClient *client)
+{
   client->stop();
   delete client;
 }

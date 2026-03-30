@@ -243,7 +243,7 @@ void configDefaults()
   setConfigStr(config, tz, "Europe/Berlin");
   config.location[0] = '\0';
   config.loadPower_W = 1000; // initial assume 1kW
-  config.cap_bat_min_Wh = 500;
+  config.bat_soc_min = 5;
   config.gridMin_W = GRID_PURCHASE_THRESHOLD_W;
   config.mode = SMODE_OFF; // initial set to off
   config.update_startup = false;
@@ -275,12 +275,13 @@ bool updateSolarForecast()
     if ((lastResult = restClient.get(String(url), json, NULL)))
     {
       serializeJsonPretty(json, Serial);
+      memset(systemState.pv_forecast_ts_wh, 0, sizeof(systemState.pv_forecast_ts_wh));
       uint8_t i = 0;
       for (JsonPair entry : json[F("result")].as<JsonObject>())
       {
         uint32_t ts = strtoul(entry.key().c_str(), NULL, 10);
         uint32_t wh = entry.value().as<uint32_t>();
-        if (i < sizeof(systemState.pv_forecast_ts_wh) / sizeof(systemState.pv_forecast_ts_wh[0]))
+        if (i < SOLAR_FORECAST_HOURS)
         {
           systemState.pv_forecast_ts_wh[i][0] = ts;
           systemState.pv_forecast_ts_wh[i][1] = wh;
@@ -288,7 +289,7 @@ bool updateSolarForecast()
         }
         else
         {
-          putEvent(String(F("WARN: overflow ")) + i);
+          putEvent(String(F("WARN: updateSolarForecast overflow ")) + i);
           break;
         }
       }
@@ -374,7 +375,7 @@ void jsonToConfig(JsonDocument &json)
   setConfigStr(config, sonnenApiToken, json[F("sn_token")]);
   config.gridMin_W = json[F("sn_grdmin")].as<uint16_t>();
   config.loadPower_W = json[F("sn_loadpower")].as<uint16_t>();
-  config.cap_bat_min_Wh = json[F("sn_cap_min")].as<uint16_t>();
+  config.bat_soc_min = json[F("sn_soc_min")].as<uint8_t>();
 
   config.lon = json[F("lc_lon")].as<float>();
   config.lat = json[F("lc_lat")].as<float>();
@@ -415,7 +416,7 @@ void configToJson(JsonDocument &json, bool confidential)
   }
   json[F("sn_grdmin")] = config.gridMin_W;
   json[F("sn_loadpower")] = config.loadPower_W;
-  json[F("sn_cap_min")] = config.cap_bat_min_Wh;
+  json[F("sn_soc_min")] = config.bat_soc_min;
 
   json[F("lc_lon")] = config.lon;
   json[F("lc_lat")] = config.lat;
@@ -561,7 +562,7 @@ void handleAPI()
       setConfigStr(config, sonnenApiToken, apiToken.c_str());
     }
     config.gridMin_W = MAX(50, MAX(0, server.arg(F("sn_grdmin")).toInt()));
-    config.cap_bat_min_Wh = MIN(systemState.cap_bat_max_Wh, MAX(0, server.arg(F("sn_cap_min")).toInt()));
+    config.bat_soc_min = MIN(100, MAX(0, server.arg(F("sn_soc_min")).toInt()));
     saveConfig();
     systemState.skipUpdateCountSysten = 0;
   }
@@ -573,8 +574,6 @@ void handleAPI()
     config.az = MIN(360, MAX(0, server.arg(F("lc_az")).toInt()));
     config.dec = MIN(90, MAX(0, server.arg(F("lc_dec")).toInt()));
     systemState.pv_forecast_ts = 0; // force fetch new data
-    memset(config.cons_stats_Wh, 0, sizeof(config.cons_stats_Wh));
-    systemState.stat_hour_key = -1;
     setConfigStr(config, location, PSTR("Location will be updated..."));
     saveConfig();
   }

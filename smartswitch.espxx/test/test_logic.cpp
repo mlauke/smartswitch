@@ -297,7 +297,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.usoc = 25;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 449W, battery min capacity 2000Wh reached in ~12h", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 449W, battery min SoC 20% reached in ~12h", msg);
   TEST_ASSERT_FALSE(state);
 }
 
@@ -358,7 +358,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.gridFeedIn_W = -50;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min capacity 2000Wh reached", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 5% - consumption 330W, battery min SoC 20% reached", msg);
   TEST_ASSERT_FALSE(state);
   assertStaysStable(false);
 }
@@ -430,26 +430,47 @@ void test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocToo
 
 void test_updateConsumptionStats()
 {
+  // Use TEST_TS local time to find wday/hour of hour being tested (hour 0) and next hour (hour 1)
+  time_t local_ts0 = (time_t)(TEST_TS + systemState.utc_offset);
+  struct tm lt0;
+  gmtime_r(&local_ts0, &lt0);
+  int wday = lt0.tm_wday;
+  int hour0 = lt0.tm_hour;
+  int hour1 = (hour0 + 1) % 24;
+  int wday1 = (hour0 == 23) ? (wday + 1) % 7 : wday;
+
+  // Accumulate 3 ticks in hour0: 300W, 400W, 500W → mean = 400W
   systemState.ts = TEST_TS;
-
-  time_t local_ts = (time_t)(systemState.ts + systemState.utc_offset);
-  struct tm lt;
-  gmtime_r(&local_ts, &lt);
-  int wday = lt.tm_wday;
-  int hour = lt.tm_hour;
-
-  // Initially zero after setUp
-  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour]);
-
-  // First update initializes slot directly with cons_W_norm
   systemState.cons_W = 300;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(300, systemConfig.cons_stats_Wh[wday][hour]);
+  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour0]); // slot not written yet
 
-  // Second update applies EMA: (300*9 + 400) / 10 = 310
   systemState.cons_W = 400;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(310, systemConfig.cons_stats_Wh[wday][hour]);
+  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour0]); // still within same hour
+
+  systemState.cons_W = 500;
+  updateSystemState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour0]); // still within same hour
+
+  // Advance to hour1 — triggers rollover: slot gets mean of hour0 samples (300+400+500)/3 = 400
+  systemState.ts = TEST_TS + 3600;
+  systemState.cons_W = 200;
+  updateSystemState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(400, systemConfig.cons_stats_Wh[wday][hour0]);  // true mean written
+  TEST_ASSERT_EQUAL(0,   systemConfig.cons_stats_Wh[wday1][hour1]); // hour1 slot not yet written
+
+  // Simulate a second occurrence of hour0 (next week): accumulate 200W
+  systemState.ts = TEST_TS + 7 * 24 * 3600; // same weekday, same hour, one week later
+  systemState.cons_W = 200;
+  updateSystemState(&systemConfig, &systemState); // triggers hour1→hour0 rollover (writes hour1, resets)
+  TEST_ASSERT_EQUAL(400, systemConfig.cons_stats_Wh[wday][hour0]); // unchanged until its own rollover
+
+  // Advance past hour0 again: EMA blends 200W mean into existing 400W: (400*9 + 200) / 10 = 380
+  systemState.ts = TEST_TS + 7 * 24 * 3600 + 3600;
+  systemState.cons_W = 200;
+  updateSystemState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(380, systemConfig.cons_stats_Wh[wday][hour0]); // cross-week EMA applied
 }
 
 void test_predictBatteryCapacityStateUsesStats()
@@ -465,13 +486,29 @@ void test_predictBatteryCapacityStateUsesStats()
   BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
   TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
 
-  // Fill all stats with high consumption (2000W): battery drains faster → must hit Min
+  // Fill all stats with high consumption: battery drains faster → must hit Min
   for (int d = 0; d < 7; d++)
     for (int h = 0; h < 24; h++)
       systemConfig.cons_stats_Wh[d][h] = 500;
 
   state = predictBatteryCapacityState(&systemConfig, &systemState);
   TEST_ASSERT_EQUAL(BatteryLevel::Min, state.level);
+
+  // Fill all stats with low consumption: battery will be full charged
+  for (int d = 0; d < 7; d++)
+    for (int h = 0; h < 24; h++)
+      systemConfig.cons_stats_Wh[d][h] = 100;
+
+  state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(BatteryLevel::Max, state.level);
+
+  // Fill all stats with mid range consumption: battery state will be balanced
+  for (int d = 0; d < 7; d++)
+    for (int h = 0; h < 24; h++)
+      systemConfig.cons_stats_Wh[d][h] = 300;
+
+  state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(BatteryLevel::Balanced, state.level);
 }
 
 int main(int argc, char **argv)
@@ -522,9 +559,11 @@ void setUp(void)
   inverterLatencyCnt = 0;
   memset(systemConfig.cons_stats_Wh, 0, sizeof(systemConfig.cons_stats_Wh));
   systemState.stat_hour_key = -1;
+  systemState.cons_sum_W = 0;
+  systemState.cons_count = 0;
   systemConfig.loadPower_W = 3100;
   systemConfig.gridMin_W = 100;
-  systemConfig.cap_bat_min_Wh = 2000;
+  systemConfig.bat_soc_min = 20;
 
   systemState.cap_bat_max_Wh = 9900;
   systemState.inv_max_w = 4600;
