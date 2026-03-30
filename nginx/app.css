@@ -115,6 +115,7 @@ button {
   }
 }
 
+.fg-s,
 .fg {
   display: grid;
   align-items: center;
@@ -132,6 +133,10 @@ button {
     font-size: small;
     color: #666;
   }
+}
+
+.fg-s {
+  grid-template-columns: 60% 40%;
 }
 
 span.switch {
@@ -311,5 +316,128 @@ button.loading .spinner {
 
   100% {
     transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+.day-selector {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  flex-wrap: wrap;
+}
+
+.day-btn {
+  flex: 1;
+  padding: 4px 2px;
+  font-size: small;
+}
+
+.day-btn.active {
+  background: #007BFF;
+  color: white;
+}
+
+.chart-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.bars-row {
+  display: flex;
+}
+
+.x-axis-row {
+  display: flex;
+}
+
+.x-axis-spacer {
+  flex-shrink: 0;
+  width: 32px; /* matches y-axis min-width + padding + border + margin */
+}
+
+.stats-x-axis {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 1px;
+  padding: 0 4px;
+}
+
+.stats-x-axis > .bar-lbl {
+  flex: 1;
+}
+
+.stats-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.55rem;
+  color: #888;
+  text-align: right;
+  min-width: 28px;
+  padding: 0 2px 4px 0;
+  border-right: 1px solid #ccc;
+  margin-right: 2px;
+}
+
+.stats-bars {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  height: 120px;
+  gap: 1px;
+  padding: 4px;
+  border-top: 1px solid #ccc;
+}
+
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bar {
+  width: 100%;
+  background: #007BFF;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+  transition: height 0.3s;
+}
+
+.bar-now {
+  background: #28a746;
+}
+
+.bar-lbl {
+  font-size: 0.6rem;
+  color: #888;
+  text-align: center;
+  line-height: 1.2;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bar {
+    background: #4a9eff;
+  }
+
+  .bar-now {
+    background: #6f6;
+  }
+
+  .bar-lbl {
+    color: #aaa;
+  }
+
+  .day-btn.active {
+    background: #4a9eff;
+  }
+
+  .stats-y-axis {
+    color: #aaa;
+    border-right-color: #555;
   }
 }

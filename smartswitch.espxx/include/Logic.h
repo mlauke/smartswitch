@@ -55,6 +55,19 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
   // consumption without load
   systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W ? systemConfig->loadPower_W : 0);
   systemState->system_Power_W = systemState->prod_W + (systemState->fullChargeRequest || systemState->usoc == 0 ? 0 : systemState->inv_max_w);
+
+  // Update per-hour-per-weekday consumption statistics (EMA α=0.1)
+  if (systemState->ts > 0)
+  {
+    time_t local_ts = (time_t)(systemState->ts + systemState->utc_offset);
+    struct tm lt;
+    gmtime_r(&local_ts, &lt);
+    int16_t key = (int16_t)(lt.tm_wday * 24 + lt.tm_hour);
+    uint16_t *slot = &systemConfig->cons_stats_Wh[lt.tm_wday][lt.tm_hour];
+    *slot = (*slot == 0) ? systemState->cons_W_norm
+                         : (uint16_t)(((uint32_t)*slot * 9 + systemState->cons_W_norm) / 10);
+    systemState->stat_hour_key = key;
+  }
 }
 
 enum BatteryLevel
@@ -92,6 +105,16 @@ static int findPvForecastData(SystemState *systemState)
   return foundPvData ? i : -1;
 }
 
+static uint16_t getConsumptionWh(SystemConfig *systemConfig, SystemState *systemState, uint32_t utc_ts, uint16_t seconds)
+{
+  time_t local_ts = (time_t)(utc_ts + systemState->utc_offset);
+  struct tm lt;
+  gmtime_r(&local_ts, &lt);
+  uint16_t stat = systemConfig->cons_stats_Wh[lt.tm_wday][lt.tm_hour];
+  uint16_t cons = (stat > 0) ? stat : systemState->cons_W_norm;
+  return (uint16_t)((uint32_t)seconds * cons / SECONDS_PER_HOUR);
+}
+
 static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, SystemState *systemState)
 {
   short index = findPvForecastData(systemState);
@@ -107,7 +130,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
   uint16_t seconds = ts + SECONDS_PER_HOUR - systemState->ts;                          // remaining seconds in this hour
   uint32_t wh = seconds * systemState->pv_forecast_ts_wh[index][1] / SECONDS_PER_HOUR; // remaining pv production in this hour
-  uint16_t cons_wh = seconds * systemState->cons_W_norm / SECONDS_PER_HOUR;            // remaining consumption in this hour
+  uint16_t cons_wh = getConsumptionWh(systemConfig, systemState, ts, seconds);         // remaining consumption in this hour
 
   DEBUGF("%d => %u %u (s) %s %u/%u (Wh)\n", index, ts, systemState->ts, toDate(ts), wh, systemState->pv_forecast_ts_wh[index][1]);
 
@@ -137,7 +160,7 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
 
     ts = systemState->pv_forecast_ts_wh[index][0];
     wh = systemState->pv_forecast_ts_wh[index][1];
-    cons_wh = systemState->cons_W_norm; // next turn is full hour, so consumption is Wh
+    cons_wh = getConsumptionWh(systemConfig, systemState, ts, SECONDS_PER_HOUR); // next turn is full hour, so consumption is Wh
   }
   DEBUGF("capacity %u Wh (bat) %u Wh (min) %u Wh (hys) %u Wh at %s\n", cap_bat_sim_wh, cap_bat_min_Wh, hysteresis_Wh, cons_wh, toDate(ts));
   return BatteryState{

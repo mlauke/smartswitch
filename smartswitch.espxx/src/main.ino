@@ -385,6 +385,17 @@ void jsonToConfig(JsonDocument &json)
   setConfigStr(config, location, json[F("loc")]);
   setConfigStr(config, tz, json[F("tz")]);
 
+  JsonArray dayStats = json[F("cons_stats")].as<JsonArray>();
+  if (!dayStats.isNull())
+  {
+    for (int d = 0; d < 7 && d < (int)dayStats.size(); d++)
+    {
+      JsonArray hourStats = dayStats[d].as<JsonArray>();
+      for (int h = 0; h < 24 && h < (int)hourStats.size(); h++)
+        config.cons_stats_Wh[d][h] = hourStats[h].as<uint16_t>();
+    }
+  }
+
   config.version = json[F("version")].as<uint16_t>();
 }
 
@@ -414,6 +425,14 @@ void configToJson(JsonDocument &json, bool confidential)
 
   json[F("loc")] = config.location;
   json[F("tz")] = config.tz;
+
+  JsonArray dayStats = json[F("cons_stats")].to<JsonArray>();
+  for (int d = 0; d < 7; d++)
+  {
+    JsonArray hourStats = dayStats.add<JsonArray>();
+    for (int h = 0; h < 24; h++)
+      hourStats.add(config.cons_stats_Wh[d][h]);
+  }
 
   json[F("version")] = config.version;
 }
@@ -554,6 +573,8 @@ void handleAPI()
     config.az = MIN(360, MAX(0, server.arg(F("lc_az")).toInt()));
     config.dec = MIN(90, MAX(0, server.arg(F("lc_dec")).toInt()));
     systemState.pv_forecast_ts = 0; // force fetch new data
+    memset(config.cons_stats_Wh, 0, sizeof(config.cons_stats_Wh));
+    systemState.stat_hour_key = -1;
     setConfigStr(config, location, PSTR("Location will be updated..."));
     saveConfig();
   }
@@ -1002,7 +1023,12 @@ static bool updateSystemData()
     }
     systemState.tm_yday = time.tm_yday;
 
+    int16_t prev_stat_key = systemState.stat_hour_key;
     updateSystemState(&config, &systemState);
+    if (systemState.stat_hour_key != prev_stat_key && prev_stat_key != -1)
+    {
+      saveConfig(false); // persist stats on hour change, no version bump
+    }
   }
 
   if (ok && !(ok &= (config.loadPower_W > 0)))
@@ -1086,7 +1112,7 @@ static bool loadConfig()
   return true;
 }
 
-static bool saveConfig()
+static bool saveConfig(bool updateVersion)
 {
   File f = LittleFS.open(CONFIGFILE, "w");
   if (!f)
@@ -1095,7 +1121,8 @@ static bool saveConfig()
     return false;
   }
 
-  config.version++; // update version
+  if (updateVersion)
+    config.version++; // update version
 
   JsonDocument json;
   configToJson(json, false);
@@ -1105,4 +1132,9 @@ static bool saveConfig()
   f.close();
   saveConfigFile = false;
   return true;
+}
+
+static bool saveConfig()
+{
+  return saveConfig(true);
 }

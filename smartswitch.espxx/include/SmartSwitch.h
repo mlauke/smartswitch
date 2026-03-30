@@ -143,6 +143,7 @@ typedef struct
   char tz[CFG_SZ_TZ + 1];
   enum SwitchMode mode; // 0 - off, 1 - on, 2 - automatic
   bool update_startup;  // release update check on startup
+  uint16_t cons_stats_Wh[7][24]; // avg consumption per weekday (0=Sun) x hour (Watt), EMA
   uint16_t version;     //
 } SystemConfig;
 
@@ -196,6 +197,8 @@ typedef struct
   logEntry error_bt; // last battery error
   logEntry error_lc; // last solar forecast or location error
   uint8_t errorIx = 0;
+
+  int16_t stat_hour_key = -1; // weekday*24+hour key of last stats update, -1 = uninitialized
 
 } SystemState;
 

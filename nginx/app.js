@@ -1,5 +1,6 @@
 
 var systemDataVersion = -1;
+var consStats = null;
 
 async function fetchAPI(uri, cb) {
 
@@ -46,6 +47,7 @@ function fetchData() {
     if (response !== undefined && response.ok && json !== undefined) {
       systemDataVersion = json["version"];
       toggleLoadPowerFields(false);
+      if (json["cons_stats"]) consStats = json["cons_stats"];
     }
   });
 }
@@ -124,9 +126,50 @@ function showLog() {
   }
 }
 
-function closeOverlay() {
-  const overlay = document.getElementById("logOverlay");
-  overlay !== null && overlay.classList.remove("active");
+function closeOverlay(btn) {
+  btn.closest('.overlay').classList.remove('active');
+}
+
+function showConsStats() {
+  document.getElementById("statsOverlay").classList.add("active");
+  renderConsStats(new Date().getDay());
+}
+
+function renderConsStats(dayIdx) {
+  document.querySelectorAll('#statsOverlay .day-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === dayIdx);
+  });
+  if (!consStats) return;
+  const data = consStats[dayIdx];
+  const maxVal = Math.max(...consStats.flat(), 1);
+  const yAxis = document.getElementById("statsYAxis");
+  if (yAxis) {
+    yAxis.innerHTML = "";
+    [maxVal + " Wh", Math.round(maxVal / 2) + " Wh", "0 Wh"].forEach(v => {
+      const s = document.createElement("span"); s.textContent = v; yAxis.appendChild(s);
+    });
+  }
+  const bars = document.getElementById("statsBars");
+  bars.innerHTML = "";
+  data.forEach((v, h) => {
+    const col = document.createElement("div");
+    col.className = "bar-col";
+    const bar = document.createElement("div");
+    bar.className = "bar" + (h === new Date().getHours() && dayIdx === new Date().getDay() ? " bar-now" : "");
+    bar.style.height = Math.round(v / maxVal * 100) + "%";
+    bar.title = h + ":00 — " + v + " W";
+    col.appendChild(bar);
+    bars.appendChild(col);
+  });
+  const xAxis = document.getElementById("statsXAxis");
+  if (xAxis && !xAxis.childElementCount) {
+    for (let h = 0; h < 24; h++) {
+      const lbl = document.createElement("div");
+      lbl.className = "bar-lbl";
+      lbl.textContent = (h % 6 === 0) ? h : "";
+      xAxis.appendChild(lbl);
+    }
+  }
 }
 
 function sendUpdate(payload){

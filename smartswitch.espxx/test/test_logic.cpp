@@ -1,6 +1,7 @@
 #include <unity.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <cstring>
 #include <Logic.h>
 
 #define TEST_TS 1762556400
@@ -427,17 +428,65 @@ void test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocToo
   TEST_ASSERT_FALSE(state);
 }
 
+void test_updateConsumptionStats()
+{
+  systemState.ts = TEST_TS;
+
+  time_t local_ts = (time_t)(systemState.ts + systemState.utc_offset);
+  struct tm lt;
+  gmtime_r(&local_ts, &lt);
+  int wday = lt.tm_wday;
+  int hour = lt.tm_hour;
+
+  // Initially zero after setUp
+  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour]);
+
+  // First update initializes slot directly with cons_W_norm
+  systemState.cons_W = 300;
+  updateSystemState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(300, systemConfig.cons_stats_Wh[wday][hour]);
+
+  // Second update applies EMA: (300*9 + 400) / 10 = 310
+  systemState.cons_W = 400;
+  updateSystemState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(310, systemConfig.cons_stats_Wh[wday][hour]);
+}
+
+void test_predictBatteryCapacityStateUsesStats()
+{
+  systemState.ts = 1762598185;
+  systemState.cap_bat_Wh = 4100;
+  systemState.cons_W = 298;
+  systemState.switchEnabled = false;
+  systemState.prod_W = 2150;
+
+  // With zero stats, falls back to cons_W_norm — same as test_predictBatteryCapacityStateSwitchOn
+  updateSystemState(&systemConfig, &systemState);
+  BatteryState state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_NOT_EQUAL(BatteryLevel::Min, state.level);
+
+  // Fill all stats with high consumption (2000W): battery drains faster → must hit Min
+  for (int d = 0; d < 7; d++)
+    for (int h = 0; h < 24; h++)
+      systemConfig.cons_stats_Wh[d][h] = 500;
+
+  state = predictBatteryCapacityState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(BatteryLevel::Min, state.level);
+}
+
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
 
   RUN_TEST(test_upateConsumption);
+  RUN_TEST(test_updateConsumptionStats);
   RUN_TEST(test_predictBatteryCapacityStateNoData);
   RUN_TEST(test_predictBatteryCapacityStateSwitchOff);
   RUN_TEST(test_predictBatteryCapacityStateSwitchOn);
   RUN_TEST(test_predictBatteryCapacityStateSwitchOffOn);
   RUN_TEST(test_predictBatteryCapacityStateSwitchHysteresis);
   RUN_TEST(test_predictBatteryCapacityStateSwitchHysteresisAvoidFlicker);
+  RUN_TEST(test_predictBatteryCapacityStateUsesStats);
 
   RUN_TEST(test_determineDesiredStateSwitchOffSystemStatusError_Network);
   RUN_TEST(test_determineDesiredStateSwitchOffSystemStatusError_Battery);
@@ -471,6 +520,8 @@ void setUp(void)
   int weatherFactor = 2;
 
   inverterLatencyCnt = 0;
+  memset(systemConfig.cons_stats_Wh, 0, sizeof(systemConfig.cons_stats_Wh));
+  systemState.stat_hour_key = -1;
   systemConfig.loadPower_W = 3100;
   systemConfig.gridMin_W = 100;
   systemConfig.cap_bat_min_Wh = 2000;

@@ -19,33 +19,39 @@
     <legend>Status</legend>
     <div class="container">
       <div>
-        <div class="fg">
+        <div class="fg-s">
           <div>Switch:</div>
           <div class="value">
             <span class="switch" name="switch" data-value="false"></span>
           </div>
         </div>
-        <div class="fg">
+        <div class="fg-s">
           <div>Production:</div>
           <div class="value"><span name="prod"></span> W</div>
         </div>
-        <div class="fg">
+        <div class="fg-s">
           <div>Consumption:</div>
           <div class="value"><span name="cons_w"></span> W</div>
         </div>
-        <div class="fg">
+        <div class="fg-s">
           <div>Cons. (avg):</div>
           <div class="value"><span name="cons_avg_w"></span> W</div>
         </div>
-        <div class="fg">
+        <div class="fg-s">
           <div>Grid:</div>
           <div class="value"><span name="grid"></span> W</div>
         </div>
-        <div class="fg">
+        <div class="fg-s">
           <div>Battery Load:</div>
           <div class="value">
             <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg" class="arrow-down">▼</span>
             <span data-value class=""><span name="pac_total_w"></span> W</span>
+          </div>
+        </div>
+        <div class="fg-s">
+          <div>Cons. Statistic:</div>
+          <div class="value">
+            <a href="#" onclick="showConsStats()">Stats</a>
           </div>
         </div>
       </div>
@@ -123,7 +129,7 @@
       </div>
       <div class="fg">
         <div></div>
-        <button id="calibrateBtn" type="button" onclick="javascript:triggerCalibrate();">
+        <button id="calibrateBtn" type="button" onclick="triggerCalibrate()">
           <span>Calibrate</span>
           <div class="spinner"></div>
         </button>
@@ -192,7 +198,7 @@
       </div>
     </fieldset>
   </form>
-  <form action="/api/update" method="post" onSubmit="return confirm('Sure?');">
+  <form action="/api/update" method="post" onSubmit="return confirm('Sure?')">
     <fieldset>
       <legend>Software</legend>
       <div class="fg">
@@ -232,12 +238,12 @@
       </div>
       <div class="fg">
         <div></div>
-        <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?');">
+        <input type="submit" name="restart" value="Restart" onclick="return confirm('Sure?')">
       </div>
       <div class="fg">
         <div></div>
         <input type="submit" name="reset" value="Factory Reset"
-          onclick="return confirm('Sure? WLAN Access Data will be erased!');">
+          onclick="return confirm('Sure? WLAN Access Data will be erased!')">
       </div>
     </fieldset>
   </form>
@@ -246,6 +252,30 @@
     <button class="close-btn" onclick="closeOverlay(this)">X</button>
     <div class="overlay-content">
       <div id="eventLog" class="eventLog"></div>
+    </div>
+  </div>
+  <div id="statsOverlay" class="overlay">
+    <button class="close-btn" onclick="closeOverlay(this)">X</button>
+    <div class="overlay-content">
+      <div class="day-selector">
+        <button class="day-btn" onclick="renderConsStats(0)">Sun</button>
+        <button class="day-btn" onclick="renderConsStats(1)">Mon</button>
+        <button class="day-btn" onclick="renderConsStats(2)">Tue</button>
+        <button class="day-btn" onclick="renderConsStats(3)">Wed</button>
+        <button class="day-btn" onclick="renderConsStats(4)">Thu</button>
+        <button class="day-btn" onclick="renderConsStats(5)">Fri</button>
+        <button class="day-btn" onclick="renderConsStats(6)">Sat</button>
+      </div>
+      <div class="chart-wrapper">
+        <div class="bars-row">
+          <div id="statsYAxis" class="stats-y-axis"></div>
+          <div id="statsBars" class="stats-bars"></div>
+        </div>
+        <div class="x-axis-row">
+          <div class="x-axis-spacer"></div>
+          <div id="statsXAxis" class="stats-x-axis"></div>
+        </div>
+      </div>
     </div>
   </div>
 
