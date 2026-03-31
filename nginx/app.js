@@ -112,7 +112,7 @@ function renderLog(el, ls, nm) {
   });
 }
 
-function batteryInfo(){
+function batteryInfo() {
   const overlay = document.getElementById("batInfoOverlay");
   overlay.classList.add("active");
 }
@@ -145,8 +145,8 @@ function renderConsStats(dayIdx) {
   const yAxis = document.getElementById("statsYAxis");
   if (yAxis) {
     yAxis.innerHTML = "";
-    [maxVal + " Wh", Math.round(maxVal / 2) + " Wh", "0 Wh"].forEach(v => {
-      const s = document.createElement("span"); s.textContent = v; yAxis.appendChild(s);
+    [maxVal, Math.round(maxVal / 2), 0].forEach(v => {
+      const s = document.createElement("span"); s.textContent = (v + " Wh"); yAxis.appendChild(s);
     });
   }
   const bars = document.getElementById("statsBars");
@@ -157,7 +157,7 @@ function renderConsStats(dayIdx) {
     const bar = document.createElement("div");
     bar.className = "bar" + (h === new Date().getHours() && dayIdx === new Date().getDay() ? " bar-now" : "");
     bar.style.height = Math.round(v / maxVal * 100) + "%";
-    bar.title = h + ":00 — " + v + " W";
+    bar.title = h + ":00 — " + v + " Wh";
     col.appendChild(bar);
     bars.appendChild(col);
   });
@@ -172,7 +172,7 @@ function renderConsStats(dayIdx) {
   }
 }
 
-function sendUpdate(payload){
+function sendUpdate(payload) {
   fetch("/api/update", {
     method: "POST",
     headers: {
@@ -182,18 +182,18 @@ function sendUpdate(payload){
   });
 }
 
-function toggleLoadPowerFields(isLoading){
+function toggleLoadPowerFields(isLoading) {
   document.getElementById("sn_loadpower").disabled = isLoading;
   const btn = document.getElementById("calibrateBtn");
   btn.disabled = isLoading;
-  if(isLoading){
+  if (isLoading) {
     btn.classList.add("loading");
-  }else{
+  } else {
     btn.classList.remove("loading");
   }
 }
 
-function triggerCalibrate(){
+function triggerCalibrate() {
   toggleLoadPowerFields(true);
   sendUpdate("calibrate");
 }
