@@ -151,11 +151,18 @@ function renderConsStats(dayIdx) {
   }
   const bars = document.getElementById("statsBars");
   bars.innerHTML = "";
+  const currentDay = new Date().getDay();
+  const currentHour = new Date().getHours()
+  const currentAvg = document.getElementById("cons_avg_w").getAttribute("data-value");
   data.forEach((v, h) => {
     const col = document.createElement("div");
     col.className = "bar-col";
     const bar = document.createElement("div");
-    bar.className = "bar" + (h === new Date().getHours() && dayIdx === new Date().getDay() ? " bar-now" : "");
+    bar.className = "bar";
+    if (h === currentHour && dayIdx === currentDay) {
+      bar.className += " bar-now";
+      v = currentAvg;
+    }
     bar.style.height = Math.round(v / maxVal * 100) + "%";
     bar.title = h + ":00 — " + v + " Wh";
     col.appendChild(bar);

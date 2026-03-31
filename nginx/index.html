@@ -35,7 +35,7 @@
         </div>
         <div class="fg-s">
           <div>Cons. (avg):</div>
-          <div class="value"><span name="cons_avg_w"></span> W</div>
+          <div class="value"><span id="cons_avg_w" name="cons_avg_w" data-value></span> W</div>
         </div>
         <div class="fg-s">
           <div>Grid:</div>
@@ -45,7 +45,7 @@
           <div>Battery Load:</div>
           <div class="value">
             <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg" class="arrow-down">▼</span>
-            <span data-value class=""><span name="pac_total_w"></span> W</span>
+            <span data-value><span name="pac_total_w"></span> W</span>
           </div>
         </div>
       </div>
@@ -162,7 +162,9 @@
   </form>
   <form action="/api/update" method="post">
     <fieldset>
-      <legend title="exact location is determined upon longitude and latitude on successful pv forecast data update. this may take some minutes until valid">PV Location</legend>
+      <legend
+        title="exact location is determined upon longitude and latitude on successful pv forecast data update. this may take some minutes until valid">
+        PV Location</legend>
       <div class="fg">
         <div>Location:</div>
         <div name="loc" readonly></div>

@@ -67,12 +67,11 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
     // On hour rollover: compute true mean and blend into slot via EMA, then reset accumulators
     if (key != systemState->stat_hour_key && systemState->stat_hour_key >= 0 && systemState->cons_count > 0)
     {
-      uint8_t slot_day  = (uint8_t)(systemState->stat_hour_key / 24); // day of the hour being closed out (differs from current day at midnight)
+      uint8_t slot_day = (uint8_t)(systemState->stat_hour_key / 24); // day of the hour being closed out (differs from current day at midnight)
       uint8_t slot_hour = (uint8_t)(systemState->stat_hour_key % 24);
       uint16_t *slot = &systemConfig->cons_stats_Wh[slot_day][slot_hour];
-      uint16_t hour_mean = (uint16_t)(systemState->cons_sum_W / systemState->cons_count);
-      *slot = (*slot == 0) ? hour_mean
-                           : (uint16_t)(((uint32_t)*slot * 9 + hour_mean) / 10);
+      *slot = (*slot == 0) ? systemState->cons_avg_W
+                           : (uint16_t)(((uint32_t)*slot * 9 + systemState->cons_avg_W) / 10);
       systemState->cons_sum_W = 0;
       systemState->cons_count = 0;
     }
@@ -80,7 +79,7 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
     // Accumulate current sample into the (possibly just-reset) hour bucket
     systemState->cons_sum_W += systemState->cons_W_norm;
     systemState->cons_count++;
-
+    systemState->cons_avg_W = (uint16_t)(systemState->cons_sum_W / systemState->cons_count);
     systemState->stat_hour_key = key;
   }
 }
