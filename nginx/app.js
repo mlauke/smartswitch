@@ -14,13 +14,13 @@ async function fetchAPI(uri, cb) {
     data = await response.json();
     Object.keys(data).forEach(key => {
       document.getElementsByName(key).forEach(e => {
+        const v = data[key];
         if (e.type == "radio") {
-          e.checked = e.value == data[key];
+          e.checked = e.value == v;
         } else if (e instanceof HTMLInputElement) {
-          e.value = data[key];
+          e.value = v;
         } else {
           const dv = "data-value";
-          var v = data[key];
           if (typeof (v) === "boolean") {
             e.textContent = v ? "On" : "Off";
             e.setAttribute(dv, v);

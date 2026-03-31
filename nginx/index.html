@@ -35,7 +35,7 @@
         </div>
         <div class="fg-s">
           <div>Cons. (avg):</div>
-          <div class="value"><span id="cons_avg_w" name="cons_avg_w" data-value></span> W</div>
+          <div class="value"><span name="cons_avg_w"></span> W</div>
         </div>
         <div class="fg-s">
           <div>Grid:</div>
@@ -45,7 +45,7 @@
           <div>Battery Load:</div>
           <div class="value">
             <span data-value name="chrg" class="arrow-up">▲</span><span data-value name="chrg" class="arrow-down">▼</span>
-            <span data-value><span name="pac_total_w"></span> W</span>
+            <span name="pac_total_w"></span> W
           </div>
         </div>
       </div>
@@ -252,6 +252,7 @@
     </div>
   </div>
   <div id="statsOverlay" class="overlay">
+    <span data-value id="cons_avg_w" name="cons_avg_w"></span>
     <button class="close-btn" onclick="closeOverlay(this)">X</button>
     <div class="overlay-content">
       <div class="day-selector">
