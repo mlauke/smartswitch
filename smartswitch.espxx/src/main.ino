@@ -465,6 +465,15 @@ void handleData()
 
   configToJson(json, true);
   json[F("start_ts")] = toLocalDate(&systemState, systemState.start_ts);
+
+  JsonArray forecast = json[F("pv_forecast")].to<JsonArray>();
+  for (int i = 0; i < SOLAR_FORECAST_HOURS; i++) {
+    if (systemState.pv_forecast_ts_wh[i][0] == 0) break;
+    JsonArray entry = forecast.add<JsonArray>();
+    entry.add(systemState.pv_forecast_ts_wh[i][0]); // Unix ts (s)
+    entry.add(systemState.pv_forecast_ts_wh[i][1]); // Wh
+  }
+
   sendJson("data", json);
 }
 

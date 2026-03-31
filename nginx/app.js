@@ -1,6 +1,7 @@
 
 var systemDataVersion = -1;
 var consStats = null;
+var pvForecastByDayHour = null; // {dayOfWeek: {hour: wh}}
 
 async function fetchAPI(uri, cb) {
 
@@ -48,6 +49,7 @@ function fetchData() {
       systemDataVersion = json["version"];
       toggleLoadPowerFields(false);
       if (json["cons_stats"]) consStats = json["cons_stats"];
+      if (json["pv_forecast"]) pvForecastByDayHour = parsePvForecast(json["pv_forecast"]);
     }
   });
 }
@@ -135,13 +137,27 @@ function showConsStats() {
   renderConsStats(new Date().getDay());
 }
 
+function parsePvForecast(raw) {
+  const map = {};
+  raw.forEach(([ts, wh]) => {
+    const d = new Date(ts * 1000);
+    const day = d.getDay();
+    const hour = d.getHours();
+    if (!map[day]) map[day] = {};
+    map[day][hour] = wh;
+  });
+  return map;
+}
+
 function renderConsStats(dayIdx) {
   document.querySelectorAll('#statsOverlay .day-btn').forEach((btn, i) => {
     btn.classList.toggle('active', i === dayIdx);
   });
   if (!consStats) return;
   const data = consStats[dayIdx];
-  const maxVal = Math.max(...consStats.flat(), 1);
+  const forecastDay = pvForecastByDayHour ? (pvForecastByDayHour[dayIdx] || {}) : {};
+  const forecastVals = Object.values(forecastDay);
+  const maxVal = Math.max(...consStats.flat(), ...forecastVals, 1);
   const yAxis = document.getElementById("statsYAxis");
   if (yAxis) {
     yAxis.innerHTML = "";
@@ -166,6 +182,14 @@ function renderConsStats(dayIdx) {
     bar.style.height = Math.round(v / maxVal * 100) + "%";
     bar.title = h + ":00 — " + v + " Wh";
     col.appendChild(bar);
+    const fWh = forecastDay[h] || 0;
+    if (fWh > 0) {
+      const fBar = document.createElement("div");
+      fBar.className = "bar-forecast";
+      fBar.style.height = Math.round(fWh / maxVal * 100) + "%";
+      fBar.title = h + ":00 — " + fWh + " Wh (Forecast)";
+      col.appendChild(fBar);
+    }
     bars.appendChild(col);
   });
   const xAxis = document.getElementById("statsXAxis");
