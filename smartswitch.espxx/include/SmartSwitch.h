@@ -49,6 +49,9 @@
 #define LPB_ADDR_DEST 0
 #define LPB_RETRIES 5
 
+#define SYSTEM_UPDATE_INTERVAL_MS 2000 // update intervall millis
+#define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
+
 #define SONNEN_API_URI "api/v2"
 #define SONNEN_API_CONFIGURATIONS "configurations"
 #define SONNEN_API_LATEST_DATA "latestdata"
@@ -56,8 +59,6 @@
 #define SONNEN_API_STATUS "status"
 #define SONNEN_INVERTER_LATENCY_MS 5000 // battery inverter latency until load is compensated - sonnen battery 10 specific
 #define SONNEN_INVERTER_LATENCY_COUNT (1 + (SONNEN_INVERTER_LATENCY_MS + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
-
-#define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 
 #define URL_LOCATION "http://ip-api.com/json/"
 
@@ -67,7 +68,6 @@
 #define URL_SOLAR_FORECAST "http://api.forecast.solar/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 #define URL_SOLAR_FORECAST_DEV "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
-#define SYSTEM_UPDATE_INTERVAL_MS 2000 // update intervall millis
 #define GRID_PURCHASE_THRESHOLD_W 100
 #define BATTERY_MAX_USOC 10
 #define BATTERY_MIN_USOC 3
@@ -156,8 +156,7 @@ typedef struct
 typedef struct
 {
   uint32_t start_ts;  // system start timestamp
-  uint32_t ts;        // current system time (UTC) - taken from battery status
-  uint16_t tm_yday;   // day of year
+  uint32_t ts;        // current system timestamp in seconds (UTC) - taken from battery status
   int16_t utc_offset; // UTC to local time offset in seconds
   bool switchEnabled; // state of the load switch
 

@@ -70,8 +70,11 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
       uint8_t slot_day = (uint8_t)(systemState->stat_hour_key / 24); // day of the hour being closed out (differs from current day at midnight)
       uint8_t slot_hour = (uint8_t)(systemState->stat_hour_key % 24);
       uint16_t *slot = &systemConfig->cons_stats_Wh[slot_day][slot_hour];
-      *slot = (*slot == 0) ? systemState->cons_avg_W
-                           : (uint16_t)(((uint32_t)*slot * 9 + systemState->cons_avg_W) / 10);
+      // sanity check, do we have enough samples collected in one hour, at least 80% uptime?
+      if (systemState->cons_count >= (0.8 * 3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000)))
+      {
+        *slot = (*slot == 0) ? systemState->cons_avg_W : (uint16_t)(((uint32_t)*slot * 9 + systemState->cons_avg_W) / 10);
+      }
       systemState->cons_sum_W = 0;
       systemState->cons_count = 0;
     }
@@ -190,7 +193,7 @@ const char *const EVENTS[] = {
     "SoC %0% - consumption %2W too high, to much grid purchase %3W",
     "SoC %0% - consumption %2W, battery min SoC %4% reached%7",
     "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
-    "SoC %0% - battery will full charge, but SoC too low",
+    "SoC %0% - battery will be full charged%7, but SoC too low",
 };
 
 static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemState)
@@ -267,8 +270,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   if (event != 0)
   {
-    char label[16];
-    snprintf(label, sizeof(label), state.hours > 0 ? " in ~%dh" : "", state.hours);
+    char hour_label[16];
+    snprintf(hour_label, sizeof(hour_label), state.hours > 0 ? " in ~%dh" : "", state.hours);
 
     Arg args[] = {
         ARG_UINT8, &systemState->usoc,
@@ -278,7 +281,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_UINT8, &systemConfig->bat_soc_min,
         ARG_FLT, &temp_off,
         ARG_FLT, &temp_on,
-        ARG_STR, &label,
+        ARG_STR, &hour_label,
         ARG_STR, (void *)SystemStatusLabel[status]};
 
     format_indexed(msg, len, EVENTS[event], args);

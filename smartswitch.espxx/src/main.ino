@@ -467,8 +467,10 @@ void handleData()
   json[F("start_ts")] = toLocalDate(&systemState, systemState.start_ts);
 
   JsonArray forecast = json[F("pv_forecast")].to<JsonArray>();
-  for (int i = 0; i < SOLAR_FORECAST_HOURS; i++) {
-    if (systemState.pv_forecast_ts_wh[i][0] == 0) break;
+  for (int i = 0; i < SOLAR_FORECAST_HOURS; i++)
+  {
+    if (systemState.pv_forecast_ts_wh[i][0] == 0)
+      break;
     JsonArray entry = forecast.add<JsonArray>();
     entry.add(systemState.pv_forecast_ts_wh[i][0]); // Unix ts (s)
     entry.add(systemState.pv_forecast_ts_wh[i][1]); // Wh
@@ -1029,7 +1031,6 @@ static bool updateSystemData()
     {
       systemState.start_ts = systemState.ts;
     }
-    systemState.tm_yday = time.tm_yday;
 
     int16_t prev_stat_key = systemState.stat_hour_key;
     updateSystemState(&config, &systemState);

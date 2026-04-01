@@ -167,8 +167,9 @@ function renderConsStats(dayIdx) {
   }
   const bars = document.getElementById("statsBars");
   bars.innerHTML = "";
-  const currentDay = new Date().getDay();
-  const currentHour = new Date().getHours()
+  const now = new Date();
+  const currentDay = now.getDay();
+  const currentHour = now.getHours()
   const currentAvg = document.getElementById("cons_avg_w").getAttribute("data-value");
   data.forEach((v, h) => {
     const col = document.createElement("div");
@@ -197,7 +198,7 @@ function renderConsStats(dayIdx) {
     for (let h = 0; h < 24; h++) {
       const lbl = document.createElement("div");
       lbl.className = "bar-lbl";
-      lbl.textContent = (h % 6 === 0) ? h : "";
+      lbl.textContent = (h % 6 === 0) ? (h.toString().padStart(2, '0') + ":00") : "";
       xAxis.appendChild(lbl);
     }
   }

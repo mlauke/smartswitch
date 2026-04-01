@@ -334,7 +334,7 @@ void test_determineDesiredStateBelowMinCapacityButSurplusWillFullCharge()
   systemState.switchEnabled = true;
 
   bool state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will full charge, but SoC too low", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will be full charged in ~7h, but SoC too low", msg);
   TEST_ASSERT_FALSE(state);
 
   systemState.ts = TEST_TS + 35 * 3600;
@@ -428,6 +428,50 @@ void test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocToo
   TEST_ASSERT_FALSE(state);
 }
 
+void test_updateConsumptionStats_Mean()
+{
+  time_t local_ts0 = (time_t)(TEST_TS + systemState.utc_offset);
+  struct tm lt0;
+  gmtime_r(&local_ts0, &lt0);
+  int wday = lt0.tm_wday;
+  int hour0 = lt0.tm_hour;
+  int hour1 = (hour0 + 1) % 24;
+  int wday1 = wday;
+
+  systemState.ts = TEST_TS;
+  systemState.cons_W = 300;
+  updateSystemState(&systemConfig, &systemState);
+  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour0]); // slot not written yet
+  TEST_ASSERT_EQUAL(300, systemState.cons_sum_W);
+  TEST_ASSERT_EQUAL(1, systemState.cons_count);
+  int i = 0;
+  for (; i < (55 * 60 * 1000 / SYSTEM_UPDATE_INTERVAL_MS); i++)
+  {
+    updateSystemState(&systemConfig, &systemState);
+    systemState.ts += SYSTEM_UPDATE_INTERVAL_MS / 1000;
+  }
+  TEST_ASSERT_EQUAL(300 + 300 * i, systemState.cons_sum_W);
+  TEST_ASSERT_EQUAL(1 + i, systemState.cons_count);
+
+  systemState.cons_W = 4200;
+  int j = 0;
+  for (; j < (5 * 60 * 1000 / SYSTEM_UPDATE_INTERVAL_MS); j++) // 5min before next hour
+  {
+    updateSystemState(&systemConfig, &systemState);
+    systemState.ts += SYSTEM_UPDATE_INTERVAL_MS / 1000;
+  }
+  TEST_ASSERT_EQUAL(300 + 300 * i + 4200 * j, systemState.cons_sum_W);
+  TEST_ASSERT_EQUAL(1 + i + j, systemState.cons_count);
+
+  // rollover
+  systemState.cons_W = 1200;
+  updateSystemState(&systemConfig, &systemState);
+  systemState.ts += SYSTEM_UPDATE_INTERVAL_MS / 1000;
+  TEST_ASSERT_EQUAL(1200, systemState.cons_sum_W);
+  TEST_ASSERT_EQUAL(1, systemState.cons_count);
+  TEST_ASSERT_EQUAL(624, systemConfig.cons_stats_Wh[wday][hour0]); // slot has been written yet
+}
+
 void test_updateConsumptionStats()
 {
   // Use TEST_TS local time to find wday/hour of hour being tested (hour 0) and next hour (hour 1)
@@ -437,7 +481,7 @@ void test_updateConsumptionStats()
   int wday = lt0.tm_wday;
   int hour0 = lt0.tm_hour;
   int hour1 = (hour0 + 1) % 24;
-  int wday1 = (hour0 == 23) ? (wday + 1) % 7 : wday;
+  int wday1 = wday;
 
   // Accumulate 3 ticks in hour0: 300W, 400W, 500W → mean = 400W
   systemState.ts = TEST_TS;
@@ -454,23 +498,35 @@ void test_updateConsumptionStats()
   TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday][hour0]); // still within same hour
 
   // Advance to hour1 — triggers rollover: slot gets mean of hour0 samples (300+400+500)/3 = 400
-  systemState.ts = TEST_TS + 3600;
+  for (int i = 0; i < 750; i++)
+  {
+    updateSystemState(&systemConfig, &systemState);
+  }
   systemState.cons_W = 200;
+  for (int i = 0; i < 750; i++)
+  {
+    updateSystemState(&systemConfig, &systemState);
+  }
+  systemState.ts = TEST_TS + 3600;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(400, systemConfig.cons_stats_Wh[wday][hour0]);  // true mean written
-  TEST_ASSERT_EQUAL(0,   systemConfig.cons_stats_Wh[wday1][hour1]); // hour1 slot not yet written
+  TEST_ASSERT_EQUAL(350, systemConfig.cons_stats_Wh[wday][hour0]); // true mean written
+  TEST_ASSERT_EQUAL(0, systemConfig.cons_stats_Wh[wday1][hour1]);  // hour1 slot not yet written
 
   // Simulate a second occurrence of hour0 (next week): accumulate 200W
   systemState.ts = TEST_TS + 7 * 24 * 3600; // same weekday, same hour, one week later
   systemState.cons_W = 200;
-  updateSystemState(&systemConfig, &systemState); // triggers hour1→hour0 rollover (writes hour1, resets)
-  TEST_ASSERT_EQUAL(400, systemConfig.cons_stats_Wh[wday][hour0]); // unchanged until its own rollover
+  updateSystemState(&systemConfig, &systemState);                  // triggers hour1→hour0 rollover (writes hour1, resets)
+  TEST_ASSERT_EQUAL(350, systemConfig.cons_stats_Wh[wday][hour0]); // unchanged until its own rollover
 
-  // Advance past hour0 again: EMA blends 200W mean into existing 400W: (400*9 + 200) / 10 = 380
+  // Advance past hour0 again: EMA blends 200W mean into existing 350W: (350*9 + 200) / 10 = 335
+  for (int i = 0; i < 1440; i++)
+  {
+    updateSystemState(&systemConfig, &systemState);
+  }
   systemState.ts = TEST_TS + 7 * 24 * 3600 + 3600;
   systemState.cons_W = 200;
   updateSystemState(&systemConfig, &systemState);
-  TEST_ASSERT_EQUAL(380, systemConfig.cons_stats_Wh[wday][hour0]); // cross-week EMA applied
+  TEST_ASSERT_EQUAL(335, systemConfig.cons_stats_Wh[wday][hour0]); // cross-week EMA applied
 }
 
 void test_predictBatteryCapacityStateUsesStats()
@@ -516,7 +572,9 @@ int main(int argc, char **argv)
   UNITY_BEGIN();
 
   RUN_TEST(test_upateConsumption);
+  RUN_TEST(test_updateConsumptionStats_Mean);
   RUN_TEST(test_updateConsumptionStats);
+
   RUN_TEST(test_predictBatteryCapacityStateNoData);
   RUN_TEST(test_predictBatteryCapacityStateSwitchOff);
   RUN_TEST(test_predictBatteryCapacityStateSwitchOn);
