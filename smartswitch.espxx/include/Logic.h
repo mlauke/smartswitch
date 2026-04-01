@@ -52,9 +52,12 @@ static char *toLocalDate(SystemState *systemState, uint32_t utc_ts)
 void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
 {
   systemState->cons_W_nom = (systemState->cons_W + 5) / 10 * 10; // round up multiple of 10W
-  // consumption without load
-  systemState->cons_W_norm = systemState->cons_W_nom - (systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W ? systemConfig->loadPower_W : 0);
-  systemState->system_Power_W = systemState->prod_W + (systemState->fullChargeRequest || systemState->usoc == 0 ? 0 : systemState->inv_max_w);
+
+  bool loadActive = systemState->switchEnabled && systemState->cons_W_nom > systemConfig->loadPower_W;
+  systemState->cons_W_norm = systemState->cons_W_nom - (loadActive ? systemConfig->loadPower_W : 0);
+
+  bool batteryAvailable = !systemState->fullChargeRequest && systemState->usoc > 0;
+  systemState->system_Power_W = systemState->prod_W + (batteryAvailable ? systemState->inv_max_w : 0);
 
   // Update per-hour-per-weekday consumption statistics (true hourly mean, cross-week EMA α=0.1)
   if (systemState->ts > 0)
@@ -65,24 +68,23 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
     int16_t key = (int16_t)(lt.tm_wday * 24 + lt.tm_hour);
 
     // On hour rollover: compute true mean and blend into slot via EMA, then reset accumulators
-    if (key != systemState->stat_hour_key && systemState->stat_hour_key >= 0 && systemState->cons_count > 0)
+    if (key != systemState->stat_hour_key && systemState->stat_hour_key >= 0)
     {
-      uint8_t slot_day = (uint8_t)(systemState->stat_hour_key / 24); // day of the hour being closed out (differs from current day at midnight)
-      uint8_t slot_hour = (uint8_t)(systemState->stat_hour_key % 24);
-      uint16_t *slot = &systemConfig->cons_stats_Wh[slot_day][slot_hour];
-      // sanity check, do we have enough samples collected in one hour, at least 80% uptime?
-      if (systemState->cons_count >= (0.8 * 3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000)))
+      constexpr uint16_t MIN_HOUR_SAMPLES = (uint16_t)(0.8f * 3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000));
+      if (systemState->cons_count >= MIN_HOUR_SAMPLES) // at least 80% uptime in closed hour
       {
+        uint16_t *slot = &systemConfig->cons_stats_Wh[systemState->stat_hour_key / 24][systemState->stat_hour_key % 24];
         *slot = (*slot == 0) ? systemState->cons_avg_W : (uint16_t)(((uint32_t)*slot * 9 + systemState->cons_avg_W) / 10);
       }
-      systemState->cons_sum_W = 0;
-      systemState->cons_count = 0;
+      systemState->cons_sum_W = systemState->cons_avg_W; // seed new hour with last avg as prior
+      systemState->cons_count = 1;
     }
 
     // Accumulate current sample into the (possibly just-reset) hour bucket
     systemState->cons_sum_W += systemState->cons_W_norm;
     systemState->cons_count++;
     systemState->cons_avg_W = (uint16_t)(systemState->cons_sum_W / systemState->cons_count);
+
     systemState->stat_hour_key = key;
   }
 }

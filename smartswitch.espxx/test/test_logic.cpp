@@ -467,8 +467,8 @@ void test_updateConsumptionStats_Mean()
   systemState.cons_W = 1200;
   updateSystemState(&systemConfig, &systemState);
   systemState.ts += SYSTEM_UPDATE_INTERVAL_MS / 1000;
-  TEST_ASSERT_EQUAL(1200, systemState.cons_sum_W);
-  TEST_ASSERT_EQUAL(1, systemState.cons_count);
+  TEST_ASSERT_EQUAL(1824, systemState.cons_sum_W); // expect average previous hour as new start value
+  TEST_ASSERT_EQUAL(2, systemState.cons_count);
   TEST_ASSERT_EQUAL(624, systemConfig.cons_stats_Wh[wday][hour0]); // slot has been written yet
 }
 

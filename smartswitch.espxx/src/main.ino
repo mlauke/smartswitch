@@ -1019,7 +1019,6 @@ static bool updateSystemData()
     systemState.gridFeedIn_W = json[F("GridFeedIn_W")].as<int>();
     systemState.prod_W = json[F("Production_W")].as<uint16_t>();
     systemState.cons_W = json[F("Consumption_W")].as<uint16_t>();
-    systemState.cons_avg_W = json[F("Consumption_Avg")].as<uint16_t>();
     systemState.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
     systemState.charge = json[F("BatteryCharging")].as<short>() - json[F("BatteryDischarging")].as<short>();
 

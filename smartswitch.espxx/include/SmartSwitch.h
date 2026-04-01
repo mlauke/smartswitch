@@ -172,7 +172,7 @@ typedef struct
   uint16_t cons_W;              // consumption (Watt)
   uint16_t cons_W_nom;          // consumption rounded as multiple of 10 (Watt)
   uint16_t cons_W_norm;         // normalized consumption without load (Watt)
-  uint16_t cons_avg_W;          // consumption average (W)
+  uint16_t cons_avg_W;          // consumption average (W) - long term mean over hours, used to build statistics
   uint16_t bat_cycles;          // Number of charge/discharge cycles
   uint16_t cap_bat_new_Wh;      // max usable battery capacity for new battery
   uint8_t cap_bat_soh;          // percentage of usable battery capacity (SoH)
