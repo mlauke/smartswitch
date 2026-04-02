@@ -155,9 +155,10 @@ function renderConsStats(dayIdx) {
   });
   if (!consStats) return;
   const data = consStats[dayIdx];
+  const currentAvg = document.getElementById("cons_avg_w").getAttribute("data-value");
   const forecastDay = pvForecastByDayHour ? (pvForecastByDayHour[dayIdx] || {}) : {};
   const forecastVals = Object.values(forecastDay);
-  const maxVal = Math.max(...consStats.flat(), ...forecastVals, 1);
+  const maxVal = Math.max(...consStats.flat(), ...forecastVals, currentAvg, 1);
   const yAxis = document.getElementById("statsYAxis");
   if (yAxis) {
     yAxis.innerHTML = "";
@@ -170,7 +171,6 @@ function renderConsStats(dayIdx) {
   const now = new Date();
   const currentDay = now.getDay();
   const currentHour = now.getHours()
-  const currentAvg = document.getElementById("cons_avg_w").getAttribute("data-value");
   data.forEach((v, h) => {
     const col = document.createElement("div");
     col.className = "bar-col";

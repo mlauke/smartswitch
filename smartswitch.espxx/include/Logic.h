@@ -28,6 +28,20 @@
 #include "debug.h"
 
 #define SECONDS_PER_HOUR 3600
+#define MIN_HOUR_SAMPLES (uint16_t)(0.8f * 3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000))
+
+enum BatteryLevel
+{
+  Min,     // predicted final state will be below min capacity
+  Max,     // predicted state will reach battery full capacity
+  Balanced // neither min nor max will be reached
+};
+
+typedef struct
+{
+  uint8_t hours;
+  BatteryLevel level;
+} BatteryState;
 
 char tsfmt[30];
 char *toDate(uint32_t utc_ts, int16_t offset)
@@ -70,7 +84,6 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
     // On hour rollover: compute true mean and blend into slot via EMA, then reset accumulators
     if (key != systemState->stat_hour_key && systemState->stat_hour_key >= 0)
     {
-      constexpr uint16_t MIN_HOUR_SAMPLES = (uint16_t)(0.8f * 3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000));
       if (systemState->cons_count >= MIN_HOUR_SAMPLES) // at least 80% uptime in closed hour
       {
         uint16_t *slot = &systemConfig->cons_stats_Wh[systemState->stat_hour_key / 24][systemState->stat_hour_key % 24];
@@ -88,19 +101,6 @@ void updateSystemState(SystemConfig *systemConfig, SystemState *systemState)
     systemState->stat_hour_key = key;
   }
 }
-
-enum BatteryLevel
-{
-  Min,     // predicted final state will be below min capacity
-  Max,     // predicted state will reach battery full capacity
-  Balanced // neither min nor max will be reached
-};
-
-typedef struct
-{
-  uint8_t hours;
-  BatteryLevel level;
-} BatteryState;
 
 static int findPvForecastData(SystemState *systemState)
 {
