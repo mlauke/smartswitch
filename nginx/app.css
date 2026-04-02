@@ -342,6 +342,13 @@ button.loading .spinner {
   flex-direction: column;
 }
 
+.day-totals {
+  padding: 4px 6px;
+  font-size: small;
+  text-align: center;
+  color: #555;
+}
+
 .bars-row {
   display: flex;
 }
@@ -453,5 +460,9 @@ button.loading .spinner {
   .stats-y-axis {
     color: #aaa;
     border-right-color: #555;
+  }
+
+  .day-totals {
+    color: #aaa;
   }
 }

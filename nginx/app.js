@@ -202,6 +202,11 @@ function renderConsStats(dayIdx) {
       xAxis.appendChild(lbl);
     }
   }
+  const totalCons = data.reduce((a, b) => a + b, 0);
+  const totalPv = Object.values(forecastDay).reduce((a, b) => a + b, 0);
+  const fmt = wh => wh >= 1000 ? (wh / 1000).toFixed(1) + " kWh" : wh + " Wh";
+  const totals = document.getElementById("dayTotals");
+  if (totals) totals.textContent = "Consumption: " + fmt(totalCons) + "   PV Forecast: " + fmt(totalPv);
 }
 
 function sendUpdate(payload) {
