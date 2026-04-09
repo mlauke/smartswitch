@@ -81,6 +81,8 @@ therefore i decided to use a triac as switching device for a simple NO1 relais (
 as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with the ESP controller board on a din rail inside of my houses fuse box.
 
 # Features/Bugs
+  - ✅ bug: flicker when SoC 0%, surplus waste > load and battery will fullcharge. the switch goes on and off immediate due to "event 6" - no hysteresis
+  - ✅ bug: flicker when consumption without load is very low so that C_norm is not calculated correctly as difference between C = C_n - C_load
   - ✅ bug: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysteresis)
   - ✅ bug: discharge not allowed but switch is triggered due to boiler min
   - ✅ detect battery training mode - support ticket at sonnen opened - workaround implemented "Set Point Priority" "Full Charge Request"
@@ -90,8 +92,7 @@ as mentioned above, a SSR which can drive the 3,3kW load will become very hot if
   - ❌ feat: suspend/sleep for a while (or double the amount of sleep)
     - if switch is off and will stay off
     - if boiler max temperature is reached already
-  - ❌ feat: capacity calculation should consider surplus difference between production and avg consumption in the current remaining hour => S+ = P - C(avg)
-  - ❌ feat: measure consumption avg per hour and week day and save to config for better long term approximation
+  - ✅ feat: measure consumption avg per hour and week day and save to config for better long term approximation
   - ✅ feat: calibrate load automatically
   - ✅ feat: aggressive load - if battery is below min capacity, but production increases and surplus will full charge the battery during the day and remaining capacity is still enough to drive load
 

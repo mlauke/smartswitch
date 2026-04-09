@@ -206,7 +206,7 @@ static bool isSurplusAvailable(SystemConfig *systemConfig, SystemState *systemSt
 // is surplus "wasted" to grid? - if battery is not loaded - e.g. summer mode
 static bool isWasteExceedsLoad(SystemConfig *systemConfig, SystemState *systemState)
 {
-  return systemState->gridFeedIn_W >= (systemConfig->loadPower_W + systemConfig->gridMin_W);
+  return systemState->gridFeedIn_W >= (systemConfig->loadPower_W + systemConfig->gridMin_W) * 105 / 100; //+5%
 }
 
 // aware of max system power (production + max inverter power) or if surplus ("waste") exceeds load
@@ -230,7 +230,6 @@ static uint16_t inverterLatencyCnt = 0;
 
 static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig, SystemState *systemState, SystemStatus status)
 {
-
   bool desiredState = systemState->switchEnabled;
 
   uint8_t event = 0;
@@ -250,7 +249,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ((event = 3) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((event = 5) && isBoilerOffThreshold(systemState, temp_off)) ||
         ((event = 4) && state.level == BatteryLevel::Min && !isSurplusAvailable(systemConfig, systemState)) ||
-        ((event = 6) && state.level == BatteryLevel::Max && systemState->usoc <= BATTERY_MIN_USOC))
+        ((event = 6) && state.level == BatteryLevel::Max && systemState->usoc <= BATTERY_USOC_OFF))
     {
       desiredState = false;
       inverterLatencyCnt = 0;
@@ -261,7 +260,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((event = 1) && isBoilerOnThreshold(systemState, temp_on)) &&
         (isWasteExceedsLoad(systemConfig, systemState) ||
          (isEnoughPowerAvailable(systemConfig, systemState) &&
-          systemState->usoc > BATTERY_MAX_USOC &&
+          systemState->usoc > BATTERY_USOC_ON &&
           state.level != BatteryLevel::Min)) &&
         (inverterLatencyCnt++ > SONNEN_INVERTER_LATENCY_COUNT)) // stable
     {

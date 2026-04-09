@@ -69,8 +69,8 @@
 #define URL_SOLAR_FORECAST_DEV "http://192.168.188.20:8080/estimate/watthours/period/%.4f/%.4f/%d/%d/%.2f?time=seconds&no_sun=0&full=1"
 
 #define GRID_PURCHASE_THRESHOLD_W 100
-#define BATTERY_MAX_USOC 10
-#define BATTERY_MIN_USOC 3
+#define BATTERY_USOC_OFF 3
+#define BATTERY_USOC_ON 10
 
 #define BOILER_TEMPERATURE_HYSTERESIS 2
 #define BOILER_UPDATE_INTERVAL_SECONDS 15

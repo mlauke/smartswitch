@@ -779,7 +779,7 @@ void calibrate(SystemStatus status)
 
   if (cnt == 0)
   {
-    config.loadPower_W = MAX(0, (median_uint16(load_on, CALIBRATE_MEASURE) - median_uint16(load_off, CALIBRATE_MEASURE)) * 103 / 100); // +3%
+    config.loadPower_W = MAX(0, (median_uint16(load_on, CALIBRATE_MEASURE) - median_uint16(load_off, CALIBRATE_MEASURE)));
     saveConfig();
 
     char event[64];

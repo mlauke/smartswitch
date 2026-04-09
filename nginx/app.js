@@ -157,7 +157,7 @@ function renderConsStats(dayIdx) {
   const data = consStats[dayIdx];
   const currentAvg = document.getElementById("cons_avg_w").getAttribute("data-value");
   const forecastDay = pvForecastByDayHour ? (pvForecastByDayHour[dayIdx] || {}) : {};
-  const forecastVals = Object.values(forecastDay);
+  const forecastVals = pvForecastByDayHour ? Object.values(pvForecastByDayHour).flatMap(obj => Object.values(obj)) : [];
   const maxVal = Math.max(...consStats.flat(), ...forecastVals, currentAvg, 1);
   const yAxis = document.getElementById("statsYAxis");
   if (yAxis) {
@@ -204,9 +204,9 @@ function renderConsStats(dayIdx) {
   }
   const totalCons = data.reduce((a, b) => a + b, 0);
   const totalPv = Object.values(forecastDay).reduce((a, b) => a + b, 0);
-  const fmt = wh => wh >= 1000 ? (wh / 1000).toFixed(1) + " kWh" : wh + " Wh";
+  const fmt = wh => (wh >= 1000 ? (wh / 1000).toFixed(1) + " k" : wh) + "Wh";
   const totals = document.getElementById("dayTotals");
-  if (totals) totals.textContent = "Consumption: " + fmt(totalCons) + "   PV Forecast: " + fmt(totalPv);
+  if (totals) totals.textContent = "Consumption: " + fmt(totalCons) + " / PV Forecast: " + fmt(totalPv);
 }
 
 function sendUpdate(payload) {

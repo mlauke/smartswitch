@@ -277,7 +277,7 @@ void test_determineDesiredStateSurplusWaste()
   systemState.cap_bat_Wh = 0;
   systemState.usoc = 0;
   systemState.cons_W = 347;
-  systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W;
+  systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W + 200;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
 
   char msg[90];
@@ -293,12 +293,49 @@ void test_determineDesiredStateSurplusWaste()
   assertStaysStable(true);
 
   systemState.switchEnabled = state;
-  systemState.cons_W = 450 + systemConfig.loadPower_W;
+  systemState.cons_W = 650 + systemConfig.loadPower_W;
   systemState.usoc = 25;
+  systemState.gridFeedIn_W = -100;
 
   state = determineState(msg, sizeof(msg));
-  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 449W, battery min SoC 20% reached in ~12h", msg);
   TEST_ASSERT_FALSE(state);
+  TEST_ASSERT_EQUAL_STRING("SoC 25% - consumption 649W, battery min SoC 20% reached in ~8h", msg);
+}
+
+void test_determineDesiredStateSurplusWasteHysteresis()
+{
+  char msg[80];
+
+  int pvData[] = {800, 1100, 1400, 1700, 2000, 2300, 2500, 2600, 2400, 2100};
+  int len = sizeof(pvData) / sizeof(int);
+  prepareForecast(len, pvData);
+
+  systemState.ts = TEST_TS;
+  systemState.cap_bat_Wh = 0;
+  systemState.usoc = 0;
+
+  systemState.prod_W = 3450;
+  systemState.cons_W = 243;
+
+  systemState.gridFeedIn_W = (systemConfig.gridMin_W + systemConfig.loadPower_W);
+  bool state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_FALSE(state);
+
+  systemState.gridFeedIn_W = (systemConfig.gridMin_W + systemConfig.loadPower_W) * 1.049;
+  state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_FALSE(state);
+
+  // expect waste grid feed_in > ((grid_min + load) + 5%)
+  systemState.gridFeedIn_W = (systemConfig.gridMin_W + systemConfig.loadPower_W) * 1.05;
+  state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_TRUE(state);
+
+  systemState.switchEnabled = state;
+  systemState.ts += 10;
+  systemState.cons_W += systemConfig.loadPower_W;
+  systemState.gridFeedIn_W = -100;
+  state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_TRUE(state);
 }
 
 void test_determineDesiredStateSurplusWasteNoForecastData()
@@ -308,7 +345,7 @@ void test_determineDesiredStateSurplusWasteNoForecastData()
   systemState.cap_bat_Wh = 0;
   systemState.usoc = 0;
   systemState.cons_W = 347;
-  systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W;
+  systemState.prod_W = systemConfig.loadPower_W + systemState.cons_W + systemConfig.gridMin_W + 200;
   systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
 
   char msg[80];
@@ -426,6 +463,37 @@ void test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocToo
 
   bool state = determineState(msg, sizeof(msg));
   TEST_ASSERT_FALSE(state);
+}
+
+void test_determineDesiredState_VeryLowConsumption()
+{
+  char msg[80];
+
+  int pvData[] = {500, 500, 500, 770, 600, 500, 400, 300, 323};
+  int len = sizeof(pvData) / sizeof(int);
+
+  systemState.ts = TEST_TS + (SOLAR_FORECAST_HOURS - len) * 3600;
+  systemConfig.loadPower_W = 3275;
+  systemState.cons_W = 150;
+  systemState.prod_W = 3000;
+  systemState.gridFeedIn_W = systemState.prod_W - systemState.cons_W;
+
+  systemState.cap_bat_Wh = 5200;
+  systemState.usoc = 52;
+  systemState.switchEnabled = false;
+
+  prepareForecast(len, pvData);
+  bool state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_TRUE(state);
+
+  systemState.switchEnabled = state;
+  systemConfig.loadPower_W = 3275;
+  systemState.cons_W = 3280;
+  systemState.gridFeedIn_W = -100;
+
+  state = determineState(msg, sizeof(msg));
+  TEST_ASSERT_TRUE(state);
+  TEST_ASSERT_EQUAL_STRING("SoC 52% - battery will be full charged in ~8h, but SoC too low", msg);
 }
 
 void test_updateConsumptionStats_Mean()
@@ -588,8 +656,11 @@ int main(int argc, char **argv)
   RUN_TEST(test_determineDesiredStateSwitchOffSystemStatusError_Boiler);
 
   RUN_TEST(test_determineDesiredStateBatteryTargetFulfilled);
+
   RUN_TEST(test_determineDesiredStateFullchargeRequestedWithLatencyCount);
+
   RUN_TEST(test_determineDesiredStateSurplusWaste);
+  RUN_TEST(test_determineDesiredStateSurplusWasteHysteresis);
   RUN_TEST(test_determineDesiredStateSurplusWasteNoForecastData);
 
   RUN_TEST(test_determineDesiredStateBelowMinCapacityAwareOfCurrentSurplus);
@@ -597,6 +668,8 @@ int main(int argc, char **argv)
 
   RUN_TEST(test_determineDesiredState_BatteryCapacityFinallyBelowMinCapacity);
   RUN_TEST(test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocTooLow);
+
+  RUN_TEST(test_determineDesiredState_VeryLowConsumption);
 
   return UNITY_END();
 }
@@ -616,6 +689,7 @@ void setUp(void)
 
   inverterLatencyCnt = 0;
   memset(systemConfig.cons_stats_Wh, 0, sizeof(systemConfig.cons_stats_Wh));
+  memset(systemState.pv_forecast_ts_wh, 0, sizeof(systemState.pv_forecast_ts_wh));
   systemState.stat_hour_key = -1;
   systemState.cons_sum_W = 0;
   systemState.cons_count = 0;
@@ -629,6 +703,7 @@ void setUp(void)
   systemState.fullChargeRequest = false;
   systemState.cap_bat_Wh = 4100;
   systemState.usoc = 41;
+  systemState.switchEnabled = false;
 
   systemState.boiler_T_max = 65.0f;
   systemState.boiler_T_nom = 55.0f;
