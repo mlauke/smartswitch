@@ -14,6 +14,17 @@ DIY sonnen battery controller based on ESP8266/ESP32 to drive a 3.3kW heater (He
 ## Software / Releases
 the software supports ESP8266 and ESP32 modules, which can be build for the appropriate target platform. releases can be found at https://github.com/mlauke/smartswitch/releases/
 
+### Build
+Install uv (https://docs.astral.sh/uv/concepts/tools/) and run proceed to source folder
+```bash
+cd smartswitch.espxx
+# run tests
+uv run test -e native
+# run build
+uv run pio run -e esp32 -e esp8266
+# run check for outdated packages
+uv run pio pkg outdated
+```
 
 ## Hardware
 the reference implementation (at my home) uses the following components
@@ -79,22 +90,6 @@ therefore i decided to use a triac as switching device for a simple NO1 relais (
 
 #### Why not using a SSR?
 as mentioned above, a SSR which can drive the 3,3kW load will become very hot if the load is switched on for longer heating periods. too hot to put the SSR together with the ESP controller board on a din rail inside of my houses fuse box.
-
-# Features/Bugs
-  - ✅ bug: flicker when SoC 0%, surplus waste > load and battery will fullcharge. the switch goes on and off immediate due to "event 6" - no hysteresis
-  - ✅ bug: flicker when consumption without load is very low so that C_norm is not calculated correctly as difference between C = C_n - C_load
-  - ✅ bug: flicker if battery is loading, min capacity is reached (e.g. 0 => 25%) and switch is enabled (hysteresis)
-  - ✅ bug: discharge not allowed but switch is triggered due to boiler min
-  - ✅ detect battery training mode - support ticket at sonnen opened - workaround implemented "Set Point Priority" "Full Charge Request"
-  - ✅ battery system data update every day or from time to time
-  - ✅ feat: skip determine new state if not set to Auto
-  - ✅ fix: wait or delay on reset/restart requests, make sure response is send
-  - ❌ feat: suspend/sleep for a while (or double the amount of sleep)
-    - if switch is off and will stay off
-    - if boiler max temperature is reached already
-  - ✅ feat: measure consumption avg per hour and week day and save to config for better long term approximation
-  - ✅ feat: calibrate load automatically
-  - ✅ feat: aggressive load - if battery is below min capacity, but production increases and surplus will full charge the battery during the day and remaining capacity is still enough to drive load
 
 ## Vision
 - hardware
