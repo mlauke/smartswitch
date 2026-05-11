@@ -586,6 +586,9 @@ void handleAPI()
     config.dec = MIN(90, MAX(0, server.arg(F("lc_dec")).toInt()));
     systemState.pv_forecast_ts = 0; // force fetch new data
     setConfigStr(config, location, PSTR("Location will be updated..."));
+    for (int d = 0; d < 7; d++)
+      for (int h = 0; h < 24; h++)
+        config.cons_stats_Wh[d][h] = 0;
     saveConfig();
   }
   else if (server.hasArg(F("hostname")))
