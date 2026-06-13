@@ -238,6 +238,7 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 1.2f; // ~0.8 °C heater "afterglow"
 
   BatteryState state = predictBatteryCapacityState(systemConfig, systemState);
+  DEBUGF("battery state lvl=%d %dh\n", state.level, state.hours);
 
   if (systemState->switchEnabled)
   {
@@ -248,8 +249,10 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
     if (((event = 2) && status != SystemStatus::Ok) ||
         ((event = 3) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((event = 5) && isBoilerOffThreshold(systemState, temp_off)) ||
-        ((event = 4) && state.level == BatteryLevel::Min && !isSurplusAvailable(systemConfig, systemState)) ||
-        ((event = 6) && state.level == BatteryLevel::Max && systemState->usoc <= BATTERY_USOC_OFF))
+        (!isSurplusAvailable(systemConfig, systemState) &&
+         ((event = 4) && state.level == BatteryLevel::Min ||
+          (event = 6) && state.level == BatteryLevel::Max)
+         ))
     {
       desiredState = false;
       inverterLatencyCnt = 0;

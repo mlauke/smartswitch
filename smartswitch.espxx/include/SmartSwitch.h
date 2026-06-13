@@ -168,8 +168,8 @@ typedef struct
   int16_t inv_max_w;            // inverter power max - max charge/discharge power
   uint8_t usoc;                 // 0..100 user state of charge - battery capacity in %
   uint16_t system_Power_W;      // production + battery inverter max power (Watt) if battery usoc is >0
-  uint16_t prod_W;              // production (Watt)
-  uint16_t cons_W;              // consumption (Watt)
+  uint16_t prod_W;              // current PV production (Watt)
+  uint16_t cons_W;              // current consumption (Watt)
   uint16_t cons_W_nom;          // consumption rounded as multiple of 10 (Watt)
   uint16_t cons_W_norm;         // normalized consumption without load (Watt)
   uint16_t cons_avg_W;          // consumption average (W) - long term mean over hours, used to build statistics
