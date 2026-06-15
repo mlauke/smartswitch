@@ -380,7 +380,25 @@ void test_determineDesiredStateSurplusWasteHysteresisBatteryMax()
   systemState.usoc = 100;
   systemState.prod_W = 2450;
   state = determineState(msg, sizeof(msg));
-  //TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will be full charged in ~7h, but SoC too low", msg);
+  assertStaysStable(true);
+}
+
+void test_determineDesiredStateSurplusWasteHysteresisBatteryFullChargedBatteryStateMax()
+{
+  char msg[80];
+
+  int pvData[] = {2800, 2100, 2400, 200, 3000, 3300, 3800, 3200, 3400, 3600, 3400, 3100, 2600, 2400, 2100, 1100};
+  int len = sizeof(pvData) / sizeof(int);
+  prepareForecast(len, pvData);
+
+  systemState.switchEnabled = true;
+  systemState.ts = TEST_TS + 33 * 3600;
+  systemState.cons_W = 243 + systemConfig.loadPower_W;
+  systemState.gridFeedIn_W = -67;
+  systemState.cap_bat_Wh = systemState.cap_bat_max_Wh;
+  systemState.usoc = 100;
+  systemState.prod_W = 1750;
+  bool state = determineState(msg, sizeof(msg));
   assertStaysStable(true);
 }
 
@@ -707,6 +725,7 @@ int main(int argc, char **argv)
   RUN_TEST(test_determineDesiredStateSurplusWaste);
   RUN_TEST(test_determineDesiredStateSurplusWasteHysteresisBatteryMin);
   RUN_TEST(test_determineDesiredStateSurplusWasteHysteresisBatteryMax);
+  RUN_TEST(test_determineDesiredStateSurplusWasteHysteresisBatteryFullChargedBatteryStateMax);
   RUN_TEST(test_determineDesiredStateSurplusWasteNoForecastData);
 
   RUN_TEST(test_determineDesiredStateBelowMinCapacityAwareOfCurrentSurplus);
