@@ -373,6 +373,15 @@ void test_determineDesiredStateSurplusWasteHysteresisBatteryMax()
   state = determineState(msg, sizeof(msg));
   // TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will be full charged in ~7h, but SoC too low", msg);
   assertStaysStable(true);
+
+  // ###
+  systemState.ts = TEST_TS + 33 * 3600;
+  systemState.cap_bat_Wh = systemState.cap_bat_max_Wh;
+  systemState.usoc = 100;
+  systemState.prod_W = 2450;
+  state = determineState(msg, sizeof(msg));
+  //TEST_ASSERT_EQUAL_STRING("SoC 1% - battery will be full charged in ~7h, but SoC too low", msg);
+  assertStaysStable(true);
 }
 
 void test_determineDesiredStateSurplusWasteNoForecastData()
