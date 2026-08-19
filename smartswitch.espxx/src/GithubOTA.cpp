@@ -156,7 +156,7 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
     releaseWiFiClient(updateClient);
 
     #if defined(ESP8266) // workaround, fetch firmware via ssl seems too havy for esp8266
-    newUrl.replace("https://", "http://");
+    newUrl.replace(F("https://"), F("http://"));
     #endif
     DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
     updateClient = newWiFiClient(newUrl);
@@ -203,23 +203,23 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
           }
           else
           {
-            updateStatus = String("Update not finished? Something went wrong!");
+            updateStatus = F("Update not finished? Something went wrong!");
           }
         }
         else
         {
-          updateStatus = String("Error Occurred. Error #: ") + Update.getError();
+          updateStatus = String(F("Error Occurred. Error #: ")) + Update.getError();
         }
       }
     }
     else
     {
-      updateStatus = String("Not enough space to begin OTA");
+      updateStatus = F("Not enough space to begin OTA");
     }
   }
   else
   {
-    updateStatus = String("Failed to download firmware. HTTP code: ") + String(httpCode);
+    updateStatus = String(F("Failed to download firmware. HTTP code: ")) + String(httpCode);
   }
   http.end();
   releaseWiFiClient(updateClient);
