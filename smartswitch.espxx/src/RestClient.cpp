@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 #include "RestClient.h"
+#include "JsonFields.h"
 #include "debug.h"
 
 RestClient::RestClient() {}
@@ -34,7 +35,9 @@ int RestClient::lastResponseCode()
   return _lastResponseCode;
 }
 
-bool RestClient::get(String url, JsonDocument &doc, JsonDocument *filter, String hName, String hValue)
+bool RestClient::get(String url, JsonDocument &doc, JsonDocument *filter,
+                     const JsonField *expectedFields, uint8_t expectedFieldCount,
+                     String hName, String hValue)
 {
 
   HTTPClient http;
@@ -76,6 +79,15 @@ bool RestClient::get(String url, JsonDocument &doc, JsonDocument *filter, String
         DEBUGP(_lastError + " " + http.getString());
       }
       res = error == DeserializationError::Ok;
+      if (res)
+      {
+        char validationError[JSON_FIELD_PATH_SIZE + 32];
+        if (!(res = validateJsonFields(doc.as<JsonVariantConst>(), expectedFields, expectedFieldCount, validationError, sizeof(validationError))))
+        {
+          _lastError.concat(String(validationError) + F(" - ") + url);
+          DEBUGF("%s\n", _lastError.c_str());
+        }
+      }
     }
     else
     {

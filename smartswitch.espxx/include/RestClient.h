@@ -15,6 +15,8 @@
 
 #define REQUEST_TIMEOUT 8000
 
+struct JsonField; // caller supplied set of expected response fields, see JsonFields.h
+
 class RestClient {
 
 public:
@@ -23,7 +25,9 @@ public:
 
   String lastError();
   int lastResponseCode();
-  bool get(String url, JsonDocument& doc, JsonDocument* filter, String hName = "", String hValue = "");
+  bool get(String url, JsonDocument& doc, JsonDocument* filter,
+           const JsonField* expectedFields = NULL, uint8_t expectedFieldCount = 0,
+           String hName = "", String hValue = "");
 
 private:
   String _lastError;

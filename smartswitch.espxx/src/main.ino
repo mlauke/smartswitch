@@ -33,6 +33,8 @@
 
 #include "GithubOTA.h"
 #include "RestClient.h"
+#include "JsonFields.h"
+#include "SonnenApi.h"
 #include "LPB.h"
 #include "Util.h"
 
@@ -981,12 +983,12 @@ static bool ensureConnected()
   return status == WL_CONNECTED;
 }
 
-bool fetchBatteryApi(String uri, JsonDocument &json)
+bool fetchBatteryApi(String uri, JsonDocument &json, const JsonField *expectedFields, uint8_t expectedFieldCount)
 {
-  return fetchBatteryApi(uri, json, NULL);
+  return fetchBatteryApi(uri, json, expectedFields, expectedFieldCount, NULL);
 }
 
-bool fetchBatteryApi(String uri, JsonDocument &json, JsonDocument *filter)
+bool fetchBatteryApi(String uri, JsonDocument &json, const JsonField *expectedFields, uint8_t expectedFieldCount, JsonDocument *filter)
 {
 
   bool r = false;
@@ -997,7 +999,7 @@ bool fetchBatteryApi(String uri, JsonDocument &json, JsonDocument *filter)
   {
     char url[128];
     snprintf_P(url, sizeof(url), PSTR("http://%.31s/%s/%s"), config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    r = restClient.get(String(url), json, filter, "auth-token", config.sonnenApiToken);
+    r = restClient.get(String(url), json, filter, expectedFields, expectedFieldCount, "auth-token", config.sonnenApiToken);
     if (!r)
     {
       DEBUGF("ERROR: fetchBatteryApi(%s)\n", uri.c_str());
@@ -1028,50 +1030,50 @@ static bool updateSystemData()
 
   if (systemState.inv_max_w == -1)
   {
-    if ((ok &= fetchBatteryApi(SONNEN_API_CONFIGURATIONS, json)))
+    if ((ok &= fetchBatteryApi(SONNEN_API_CONFIGURATIONS, json, SONNEN_FIELDS_CONFIGURATIONS, JSON_FIELD_COUNT(SONNEN_FIELDS_CONFIGURATIONS))))
     {
-      systemState.inv_max_w = json[F("IC_InverterMaxPower_w")].as<int>();
-      systemState.cap_bat_new_Wh = json[F("CM_MarketingModuleCapacity")].as<int>() * json[F("IC_BatteryModules")].as<int>() * 90 / 100;
+      systemState.inv_max_w = json[FPSTR(KEY_SN_INVERTER_MAX_POWER_W)].as<int>();
+      systemState.cap_bat_new_Wh = json[FPSTR(KEY_SN_MODULE_CAPACITY)].as<int>() * json[FPSTR(KEY_SN_BATTERY_MODULES)].as<int>() * 90 / 100;
       DEBUGF("IC_InverterMaxPower_w %d, max battery capacity %d\n", systemState.inv_max_w, systemState.cap_bat_new_Wh);
     }
   }
   if (systemState.cap_bat_max_Wh == 0 || isUpdateSystemData())
   {
-    if (ok && (ok &= fetchBatteryApi(SONNEN_API_BATTERY, json)))
+    if (ok && (ok &= fetchBatteryApi(SONNEN_API_BATTERY, json, SONNEN_FIELDS_BATTERY, JSON_FIELD_COUNT(SONNEN_FIELDS_BATTERY))))
     {
-      systemState.cap_bat_max_Wh = json[F("fullchargecapacitywh")].as<uint16_t>();
-      systemState.bat_cycles = json[F("cyclecount")].as<uint16_t>();
+      systemState.cap_bat_max_Wh = json[FPSTR(KEY_SN_FULL_CHARGE_CAPACITY_WH)].as<uint16_t>();
+      systemState.bat_cycles = json[FPSTR(KEY_SN_CYCLE_COUNT)].as<uint16_t>();
       systemState.cap_bat_soh = systemState.cap_bat_new_Wh == 0 ? 0 : systemState.cap_bat_max_Wh * 100 / systemState.cap_bat_new_Wh;
       DEBUGF("FullChargeCapacity %d, cycles: %d, capacity: %2d%%\n", systemState.cap_bat_max_Wh, systemState.bat_cycles, systemState.cap_bat_soh);
     }
   }
   JsonDocument filter;
-  filter[F("UTC_Offset")] = true;
-  filter[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")] = true;
-  filter[F("ic_status")][F("nextfullchargestarttime")] = true;
-  filter[F("ic_status")][F("secondssincefullcharge")] = true;
-  if (ok && (ok &= fetchBatteryApi(SONNEN_API_LATEST_DATA, json, &filter)))
+  filter[FPSTR(KEY_SN_UTC_OFFSET)] = true;
+  filter[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SETPOINT_PRIORITY)][FPSTR(KEY_SN_FULL_CHARGE_REQUEST)] = true;
+  filter[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_NEXT_FULL_CHARGE_START)] = true;
+  filter[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SECONDS_SINCE_FULL_CHARGE)] = true;
+  if (ok && (ok &= fetchBatteryApi(SONNEN_API_LATEST_DATA, json, SONNEN_FIELDS_LATEST_DATA, JSON_FIELD_COUNT(SONNEN_FIELDS_LATEST_DATA), &filter)))
   {
-    systemState.utc_offset = json[F("UTC_Offset")].as<int16_t>() * 3600;
-    systemState.fullChargeRequest = json[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
+    systemState.utc_offset = json[FPSTR(KEY_SN_UTC_OFFSET)].as<int16_t>() * 3600;
+    systemState.fullChargeRequest = json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SETPOINT_PRIORITY)][FPSTR(KEY_SN_FULL_CHARGE_REQUEST)].as<bool>();
     systemState.fullChargeRequestIn =
-        json[F("ic_status")][F("nextfullchargestarttime")].as<uint32_t>() -
-        json[F("ic_status")][F("secondssincefullcharge")].as<uint32_t>();
+        json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_NEXT_FULL_CHARGE_START)].as<uint32_t>() -
+        json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SECONDS_SINCE_FULL_CHARGE)].as<uint32_t>();
 
     DEBUGF("UTC offset %d, discharge not allowed: %d %u\n", systemState.utc_offset, systemState.fullChargeRequest, systemState.fullChargeRequestIn);
   }
-  if (ok && (ok &= fetchBatteryApi(SONNEN_API_STATUS, json)))
+  if (ok && (ok &= fetchBatteryApi(SONNEN_API_STATUS, json, SONNEN_FIELDS_STATUS, JSON_FIELD_COUNT(SONNEN_FIELDS_STATUS))))
   {
-    systemState.usoc = json[F("USOC")].as<uint8_t>();
+    systemState.usoc = json[FPSTR(KEY_SN_USOC)].as<uint8_t>();
     systemState.cap_bat_Wh = systemState.cap_bat_max_Wh * systemState.usoc / 100;
-    systemState.gridFeedIn_W = json[F("GridFeedIn_W")].as<int>();
-    systemState.prod_W = json[F("Production_W")].as<uint16_t>();
-    systemState.cons_W = json[F("Consumption_W")].as<uint16_t>();
-    systemState.pac_total_W = json[F("Pac_total_W")].as<int16_t>();
-    systemState.charge = json[F("BatteryCharging")].as<short>() - json[F("BatteryDischarging")].as<short>();
+    systemState.gridFeedIn_W = json[FPSTR(KEY_SN_GRID_FEED_IN_W)].as<int>();
+    systemState.prod_W = json[FPSTR(KEY_SN_PRODUCTION_W)].as<uint16_t>();
+    systemState.cons_W = json[FPSTR(KEY_SN_CONSUMPTION_W)].as<uint16_t>();
+    systemState.pac_total_W = json[FPSTR(KEY_SN_PAC_TOTAL_W)].as<int16_t>();
+    systemState.charge = json[FPSTR(KEY_SN_BATTERY_CHARGING)].as<short>() - json[FPSTR(KEY_SN_BATTERY_DISCHARGING)].as<short>();
 
     struct tm time;
-    strptime(json[F("Timestamp")].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
+    strptime(json[FPSTR(KEY_SN_TIMESTAMP)].as<const char *>(), "%Y-%m-%d %H:%M:%S", &time);
 
     systemState.ts = mktime(&time) - systemState.utc_offset; // to UTC
     if (systemState.start_ts == 0)
