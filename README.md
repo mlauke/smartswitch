@@ -19,7 +19,7 @@ Install uv (https://docs.astral.sh/uv/concepts/tools/) and run proceed to source
 ```bash
 cd smartswitch.espxx
 # run tests
-uv run test -e native
+uv run pio test -e native
 # run build
 uv run pio run -e esp32 -e esp8266
 # run check for outdated packages

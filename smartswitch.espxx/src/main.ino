@@ -75,7 +75,7 @@ Ticker timer;
 SystemState systemState;
 SystemConfig config;
 bool saveConfigFile = false;
-bool calibrateLoad = false;
+static SwitchStateId currentState = STATE_OFF;
 
 void saveConfigCallback()
 {
@@ -135,6 +135,8 @@ void setup()
     DEBUGLN("Error loading config");
     saveConfig();
   }
+
+  currentState = stateForMode(config.mode);
 
   if (saveConfigFile)
   {
@@ -539,6 +541,7 @@ void handleAPI()
   if (server.hasArg(F("mode")))
   {
     config.mode = (SwitchMode)(server.arg(F("mode")).toInt() & 3);
+    currentState = stateForMode(config.mode);
     DEBUGF("Mode: %d\n", config.mode);
     saveConfig();
   }
@@ -551,7 +554,7 @@ void handleAPI()
     }
     else
     {
-      calibrateLoad = true;
+      currentState = STATE_CALIBRATE;
     }
   }
   else if (server.hasArg(F("update_startup")))
@@ -767,7 +770,47 @@ static bool updateBoilerData()
   return lastResult; // no new data, so still ok
 }
 
-void calibrate(SystemStatus status)
+// maps the user configured switch mode to the matching runtime state
+static SwitchStateId stateForMode(SwitchMode mode)
+{
+  switch (mode)
+  {
+  case SMODE_ON:
+    return STATE_ON;
+  case SMODE_AUTO:
+    return STATE_AUTO;
+  case SMODE_OFF:
+  default:
+    return STATE_OFF;
+  }
+}
+
+static void handleOff(SystemStatus status)
+{
+  systemState.switchEnabled = false;
+}
+
+static void handleOn(SystemStatus status)
+{
+  systemState.switchEnabled = true;
+}
+
+static void handleAuto(SystemStatus status)
+{
+  char msg[96];
+  bool desiredState = determineDesiredState(msg, sizeof(msg), &config, &systemState, status);
+  if (systemState.switchEnabled != desiredState)
+  {
+    putEvent(String(desiredState ? F("on") : F("off")) + F(" - ") + msg);
+  }
+  systemState.switchEnabled = desiredState;
+
+  DEBUGF("handleAuto() ts: %s (%u) usoc: %2d%% p/c: %d/%d (W) avg: %d (Wh) grid: %d (W) heater %d\n",
+         toDate(systemState.ts), systemState.ts, systemState.usoc, systemState.prod_W,
+         systemState.cons_W, systemState.cons_avg_W, systemState.gridFeedIn_W, systemState.switchEnabled);
+}
+
+static void handleCalibrate(SystemStatus status)
 {
   static uint8_t cnt = CALIBRATE_LOOP_CNT;
   static uint16_t load_on[CALIBRATE_MEASURE];
@@ -776,7 +819,7 @@ void calibrate(SystemStatus status)
   if (status != SystemStatus::Ok)
   {
     putEvent("invalid configuration, cannot calibrate load");
-    calibrateLoad = false;
+    currentState = stateForMode(config.mode); // back to normal operation
     return;
   }
 
@@ -792,9 +835,9 @@ void calibrate(SystemStatus status)
     memset(load_on, 0, sizeof(load_on));
     memset(load_off, 0, sizeof(load_off));
     cnt = CALIBRATE_LOOP_CNT;
-    calibrateLoad = false;
 
     systemState.switchEnabled = false;
+    currentState = stateForMode(config.mode); // done, back to normal operation
   }
   else
   {
@@ -813,6 +856,14 @@ void calibrate(SystemStatus status)
     systemState.switchEnabled = on;
   }
 }
+
+// dispatch table indexed by SwitchStateId ordinal
+static const SwitchStateHandler stateHandlers[STATE_COUNT] = {
+    handleCalibrate, // [STATE_CALIBRATE]
+    handleOn,        // [STATE_ON]
+    handleOff,       // [STATE_OFF]
+    handleAuto,      // [STATE_AUTO]
+};
 
 uint16_t updateSystemCount = 0; // initially do update
 
@@ -858,16 +909,10 @@ void loop()
 
     SystemStatus status = determineSystemStatus();
 
-    if (calibrateLoad)
-    {
-      calibrate(status);
-    }
-    else
-    {
-      updateSolarForecast();
+    updateSolarForecast();
 
-      updateState(&config, &systemState, status);
-    }
+    stateHandlers[currentState](status);
+
     updateSwitch(systemState.switchEnabled);
 
     DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), status);
@@ -1001,13 +1046,13 @@ static bool updateSystemData()
     }
   }
   JsonDocument filter;
-  filter[F("UTC_Offet")] = true;
+  filter[F("UTC_Offset")] = true;
   filter[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")] = true;
   filter[F("ic_status")][F("nextfullchargestarttime")] = true;
   filter[F("ic_status")][F("secondssincefullcharge")] = true;
   if (ok && (ok &= fetchBatteryApi(SONNEN_API_LATEST_DATA, json, &filter)))
   {
-    systemState.utc_offset = json[F("UTC_Offet")].as<int16_t>() * 3600;
+    systemState.utc_offset = json[F("UTC_Offset")].as<int16_t>() * 3600;
     systemState.fullChargeRequest = json[F("ic_status")][F("Setpoint Priority")][F("Full Charge Request")].as<bool>();
     systemState.fullChargeRequestIn =
         json[F("ic_status")][F("nextfullchargestarttime")].as<uint32_t>() -
@@ -1063,24 +1108,6 @@ static bool updateSystemData()
   }
 
   return ok;
-}
-
-static void updateState(SystemConfig *systemConfig, SystemState *systemState, SystemStatus status)
-{
-  bool desiredState = systemState->switchEnabled;
-
-  if (systemConfig->mode == SMODE_AUTO)
-  {
-    char msg[96];
-    desiredState = determineDesiredState(msg, sizeof(msg), systemConfig, systemState, status);
-    if (systemState->switchEnabled != desiredState)
-    {
-      putEvent(String(desiredState ? F("on") : F("off")) + F(" - ") + msg);
-    }
-  }
-  systemState->switchEnabled = (desiredState && systemConfig->mode == SMODE_AUTO) || (systemConfig->mode == SMODE_ON); // combine with mode
-
-  DEBUGF("updateState() ts: %s (%u) usoc: %2d%% p/c: %d/%d/%d (W) avg: %d (Wh) grid: %d (W) mode %d: heater %d\n", toDate(systemState->ts), systemState->ts, systemState->usoc, systemState->prod_W, systemState->cons_W, systemState->cons_W, systemState->cons_avg_W, systemState->gridFeedIn_W, systemConfig->mode, systemState->switchEnabled);
 }
 
 static void updateSwitch(bool switchEnabled)

@@ -250,8 +250,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ((event = 3) && (inverterLatencyCnt > SONNEN_INVERTER_LATENCY_COUNT)) || // latency count reached?
         ((event = 5) && isBoilerOffThreshold(systemState, temp_off)) ||
         (!isSurplusAvailable(systemConfig, systemState) &&
-         ((event = 4) && state.level == BatteryLevel::Min ||
-          (event = 6) && state.level == BatteryLevel::Max && systemState->usoc <= BATTERY_USOC_OFF)))
+         (((event = 4) && state.level == BatteryLevel::Min) ||
+          ((event = 6) && state.level == BatteryLevel::Max && systemState->usoc <= BATTERY_USOC_OFF))))
     {
       desiredState = false;
       inverterLatencyCnt = 0;

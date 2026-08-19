@@ -123,6 +123,18 @@ enum SwitchMode
   SMODE_ON,
   SMODE_AUTO
 };
+
+// runtime states of the load switch state machine, dispatched by ordinal
+enum SwitchStateId
+{
+  STATE_CALIBRATE,
+  STATE_ON,
+  STATE_OFF,
+  STATE_AUTO,
+  STATE_COUNT // sentinel: number of states / handler table size
+};
+
+typedef void (*SwitchStateHandler)(SystemStatus status);
 typedef struct
 {
 
