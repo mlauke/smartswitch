@@ -51,36 +51,36 @@ bool GithubOTA::checkUpdate(const char *current_release_tag)
 
   updateStatus.clear();
 
-  filter[F("tag_name")] = true;
-  filter[F("prerelease")] = true;
-  filter[F("assets")][0][F("content_type")] = true;
-  filter[F("assets")][0][F("name")] = true;
-  filter[F("assets")][0][F("browser_download_url")] = true;
+  filter[FPSTR(KEY_GH_TAG_NAME)] = true;
+  filter[FPSTR(KEY_GH_PRERELEASE)] = true;
+  filter[FPSTR(KEY_GH_ASSETS)][0][FPSTR(KEY_GH_CONTENT_TYPE)] = true;
+  filter[FPSTR(KEY_GH_ASSETS)][0][FPSTR(KEY_GH_NAME)] = true;
+  filter[FPSTR(KEY_GH_ASSETS)][0][FPSTR(KEY_GH_DOWNLOAD_URL)] = true;
 
   String url = String(update_host) + update_url;
   if (restClient.get(url, json, &filter))
   {
-    if (!json[F("tag_name")].is<const char *>())
+    if (!json[FPSTR(KEY_GH_TAG_NAME)].is<const char *>())
     {
       updateStatus = F("No release tag found");
       return false;
     }
 
-    release_tag = json[F("tag_name")].as<String>();
+    release_tag = json[FPSTR(KEY_GH_TAG_NAME)].as<String>();
 
-    DEBUGF("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, json[F("prerelease")].as<bool>());
+    DEBUGF("Found release %s - Current release %s - Prerelease: %d\n", release_tag.c_str(), current_release_tag, json[FPSTR(KEY_GH_PRERELEASE)].as<bool>());
 
-    if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || json[F("prerelease")].as<bool>())
+    if (strncmp(release_tag.c_str(), current_release_tag, strlen(current_release_tag)) == 0 || json[FPSTR(KEY_GH_PRERELEASE)].as<bool>())
     {
       updateStatus = F("No new release tag found");
       return false;
     }
 
-    for (auto asset : json[F("assets")].as<JsonArray>())
+    for (auto asset : json[FPSTR(KEY_GH_ASSETS)].as<JsonArray>())
     {
-      const char *asset_type = asset[F("content_type")];
-      const char *asset_name = asset[F("name")];
-      const char *asset_url = asset[F("browser_download_url")];
+      const char *asset_type = asset[FPSTR(KEY_GH_CONTENT_TYPE)];
+      const char *asset_name = asset[FPSTR(KEY_GH_NAME)];
+      const char *asset_url = asset[FPSTR(KEY_GH_DOWNLOAD_URL)];
 
       DEBUGF("asset found: Name: [%s], Type: [%s], URL: [%s]\n", asset_name, asset_type, asset_url);
       DEBUGF("expected: [%s], Type: [%s]\n", update_filename, update_type);
@@ -155,9 +155,9 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
     http.end();
     releaseWiFiClient(updateClient);
 
-    #if defined(ESP8266) // workaround, fetch firmware via ssl seems too havy for esp8266
+#if defined(ESP8266) // workaround, fetch firmware via ssl seems too havy for esp8266
     newUrl.replace(F("https://"), F("http://"));
-    #endif
+#endif
     DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
     updateClient = newWiFiClient(newUrl);
     http.begin(*updateClient, newUrl);
@@ -219,7 +219,7 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
   }
   else
   {
-    updateStatus = String(F("Failed to download firmware. HTTP code: ")) + String(httpCode);
+    updateStatus = String(F("Failed to download firmware. HTTP code: ")) + http.errorToString(httpCode);
   }
   http.end();
   releaseWiFiClient(updateClient);
