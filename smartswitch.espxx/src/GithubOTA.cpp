@@ -139,11 +139,11 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
 
   HTTPClient http;
 #if defined(ESP32)
-  http.setConnectTimeout(5000);
+  http.setConnectTimeout(25000);
 #endif
   http.setReuse(false);
   http.setUserAgent(userAgent);
-  http.setTimeout(5000);
+  http.setTimeout(10000);
   http.setFollowRedirects(followRedirects_t::HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
   WiFiClient *updateClient = newWiFiClient(download_url);
@@ -155,7 +155,7 @@ bool GithubOTA::doUpdate(String userAgent, void (*fnOTABegin)(void), void (*fnOT
     http.end();
     releaseWiFiClient(updateClient);
 
-#if defined(ESP8266) // workaround, fetch firmware via ssl seems too havy for esp8266
+#if defined(ESP8266) // workaround, fetch firmware via ssl seems too heavy for esp8266
     newUrl.replace(F("https://"), F("http://"));
 #endif
     DEBUGF("redirect asset url %d %s\n", httpCode, newUrl.c_str());
