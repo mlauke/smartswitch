@@ -882,7 +882,7 @@ void updateSystemCounter()
   }
 }
 
-static SystemStatus determineSystemStatus()
+static SystemStatus updateSystemStatus()
 {
   if (!ensureConnected())
     return SystemStatus::Error_Network;
@@ -909,7 +909,7 @@ void loop()
       DEBUGLN("systime configured.");
     }
 
-    SystemStatus status = determineSystemStatus();
+    SystemStatus status = updateSystemStatus();
 
     updateSolarForecast();
 
