@@ -101,6 +101,23 @@ void start()
 #endif
 }
 
+static void configureSystemTime()
+{
+  configTime(0, 0, NTP_SERVER_PRIMARY, NTP_SERVER_SECONDARY);
+  DEBUGLN("systime configured.");
+}
+
+// tls certificate validation rejects every certificate while the clock is still at
+// 1970, so the update check must not run before ntp has answered
+static void waitForSystemTime()
+{
+  for (uint16_t waited = 0; waited < NTP_SYNC_TIMEOUT_MS && time(NULL) < NTP_SYNC_EPOCH; waited += NTP_SYNC_POLL_MS)
+  {
+    delay(NTP_SYNC_POLL_MS);
+  }
+  DEBUGF("systime: %s\n", toDate((uint32_t)time(NULL)));
+}
+
 void setup()
 {
   configDefaults();
@@ -156,8 +173,11 @@ void setup()
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
+  configureSystemTime();
+
   if (config.update_startup)
   {
+    waitForSystemTime();
     handleGithubUpdate();
   }
 
@@ -469,6 +489,7 @@ void handleData()
 
   configToJson(json, true);
   json[F("start_ts")] = toLocalDate(&systemState, systemState.start_ts);
+  json[F("ca_store")] = caTrustStoreState();
 
   JsonArray forecast = json[F("pv_forecast")].to<JsonArray>();
   for (int i = 0; i < SOLAR_FORECAST_HOURS; i++)
@@ -564,6 +585,10 @@ void handleAPI()
     config.update_startup = server.arg(F("update_startup")).toInt();
     DEBUGF("Enabled: %d\n", config.update_startup);
     saveConfig();
+  }
+  else if (server.hasArg(F("certs")))
+  {
+    updateTrustStore(server.hasArg(F("certs_reset")) ? String() : server.arg(F("certs")));
   }
   else if (server.hasArg(F("boiler")))
   {
@@ -694,6 +719,19 @@ void handleGithubUpdate()
   {
     putEvent(gh_updater.getUpdateStatus());
   }
+}
+
+// replaces the tls trust store used for OTA, empty content restores the firmware bundle
+void updateTrustStore(const String &pem)
+{
+  if (pem.length() == 0)
+  {
+    resetCaTrustStore();
+    putEvent(F("certificates reset to firmware bundle"));
+    return;
+  }
+  const __FlashStringHelper *error = saveCaTrustStore(pem);
+  putEvent(error == NULL ? String(F("certificates updated")) : String(F("certificates rejected - ")) + error);
 }
 
 void clearLocationError()
@@ -905,8 +943,7 @@ void loop()
 #endif
     if (isUpdateSystemData() && ensureConnected())
     {
-      configTime(0, 0, "pool.ntp.org", "time.nist.gov");
-      DEBUGLN("systime configured.");
+      configureSystemTime();
     }
 
     SystemStatus status = updateSystemStatus();

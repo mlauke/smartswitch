@@ -44,6 +44,12 @@
 #define SERIAL_BAUDRATE 115200
 #define WEBSERVER_PORT 80
 
+#define NTP_SERVER_PRIMARY "pool.ntp.org"
+#define NTP_SERVER_SECONDARY "time.nist.gov"
+#define NTP_SYNC_TIMEOUT_MS 5000
+#define NTP_SYNC_POLL_MS 250
+#define NTP_SYNC_EPOCH 1700000000 // Nov 2023 - anything below means the clock is unset
+
 #define LPB_BAUDRATE 4800
 #define LPB_ADDR_SELF 2
 #define LPB_ADDR_DEST 0

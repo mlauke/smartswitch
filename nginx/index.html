@@ -215,6 +215,25 @@
   </form>
   <form action="/api/update" method="post">
     <fieldset>
+      <legend>Certificates</legend>
+      <div class="fg">
+        <div>Trust Store:</div>
+        <div name="ca_store"></div>
+      </div>
+      <label for="certs">Root CAs used for updates (PEM):</label>
+      <textarea id="certs" name="certs" rows="6" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+      <div class="fg">
+        <div></div>
+        <div>
+          <button type="submit">Upload</button>
+          <input type="submit" name="certs_reset" value="Use built-in"
+            onclick="return confirm('Sure? Built-in certificates will be used again.')">
+        </div>
+      </div>
+    </fieldset>
+  </form>
+  <form action="/api/update" method="post">
+    <fieldset>
       <legend>Network</legend>
       <div class="fg">
         <label for="hostname">Hostname:</label>

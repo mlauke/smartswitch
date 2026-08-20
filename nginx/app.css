@@ -101,6 +101,7 @@ button {
   .overlay-content,
   body,
   input,
+  textarea,
   button {
     background: #222;
     color: #fcf8bf;
@@ -165,6 +166,17 @@ input {
   border: 1px solid #ccc;
   border-radius: 5px;
   font-size: large;
+}
+
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-family: monospace;
+  font-size: x-small;
+  resize: vertical;
 }
 
 .container {
