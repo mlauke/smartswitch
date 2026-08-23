@@ -382,7 +382,7 @@ button.loading .spinner {
   padding: 0 4px;
 }
 
-.stats-x-axis > .bar-lbl {
+.stats-x-axis>.bar-lbl {
   flex: 1;
 }
 
@@ -461,6 +461,7 @@ button.loading .spinner {
     background: rgba(255, 200, 50, 0.4);
   }
 
+  .day-totals,
   .bar-lbl {
     color: #aaa;
   }
@@ -472,9 +473,5 @@ button.loading .spinner {
   .stats-y-axis {
     color: #aaa;
     border-right-color: #555;
-  }
-
-  .day-totals {
-    color: #aaa;
   }
 }
