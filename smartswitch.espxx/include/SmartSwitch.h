@@ -55,6 +55,19 @@
 #define LPB_ADDR_DEST 0
 #define LPB_RETRIES 5
 
+#define WIFI_RECONNECT_RETRIES 8
+#define WIFI_RECONNECT_DELAY_MS 500
+
+// the watchdog is fed between the blocking calls (feedWatchdog() in main.ino), so it only has to
+// cover the longest single phase: one rest request, or the boiler transfer which runs as one block.
+// derived from REQUEST_TIMEOUT (RestClient.h) and the LPB timings (LPB.h), so the watchdog follows
+// automatically when one of those timeouts is changed
+#define LPB_UPDATE_TIMEOUT_MS (LPB_QUERIES_PER_UPDATE * QUERY_RETRIES * (LPB_BUS_FREE_TIMEOUT_MS + LPB_REPLY_TIMEOUT_MS))
+#define SYSTEM_UPDATE_TIMEOUT_MS MAX(REQUEST_TIMEOUT, LPB_UPDATE_TIMEOUT_MS)
+
+#define WDT_RESERVE_MS 10000 // headroom for everything that is not a remote call
+#define WDT_TIMEOUT_S ((SYSTEM_UPDATE_TIMEOUT_MS + WDT_RESERVE_MS) / 1000)
+
 #define SYSTEM_UPDATE_INTERVAL_MS 2000 // update intervall millis
 #define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
 

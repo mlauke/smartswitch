@@ -596,7 +596,7 @@ inline int8_t LPB::_send(byte *msg)
 #if DEBUG_LPB
   print(msg);
 #endif
-  static const unsigned long timeoutabort = 1000; // one second timeout
+  static const unsigned long timeoutabort = LPB_BUS_FREE_TIMEOUT_MS;
   unsigned long start_timer = millis();
   unsigned long waitfree;
 retry:
@@ -806,14 +806,14 @@ int8_t LPB::Send(uint8_t type, uint32_t cmd, byte *rx_msg, byte *tx_msg, const b
 
   i = 15;
 
-  unsigned long timeout = millis() + 3000;
+  unsigned long timeout = millis() + LPB_REPLY_TIMEOUT_MS;
   while ((i > 0) && (millis() < timeout))
   {
     if (GetMessage(rx_msg))
     {
 #if DEBUG_LPB
       DEBUG(F("\r\nDuration until answer received: "));
-      DEBUGLN(3000 - (timeout - millis()));
+      DEBUGLN(LPB_REPLY_TIMEOUT_MS - (timeout - millis()));
       print(rx_msg);
 #endif
       i--;

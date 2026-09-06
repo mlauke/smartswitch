@@ -5,6 +5,10 @@
 
 #define QUERY_RETRIES 3
 
+#define LPB_BUS_FREE_TIMEOUT_MS 1000 // give up waiting for a free bus
+#define LPB_REPLY_TIMEOUT_MS 3000    // give up waiting for the answer telegram
+#define LPB_QUERIES_PER_UPDATE 4     // boiler temperatures read per update: current, nominal, min, max
+
 #define BUS_OK 1
 #define BUS_NOTFREE -1
 #define BUS_NOMATCH -2

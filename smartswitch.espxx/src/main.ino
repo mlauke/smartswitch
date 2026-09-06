@@ -84,6 +84,16 @@ void saveConfigCallback()
   saveConfigFile = true;
 }
 
+// every remote call may block until its timeout, so the watchdog is fed before each of them
+static void feedWatchdog()
+{
+#ifdef ESP32
+  esp_task_wdt_reset();
+#elif ESP8266
+  ESP.wdtFeed();
+#endif
+}
+
 void start()
 {
   server.begin(); // Actually start the server
@@ -95,7 +105,8 @@ void start()
     putBoilerError(String("LPB: No device found after ") + retries + " retries!");
   }
 #ifdef ESP32
-  // esp_task_wdt_init({ 20000, 0, true });
+  esp_task_wdt_init(WDT_TIMEOUT_S, true); // panic handler reboots, the ssr input is high-z until setup() drives it
+  esp_task_wdt_add(NULL);                 // watch the task running loop()
 #elif ESP8266
   ESP.wdtEnable(20000);
 #endif
@@ -219,7 +230,9 @@ void onOTABegin()
   if (timer.active())
     timer.detach();
   lpb->disableInterface();
-#if ESP8266
+#ifdef ESP32
+  esp_task_wdt_delete(NULL); // flashing keeps loop() busy far longer than the watchdog allows
+#elif ESP8266
   ESP.wdtDisable();
 #endif
   updateSwitch(false);
@@ -296,6 +309,7 @@ bool updateSolarForecast()
     // solar forecast api requires azimuth with -180 north, -90 east, 0 south, 90 west
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.dec, config.az - 180, config.kWp);
 
+    feedWatchdog();
     if ((lastResult = restClient.get(String(url), json, NULL)))
     {
       serializeJsonPretty(json, Serial);
@@ -685,6 +699,7 @@ void handleGithubUpdate()
 {
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
+  feedWatchdog(); // the download itself unsubscribes the watchdog, see onOTABegin()
   if (!gh_updater.checkUpdate(config.release_tag))
   {
     if (server.client() && server.client().connected())
@@ -793,6 +808,7 @@ static bool updateBoilerData()
     lastUpdateSeconds = seconds;
 
     boiler_t boilerData;
+    feedWatchdog(); // the whole transfer runs inside the driver, this is the last chance to feed
     if ((lastResult = lpb->update(&boilerData, isDevMode())))
     {
       systemState.boiler_T_cur = boilerData.t_cur;
@@ -912,12 +928,14 @@ bool isUpdateSystemData()
   return updateSystemCount == 0;
 }
 
-void updateSystemCounter()
+bool updateSystemCounter()
 {
-  if (updateSystemCount-- == 0)
+  bool isZero = updateSystemCount-- == 0;
+  if (isZero)
   {
     updateSystemCount = 4 * 60 * SYSTEM_UPDATE_INTERVAL_MS / 1000; // every 4 hours
   }
+  return isZero;
 }
 
 static SystemStatus updateSystemStatus()
@@ -936,12 +954,9 @@ void loop()
 {
   if (doUpdateFlag)
   {
-#ifdef ESP32
-// esp_task_wdt_reset();
-#elif ESP8266
-    ESP.wdtFeed();
-#endif
-    if (isUpdateSystemData() && ensureConnected())
+    feedWatchdog();
+
+    if (updateSystemCounter() && ensureConnected())
     {
       configureSystemTime();
     }
@@ -954,11 +969,9 @@ void loop()
 
     updateSwitch(systemState.switchEnabled);
 
-    DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), status);
-
-    updateSystemCounter();
-
     doUpdateFlag = false;
+
+    DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), status);
   }
   server.handleClient();
 }
@@ -990,11 +1003,12 @@ static bool ensureConnected()
   if (status != WL_CONNECTED)
   {
     DEBUG("Connecting");
-    for (int retry = 1; retry <= 8; retry++)
+    for (int retry = 1; retry <= WIFI_RECONNECT_RETRIES; retry++)
     {
+      feedWatchdog();
       statusLED(0);
       DEBUG(".");
-      delay(500);
+      delay(WIFI_RECONNECT_DELAY_MS);
 
       status = WiFi.status();
       if (status == WL_CONNECTED)
@@ -1036,6 +1050,7 @@ bool fetchBatteryApi(String uri, JsonDocument &json, const JsonField *expectedFi
   {
     char url[128];
     snprintf_P(url, sizeof(url), PSTR("http://%.31s/%s/%s"), config.sonnenHostname, SONNEN_API_URI, uri.c_str());
+    feedWatchdog();
     r = restClient.get(String(url), json, filter, expectedFields, expectedFieldCount, "auth-token", config.sonnenApiToken);
     if (!r)
     {
