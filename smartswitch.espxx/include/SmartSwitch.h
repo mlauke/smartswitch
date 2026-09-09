@@ -92,6 +92,8 @@
 #define BATTERY_USOC_ON 10
 
 #define BOILER_TEMPERATURE_HYSTERESIS 2
+#define BOILER_AFTERGLOW_K_PER_KW 0.5f // heater afterglow rises with load power: 1 kW -> 0.5 °C
+#define BOILER_BOOST_REMAINING_PCT 40  // below this share of today's yield the pv day is running out
 #define BOILER_UPDATE_INTERVAL_SECONDS 15
 
 #define CFG_SZ_HOSTNAME 32

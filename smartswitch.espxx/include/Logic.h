@@ -28,6 +28,7 @@
 #include "debug.h"
 
 #define SECONDS_PER_HOUR 3600
+#define SECONDS_PER_DAY (24 * SECONDS_PER_HOUR)
 #define MIN_HOUR_SAMPLES (uint16_t)(0.8f * 3600 / (SYSTEM_UPDATE_INTERVAL_MS / 1000))
 
 enum BatteryLevel
@@ -188,6 +189,74 @@ static BatteryState predictBatteryCapacityState(SystemConfig *systemConfig, Syst
   };
 }
 
+// local calendar day of a utc timestamp, tells today's forecast hours apart from tomorrow's
+static uint32_t localDay(SystemState *systemState, uint32_t utc_ts)
+{
+  return (utc_ts + systemState->utc_offset) / SECONDS_PER_DAY;
+}
+
+// the heater keeps releasing energy into the water after switching off, the stronger the load the more
+static float boilerAfterglow(SystemConfig *systemConfig)
+{
+  return systemConfig->loadPower_W * BOILER_AFTERGLOW_K_PER_KW / 1000.0f;
+}
+
+// share (0..100%) of today's forecasted pv yield that is still ahead of us
+static uint8_t remainingPvShareToday(SystemState *systemState, short index)
+{
+  uint32_t today = localDay(systemState, systemState->ts);
+  uint32_t total = 0;
+  uint32_t remaining = 0;
+
+  for (short i = 0; i < SOLAR_FORECAST_HOURS; i++)
+  {
+    if (systemState->pv_forecast_ts_wh[i][0] == 0 || localDay(systemState, systemState->pv_forecast_ts_wh[i][0]) != today)
+    {
+      continue; // empty slot or another day
+    }
+    total += systemState->pv_forecast_ts_wh[i][1];
+    if (i >= index)
+    {
+      remaining += systemState->pv_forecast_ts_wh[i][1];
+    }
+  }
+  return total == 0 ? 0 : (uint8_t)(remaining * 100 / total);
+}
+
+// pv energy expected to be left today after household and battery took their share. a positive
+// result means the energy would be exported, so the boiler may use it for free
+static int32_t predictSurplusToday(SystemConfig *systemConfig, SystemState *systemState, short index)
+{
+  uint32_t today = localDay(systemState, systemState->ts);
+  uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // full hour
+  uint16_t seconds = ts + SECONDS_PER_HOUR - systemState->ts;           // remaining seconds in this hour
+
+  int32_t surplus = (int32_t)systemState->cap_bat_Wh - (int32_t)systemState->cap_bat_max_Wh; // battery is served first
+  surplus += (int32_t)(seconds * systemState->pv_forecast_ts_wh[index][1] / SECONDS_PER_HOUR * SOLAR_FORECAST_SAFETY_FACTOR);
+  surplus -= getConsumptionWh(systemConfig, systemState, ts, seconds);
+
+  for (short i = index + 1; i < SOLAR_FORECAST_HOURS && localDay(systemState, systemState->pv_forecast_ts_wh[i][0]) == today; i++)
+  {
+    surplus += (int32_t)(systemState->pv_forecast_ts_wh[i][1] * SOLAR_FORECAST_SAFETY_FACTOR);
+    surplus -= getConsumptionWh(systemConfig, systemState, systemState->pv_forecast_ts_wh[i][0], SECONDS_PER_HOUR);
+  }
+  DEBUGF("surplus %d Wh left today\n", surplus);
+  return surplus;
+}
+
+// late in the day the tank is worth charging beyond the nominal setpoint: the stored heat replaces
+// gas or oil in the evening and the pv energy used for it would otherwise be exported
+static bool isBoilerBoostActive(SystemConfig *systemConfig, SystemState *systemState)
+{
+  short index = findPvForecastData(systemState);
+  if (index == -1)
+  {
+    return false; // without a forecast there is no way to tell, so stay on the nominal setpoint
+  }
+  return remainingPvShareToday(systemState, index) < BOILER_BOOST_REMAINING_PCT &&
+         predictSurplusToday(systemConfig, systemState, index) >= (systemConfig->loadPower_W >> 2); // 15min of load
+}
+
 const char *const EVENTS[] = {
     NULL,
     "SoC %0% - boiler temperature %1°C < %6°C (min) reached",
@@ -234,8 +303,13 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
 
   uint8_t event = 0;
 
+  // late in the day the tank is charged up to its maximum, see isBoilerBoostActive()
+  float temp_target = isBoilerBoostActive(systemConfig, systemState)
+                          ? systemState->boiler_T_max
+                          : (systemState->boiler_T_max + systemState->boiler_T_nom) / 2;
+
   float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
-  float temp_off = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - 1.2f; // ~0.8 °C heater "afterglow"
+  float temp_off = temp_target - boilerAfterglow(systemConfig);
 
   BatteryState state = predictBatteryCapacityState(systemConfig, systemState);
   DEBUGF("battery state lvl=%d %dh\n", state.level, state.hours);

@@ -698,6 +698,97 @@ void test_predictBatteryCapacityStateUsesStats()
   TEST_ASSERT_EQUAL(BatteryLevel::Balanced, state.level);
 }
 
+// afternoon of the forecast day: 27% of today's yield left, battery full, so the remaining
+// production would be exported - the boiler may charge the tank up to its maximum
+static void prepareBoostScenario()
+{
+  systemState.ts = TEST_TS + 15 * 3600;
+  systemState.cap_bat_Wh = systemState.cap_bat_max_Wh;
+  systemState.usoc = 100;
+  systemState.switchEnabled = true;
+  systemState.cons_W = 150 + systemConfig.loadPower_W;
+  systemState.prod_W = systemConfig.loadPower_W + 400; // surplus available, battery rules stay out
+  systemState.gridFeedIn_W = 0;
+  updateSystemState(&systemConfig, &systemState);
+}
+
+void test_boilerAfterglowScalesWithLoadPower()
+{
+  systemConfig.loadPower_W = 1000;
+  TEST_ASSERT_EQUAL_FLOAT(0.5f, boilerAfterglow(&systemConfig));
+
+  systemConfig.loadPower_W = 2000;
+  TEST_ASSERT_EQUAL_FLOAT(1.0f, boilerAfterglow(&systemConfig));
+
+  systemConfig.loadPower_W = 3000;
+  TEST_ASSERT_EQUAL_FLOAT(1.5f, boilerAfterglow(&systemConfig));
+}
+
+void test_boilerBoostInactiveBeforeNoon()
+{
+  prepareBoostScenario();
+  systemState.ts = TEST_TS + 10 * 3600; // 95% of today's yield still ahead
+
+  TEST_ASSERT_FALSE(isBoilerBoostActive(&systemConfig, &systemState));
+}
+
+void test_boilerBoostActiveInAfternoon()
+{
+  prepareBoostScenario();
+
+  TEST_ASSERT_TRUE(isBoilerBoostActive(&systemConfig, &systemState));
+}
+
+void test_boilerBoostInactiveWithoutSurplus()
+{
+  prepareBoostScenario();
+  systemState.cap_bat_Wh = 1000; // battery still needs the remaining yield
+
+  TEST_ASSERT_FALSE(isBoilerBoostActive(&systemConfig, &systemState));
+}
+
+void test_boilerBoostInactiveWithoutForecast()
+{
+  prepareBoostScenario();
+  systemState.pv_forecast_ts_wh[0][0] = 0;
+
+  TEST_ASSERT_FALSE(isBoilerBoostActive(&systemConfig, &systemState));
+}
+
+void test_determineDesiredStateSwitchOffAtNominalTarget()
+{
+  char msg[80];
+
+  prepareBoostScenario();
+  systemState.ts = TEST_TS + 10 * 3600;  // no boost, target is (65 + 55) / 2
+  systemState.usoc = 41;
+  systemState.boiler_T_cur = 58.5f;      // above 60 - 1.55 afterglow
+
+  TEST_ASSERT_FALSE(determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok));
+  TEST_ASSERT_EQUAL_STRING("SoC 41% - boiler temperature 58.50°C >= 58.45°C (max) reached", msg);
+}
+
+void test_determineDesiredStateKeepsHeatingInBoostWindow()
+{
+  char msg[80];
+
+  prepareBoostScenario();
+  systemState.boiler_T_cur = 60.0f; // beyond the nominal target, still below max - afterglow
+
+  TEST_ASSERT_TRUE(determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok));
+}
+
+void test_determineDesiredStateSwitchOffAtMaxInBoostWindow()
+{
+  char msg[80];
+
+  prepareBoostScenario();
+  systemState.boiler_T_cur = 63.5f; // above 65 - 1.55 afterglow
+
+  TEST_ASSERT_FALSE(determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok));
+  TEST_ASSERT_EQUAL_STRING("SoC 100% - boiler temperature 63.50°C >= 63.45°C (max) reached", msg);
+}
+
 int main(int argc, char **argv)
 {
   UNITY_BEGIN();
@@ -735,6 +826,15 @@ int main(int argc, char **argv)
   RUN_TEST(test_determineDesiredState_BatteryCapacityFinallyAboveMinCapacityButUsocTooLow);
 
   RUN_TEST(test_determineDesiredState_VeryLowConsumption);
+
+  RUN_TEST(test_boilerAfterglowScalesWithLoadPower);
+  RUN_TEST(test_boilerBoostInactiveBeforeNoon);
+  RUN_TEST(test_boilerBoostActiveInAfternoon);
+  RUN_TEST(test_boilerBoostInactiveWithoutSurplus);
+  RUN_TEST(test_boilerBoostInactiveWithoutForecast);
+  RUN_TEST(test_determineDesiredStateSwitchOffAtNominalTarget);
+  RUN_TEST(test_determineDesiredStateKeepsHeatingInBoostWindow);
+  RUN_TEST(test_determineDesiredStateSwitchOffAtMaxInBoostWindow);
 
   return UNITY_END();
 }
