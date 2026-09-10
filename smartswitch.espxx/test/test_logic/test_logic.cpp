@@ -786,7 +786,7 @@ void test_determineDesiredStateSwitchOffAtMaxInBoostWindow()
   systemState.boiler_T_cur = 63.5f; // above 65 - 1.55 afterglow
 
   TEST_ASSERT_FALSE(determineDesiredState(msg, sizeof(msg), &systemConfig, &systemState, SystemStatus::Ok));
-  TEST_ASSERT_EQUAL_STRING("SoC 100% - boiler temperature 63.50°C >= 63.45°C (max) reached", msg);
+  TEST_ASSERT_EQUAL_STRING("SoC 100% - boiler temperature 63.50°C >= 63.45°C (max, boost on) reached", msg);
 }
 
 int main(int argc, char **argv)

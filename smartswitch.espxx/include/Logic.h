@@ -263,7 +263,7 @@ const char *const EVENTS[] = {
     "SoC %0% - invalid data, error was %8",
     "SoC %0% - consumption %2W too high, to much grid purchase %3W",
     "SoC %0% - consumption %2W, battery min SoC %4% reached%7",
-    "SoC %0% - boiler temperature %1°C >= %5°C (max) reached",
+    "SoC %0% - boiler temperature %1°C >= %5°C (max%9) reached",
     "SoC %0% - battery will be full charged%7, but SoC too low",
 };
 
@@ -304,9 +304,9 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
   uint8_t event = 0;
 
   // late in the day the tank is charged up to its maximum, see isBoilerBoostActive()
-  float temp_target = isBoilerBoostActive(systemConfig, systemState)
-                          ? systemState->boiler_T_max
-                          : (systemState->boiler_T_max + systemState->boiler_T_nom) / 2;
+  bool boost = isBoilerBoostActive(systemConfig, systemState);
+  float temp_target = boost ? systemState->boiler_T_max
+                            : (systemState->boiler_T_max + systemState->boiler_T_nom) / 2;
 
   float temp_on = (systemState->boiler_T_max + systemState->boiler_T_nom) / 2 - BOILER_TEMPERATURE_HYSTERESIS;
   float temp_off = temp_target - boilerAfterglow(systemConfig);
@@ -359,7 +359,8 @@ static bool determineDesiredState(char *msg, int len, SystemConfig *systemConfig
         ARG_FLT, &temp_off,
         ARG_FLT, &temp_on,
         ARG_STR, &hour_label,
-        ARG_STR, (void *)SystemStatusLabel[status]};
+        ARG_STR, (void *)SystemStatusLabel[status],
+        ARG_STR, (void *)(boost ? ", boost on" : "")};
 
     format_indexed(msg, len, EVENTS[event], args);
   }
