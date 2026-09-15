@@ -223,25 +223,32 @@ static uint8_t remainingPvShareToday(SystemState *systemState, short index)
   return total == 0 ? 0 : (uint8_t)(remaining * 100 / total);
 }
 
-// pv energy expected to be left today after household and battery took their share. a positive
-// result means the energy would be exported, so the boiler may use it for free
-static int32_t predictSurplusToday(SystemConfig *systemConfig, SystemState *systemState, short index)
+// pv energy expected to be exported today: the hourly surplus charges the battery first and only
+// what overflows a full battery is exported. consumption without pv is covered by the battery and
+// does not reduce the export, so the exported energy is free for the boiler
+static uint32_t predictExportToday(SystemConfig *systemConfig, SystemState *systemState, short index)
 {
   uint32_t today = localDay(systemState, systemState->ts);
   uint32_t ts = systemState->ts - (systemState->ts % SECONDS_PER_HOUR); // full hour
   uint16_t seconds = ts + SECONDS_PER_HOUR - systemState->ts;           // remaining seconds in this hour
 
-  int32_t surplus = (int32_t)systemState->cap_bat_Wh - (int32_t)systemState->cap_bat_max_Wh; // battery is served first
-  surplus += (int32_t)(seconds * systemState->pv_forecast_ts_wh[index][1] / SECONDS_PER_HOUR * SOLAR_FORECAST_SAFETY_FACTOR);
-  surplus -= getConsumptionWh(systemConfig, systemState, ts, seconds);
+  int32_t battery = systemState->cap_bat_Wh;
+  uint32_t exported = 0;
 
-  for (short i = index + 1; i < SOLAR_FORECAST_HOURS && localDay(systemState, systemState->pv_forecast_ts_wh[i][0]) == today; i++)
+  for (short i = index; i < SOLAR_FORECAST_HOURS && localDay(systemState, systemState->pv_forecast_ts_wh[i][0]) == today; i++)
   {
-    surplus += (int32_t)(systemState->pv_forecast_ts_wh[i][1] * SOLAR_FORECAST_SAFETY_FACTOR);
-    surplus -= getConsumptionWh(systemConfig, systemState, systemState->pv_forecast_ts_wh[i][0], SECONDS_PER_HOUR);
+    battery += (int32_t)(seconds * systemState->pv_forecast_ts_wh[i][1] / SECONDS_PER_HOUR * SOLAR_FORECAST_SAFETY_FACTOR);
+    battery -= getConsumptionWh(systemConfig, systemState, systemState->pv_forecast_ts_wh[i][0], seconds);
+    if (battery > systemState->cap_bat_max_Wh)
+    {
+      exported += battery - systemState->cap_bat_max_Wh;
+      battery = systemState->cap_bat_max_Wh;
+    }
+    battery = MAX(0, battery);
+    seconds = SECONDS_PER_HOUR; // every following hour is a full one
   }
-  DEBUGF("surplus %d Wh left today\n", surplus);
-  return surplus;
+  DEBUGF("export %u Wh expected today\n", exported);
+  return exported;
 }
 
 // late in the day the tank is worth charging beyond the nominal setpoint: the stored heat replaces
@@ -254,7 +261,7 @@ static bool isBoilerBoostActive(SystemConfig *systemConfig, SystemState *systemS
     return false; // without a forecast there is no way to tell, so stay on the nominal setpoint
   }
   return remainingPvShareToday(systemState, index) < BOILER_BOOST_REMAINING_PCT &&
-         predictSurplusToday(systemConfig, systemState, index) >= (systemConfig->loadPower_W >> 2); // 15min of load
+         predictExportToday(systemConfig, systemState, index) >= (systemConfig->loadPower_W >> 2); // 15min of load
 }
 
 const char *const EVENTS[] = {

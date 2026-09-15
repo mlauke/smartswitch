@@ -739,6 +739,15 @@ void test_boilerBoostActiveInAfternoon()
   TEST_ASSERT_TRUE(isBoilerBoostActive(&systemConfig, &systemState));
 }
 
+void test_boilerBoostActiveDespiteEveningConsumption()
+{
+  prepareBoostScenario();
+  systemState.cons_W = 350 + systemConfig.loadPower_W; // household draw continues after sunset
+  updateSystemState(&systemConfig, &systemState);
+
+  TEST_ASSERT_TRUE(isBoilerBoostActive(&systemConfig, &systemState));
+}
+
 void test_boilerBoostInactiveWithoutSurplus()
 {
   prepareBoostScenario();
@@ -830,6 +839,7 @@ int main(int argc, char **argv)
   RUN_TEST(test_boilerAfterglowScalesWithLoadPower);
   RUN_TEST(test_boilerBoostInactiveBeforeNoon);
   RUN_TEST(test_boilerBoostActiveInAfternoon);
+  RUN_TEST(test_boilerBoostActiveDespiteEveningConsumption);
   RUN_TEST(test_boilerBoostInactiveWithoutSurplus);
   RUN_TEST(test_boilerBoostInactiveWithoutForecast);
   RUN_TEST(test_determineDesiredStateSwitchOffAtNominalTarget);
