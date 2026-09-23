@@ -1064,6 +1064,7 @@ static bool ensureConnected()
     }
     if (status != WL_CONNECTED)
     {
+      putEvent(String(F("restart: wifi not connected, status ")) + status);
       restart();
     }
   }
