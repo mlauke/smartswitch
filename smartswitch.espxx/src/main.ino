@@ -112,6 +112,36 @@ void start()
 #endif
 }
 
+// the reset reason survives in hardware, it is the only trace a watchdog or panic leaves
+static String resetReason()
+{
+#ifdef ESP32
+  switch (esp_reset_reason())
+  {
+  case ESP_RST_POWERON:
+    return F("power on");
+  case ESP_RST_EXT:
+    return F("external reset");
+  case ESP_RST_SW:
+    return F("software restart");
+  case ESP_RST_PANIC:
+    return F("panic / exception");
+  case ESP_RST_INT_WDT:
+    return F("interrupt watchdog timeout");
+  case ESP_RST_TASK_WDT:
+    return F("task watchdog timeout");
+  case ESP_RST_WDT:
+    return F("watchdog timeout");
+  case ESP_RST_BROWNOUT:
+    return F("brownout");
+  default:
+    return F("unknown");
+  }
+#elif defined(ESP8266)
+  return ESP.getResetReason();
+#endif
+}
+
 static void configureSystemTime()
 {
   configTime(0, 0, NTP_SERVER_PRIMARY, NTP_SERVER_SECONDARY);
@@ -185,10 +215,13 @@ void setup()
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
 
   configureSystemTime();
+  waitForSystemTime(); // a valid clock before the first entry is written
+
+  loadEventLogIndex();
+  putEvent(String(F("boot: ")) + resetReason());
 
   if (config.update_startup)
   {
-    waitForSystemTime();
     handleGithubUpdate();
   }
 
@@ -254,7 +287,6 @@ void systemDefaults()
   systemState.start_ts = 0;
   systemState.pv_forecast_ts = 0;
   memset(systemState.pv_forecast_ts_wh, 0, sizeof(systemState.pv_forecast_ts_wh));
-  systemState.eventIx = 0;
   systemState.inv_max_w = -1;
   systemState.utc_offset = -1;
   systemState.switchEnabled = false;
@@ -558,12 +590,7 @@ void handleStatus()
   addLog(errors, systemState.error_lc);
 
   JsonArray events = json[F("events")].to<JsonArray>();
-  unsigned short i = SIZE_EVENT_BUFFER;
-  while (i-- > 0)
-  {
-    logEntry log = systemState.events[(systemState.eventIx + i) % SIZE_EVENT_BUFFER];
-    addLog(events, log);
-  }
+  addEventLog(events);
 
   json[F("version")] = config.version;
 
@@ -677,6 +704,7 @@ void handleNotFound()
 void restart()
 {
   server.close();
+  saveEventLogIndex(); // the stored size matches the file after a controlled restart
   LittleFS.end();
   ESP.restart();
 }
@@ -779,16 +807,24 @@ void clearBoilerError()
   systemState.error_bs.msg[0] = '\0';
 }
 
+// system time comes from the battery api, ntp fills the gap until the first successful poll
+static uint32_t eventTimestamp()
+{
+  return systemState.ts > 0 ? systemState.ts : (uint32_t)time(NULL);
+}
+
 void putLog(logEntry &log, const char *event)
 {
   snprintf(log.msg, sizeof(log.msg), "%s", event);
-  log.ts = systemState.ts;
-  DEBUGF("log %u: %s\n", systemState.ts, event);
+  log.ts = eventTimestamp();
+  DEBUGF("log %u: %s\n", log.ts, event);
 }
 
 void putEvent(const char *event)
 {
-  putLog(systemState.events[systemState.eventIx++ % SIZE_EVENT_BUFFER], event);
+  logEntry log;
+  putLog(log, event);
+  appendEventLog(log);
 }
 
 void putEvent(String event)
@@ -1168,6 +1204,164 @@ static void updateSwitch(bool switchEnabled)
 {
   digitalWrite(PIN_SSR, switchEnabled ? HIGH : LOW);
   buildInLED(switchEnabled);
+}
+
+static uint8_t logSegment = 0; // active segment 0..LOG_SEGMENTS - 1
+static uint32_t logSize = 0;   // payload of the active segment, tracked in ram
+
+static String logSegmentPath(uint8_t segment)
+{
+  char path[24];
+  snprintf_P(path, sizeof(path), PSTR(LOGFILE_PATTERN), segment);
+  return String(path);
+}
+
+// remembers the active segment across restarts, size is the payload as of the last save
+static bool saveEventLogIndex()
+{
+  File f = LittleFS.open(LOGFILE_INDEX, "w");
+  if (!f)
+  {
+    DEBUGF("Could not open log index %s for writing\n", LOGFILE_INDEX);
+    return false;
+  }
+
+  JsonDocument json;
+  json[F("current")] = logSegment;
+  json[F("size")] = logSize;
+  serializeJson(json, f);
+  f.close();
+  return true;
+}
+
+// restores the active segment and closes an entry that a power loss cut in half
+static void loadEventLogIndex()
+{
+  File index = LittleFS.open(LOGFILE_INDEX, "r");
+  if (index)
+  {
+    JsonDocument json;
+    if (deserializeJson(json, index) == DeserializationError::Ok)
+    {
+      logSegment = json[F("current")].as<uint8_t>() % LOG_SEGMENTS;
+    }
+    index.close();
+  }
+
+  bool unterminated = false;
+  File segment = LittleFS.open(logSegmentPath(logSegment), "r");
+  if (segment)
+  {
+    logSize = segment.size();
+    if (logSize > 0)
+    {
+      segment.seek(logSize - 1);
+      unterminated = segment.read() != '\n';
+    }
+    segment.close();
+  }
+
+  if (unterminated) // terminate the torn entry, it is dropped later because it does not parse
+  {
+    File f = LittleFS.open(logSegmentPath(logSegment), "a");
+    if (f)
+    {
+      f.write('\n');
+      f.close();
+      logSize++;
+    }
+  }
+  DEBUGF("event log segment %u, %u bytes\n", logSegment, logSize);
+}
+
+// starts the next segment, emptying it keeps "payload == file size" true for every segment
+static void rotateEventLog()
+{
+  logSegment = (logSegment + 1) % LOG_SEGMENTS;
+  logSize = 0;
+
+  File f = LittleFS.open(logSegmentPath(logSegment), "w"); // drops the previous generation
+  if (f)
+  {
+    f.close();
+  }
+  saveEventLogIndex();
+}
+
+// one json line per entry, an entry is never split across two segments
+static void appendEventLog(const logEntry &log)
+{
+  JsonDocument json;
+  json[F("ts")] = log.ts;
+  json[F("msg")] = log.msg;
+  size_t len = measureJson(json) + 1; // plus the record separator
+
+  if (logSize + len > LOG_SEGMENT_MAX_SIZE)
+  {
+    rotateEventLog();
+  }
+
+  File f = LittleFS.open(logSegmentPath(logSegment), "a");
+  if (!f)
+  {
+    DEBUGF("Could not open log segment %u for writing\n", logSegment);
+    return;
+  }
+  serializeJson(json, f);
+  f.write('\n');
+  f.close();
+  logSize += len;
+}
+
+// collects the youngest entries of one segment, newest first
+static void addEventLogSegment(JsonArray &array, uint8_t segment)
+{
+  File f = LittleFS.open(logSegmentPath(segment), "r");
+  if (!f)
+  {
+    return;
+  }
+
+  uint32_t offsets[LOG_VIEW_ENTRIES];
+  uint16_t count = 0;
+
+  if (f.size() > LOG_VIEW_TAIL_SIZE)
+  {
+    f.seek(f.size() - LOG_VIEW_TAIL_SIZE);
+    f.readStringUntil('\n'); // the jump lands inside an entry, drop its remainder
+  }
+  while (f.available())
+  {
+    offsets[count++ % LOG_VIEW_ENTRIES] = f.position();
+    f.readStringUntil('\n');
+  }
+
+  uint16_t entries = MIN(count, (uint16_t)LOG_VIEW_ENTRIES);
+  for (uint16_t i = 1; i <= entries && array.size() < LOG_VIEW_ENTRIES; i++)
+  {
+    f.seek(offsets[(count - i) % LOG_VIEW_ENTRIES]);
+
+    JsonDocument entry;
+    if (deserializeJson(entry, f.readStringUntil('\n')) != DeserializationError::Ok)
+    {
+      continue; // torn or corrupted entry
+    }
+    JsonObject e = array.add<JsonObject>();
+    e[F("ts")] = entry[F("ts")].as<uint32_t>();
+    e[F("msg")] = entry[F("msg")].as<String>(); // as String, so the text is copied
+  }
+  f.close();
+}
+
+// hands the youngest entries to the ui, walking the segment ring backwards
+static void addEventLog(JsonArray &array)
+{
+  uint8_t segment = logSegment;
+  for (uint8_t i = 0; i < LOG_SEGMENTS && array.size() < LOG_VIEW_ENTRIES; i++)
+  {
+    addEventLogSegment(array, segment);
+    segment = (segment + LOG_SEGMENTS - 1) % LOG_SEGMENTS;
+  }
 }
 
 static bool loadConfig()

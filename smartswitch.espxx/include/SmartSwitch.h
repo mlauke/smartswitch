@@ -109,7 +109,12 @@
 #define CALIBRATE_MEASURE (CALIBRATE_ONOFF_TOGGLE >> 1)
 #define CALIBRATE_AVG_DIV (CALIBRATE_LOOP_CNT / CALIBRATE_ONOFF_TOGGLE / 2 * CALIBRATE_MEASURE)
 
-#define SIZE_EVENT_BUFFER 16
+#define LOGFILE_INDEX "/eventlog.json"
+#define LOGFILE_PATTERN "/eventlog-%02u.log"
+#define LOG_SEGMENTS 4
+#define LOG_SEGMENT_MAX_SIZE (16 * 1024)
+#define LOG_VIEW_ENTRIES 16     // entries handed to the ui
+#define LOG_VIEW_TAIL_SIZE 4096 // bytes scanned back from a segment's end to find them
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
@@ -219,9 +224,6 @@ typedef struct
 
   long pv_forecast_ts;                                 // last update timestamp in ms since mcu start
   uint32_t pv_forecast_ts_wh[SOLAR_FORECAST_HOURS][2]; // pair of timestamp and pv production (Wh/h) for 48h (today and tomorrow)
-
-  logEntry events[SIZE_EVENT_BUFFER]; // event buffer
-  uint8_t eventIx = 0;
 
   uint8_t skipUpdateCountSysten; // skip update on error count
 
