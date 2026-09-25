@@ -1283,10 +1283,12 @@ static void loadEventLogIndex()
     index.close();
   }
 
+  String path = logSegmentPath(logSegment);
   bool unterminated = false;
-  File segment = LittleFS.open(logSegmentPath(logSegment), "r");
-  if (segment)
+
+  if (LittleFS.exists(path)) // missing before the very first entry is written
   {
+    File segment = LittleFS.open(path, "r");
     logSize = segment.size();
     if (logSize > 0)
     {
@@ -1298,7 +1300,7 @@ static void loadEventLogIndex()
 
   if (unterminated) // terminate the torn entry, it is dropped later because it does not parse
   {
-    File f = LittleFS.open(logSegmentPath(logSegment), "a");
+    File f = LittleFS.open(path, "a");
     if (f)
     {
       f.write('\n');
@@ -1394,6 +1396,10 @@ static void addEventLog(JsonArray &array)
   uint8_t segment = logSegment;
   for (uint8_t i = 0; i < LOG_SEGMENTS && array.size() < LOG_VIEW_ENTRIES; i++)
   {
+    if (!LittleFS.exists(logSegmentPath(segment)))
+    {
+      break; // the ring has not wrapped around yet, there is no older history
+    }
     addEventLogSegment(array, segment);
     segment = (segment + LOG_SEGMENTS - 1) % LOG_SEGMENTS;
   }
