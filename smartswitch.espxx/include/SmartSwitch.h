@@ -160,6 +160,30 @@ enum SwitchStateId
   STATE_COUNT // sentinel: number of states / handler table size
 };
 
+// phase of the update cycle, kept across a reset so a watchdog reboot can name what was blocking
+enum WatchdogPhase
+{
+  PHASE_IDLE, // nothing to report, set on an intentional restart
+  PHASE_SERVER,
+  PHASE_CYCLE,
+  PHASE_WIFI,
+  PHASE_BATTERY,
+  PHASE_FORECAST,
+  PHASE_BOILER,
+  PHASE_UPDATE,
+  PHASE_COUNT // sentinel: number of phases / label table size
+};
+
+#define WATCHDOG_PHASE_MAGIC 0x5750484Aul // marks the phase as written by this firmware
+
+#ifdef ESP32
+#define RESET_PERSIST_ATTR RTC_NOINIT_ATTR // dram can be clobbered by the bootloader, rtc memory cannot
+#elif ESP8266
+#define RESET_PERSIST_ATTR __attribute__((section(".noinit")))
+#else
+#define RESET_PERSIST_ATTR
+#endif
+
 typedef void (*SwitchStateHandler)(SystemStatus status);
 typedef struct
 {

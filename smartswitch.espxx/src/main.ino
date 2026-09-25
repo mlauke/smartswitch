@@ -84,14 +84,45 @@ void saveConfigCallback()
   saveConfigFile = true;
 }
 
-// every remote call may block until its timeout, so the watchdog is fed before each of them
-static void feedWatchdog()
+// labels and the pointer array both in flash - on esp8266 plain .rodata would land in dram
+static const char PHASE_LABEL_SERVER[] PROGMEM = "web server";
+static const char PHASE_LABEL_CYCLE[] PROGMEM = "update cycle";
+static const char PHASE_LABEL_WIFI[] PROGMEM = "wifi reconnect";
+static const char PHASE_LABEL_BATTERY[] PROGMEM = "battery api";
+static const char PHASE_LABEL_FORECAST[] PROGMEM = "pv forecast";
+static const char PHASE_LABEL_BOILER[] PROGMEM = "boiler transfer";
+static const char PHASE_LABEL_UPDATE[] PROGMEM = "update check";
+
+static const char *const WatchdogPhaseLabel[PHASE_COUNT] PROGMEM = {
+    NULL, PHASE_LABEL_SERVER, PHASE_LABEL_CYCLE, PHASE_LABEL_WIFI,
+    PHASE_LABEL_BATTERY, PHASE_LABEL_FORECAST, PHASE_LABEL_BOILER, PHASE_LABEL_UPDATE};
+
+// survives watchdog, panic and external reset - only a power loss clears it, hence the magic
+static RESET_PERSIST_ATTR uint32_t watchdogPhaseMagic;
+static RESET_PERSIST_ATTR uint8_t watchdogPhase;
+
+// every remote call may block until its timeout, so the watchdog is fed before each of them.
+// the phase is kept in memory that survives a reset, so a reboot can name what was blocking
+static void feedWatchdog(WatchdogPhase phase)
 {
+  watchdogPhaseMagic = WATCHDOG_PHASE_MAGIC;
+  watchdogPhase = phase;
+
 #ifdef ESP32
   esp_task_wdt_reset();
 #elif ESP8266
   ESP.wdtFeed();
 #endif
+}
+
+// names the phase the reset hit, empty if the marker did not survive or the restart was planned
+static String lastWatchdogPhase()
+{
+  if (watchdogPhaseMagic != WATCHDOG_PHASE_MAGIC || watchdogPhase == PHASE_IDLE || watchdogPhase >= PHASE_COUNT)
+  {
+    return String();
+  }
+  return String(F(" (")) + FPSTR((const char *)pgm_read_ptr(&WatchdogPhaseLabel[watchdogPhase])) + F(")");
 }
 
 void start()
@@ -218,7 +249,8 @@ void setup()
   waitForSystemTime(); // a valid clock before the first entry is written
 
   loadEventLogIndex();
-  putEvent(String(F("boot: ")) + resetReason());
+  putEvent(String(F("boot: ")) + resetReason() + lastWatchdogPhase());
+  feedWatchdog(PHASE_IDLE); // consumed, the next reset starts from a clean marker
 
   if (config.update_startup)
   {
@@ -341,7 +373,7 @@ bool updateSolarForecast()
     // solar forecast api requires azimuth with -180 north, -90 east, 0 south, 90 west
     snprintf(url, sizeof(url), solarUrl.c_str(), config.lat, config.lon, config.dec, config.az - 180, config.kWp);
 
-    feedWatchdog();
+    feedWatchdog(PHASE_FORECAST);
     if ((lastResult = restClient.get(String(url), json, NULL)))
     {
       serializeJsonPretty(json, Serial);
@@ -704,6 +736,7 @@ void handleNotFound()
 void restart()
 {
   server.close();
+  watchdogPhase = PHASE_IDLE; // an intentional restart has no phase to report
   saveEventLogIndex(); // the stored size matches the file after a controlled restart
   LittleFS.end();
   ESP.restart();
@@ -727,7 +760,7 @@ void handleGithubUpdate()
 {
   GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
 
-  feedWatchdog(); // the download itself unsubscribes the watchdog, see onOTABegin()
+  feedWatchdog(PHASE_UPDATE); // the download itself unsubscribes the watchdog, see onOTABegin()
   if (!gh_updater.checkUpdate(config.release_tag))
   {
     if (server.client() && server.client().connected())
@@ -844,7 +877,7 @@ static bool updateBoilerData()
     lastUpdateSeconds = seconds;
 
     boiler_t boilerData;
-    feedWatchdog(); // the whole transfer runs inside the driver, this is the last chance to feed
+    feedWatchdog(PHASE_BOILER); // the whole transfer runs inside the driver, this is the last chance to feed
     if ((lastResult = lpb->update(&boilerData, isDevMode())))
     {
       systemState.boiler_T_cur = boilerData.t_cur;
@@ -990,7 +1023,7 @@ void loop()
 {
   if (doUpdateFlag)
   {
-    feedWatchdog();
+    feedWatchdog(PHASE_CYCLE);
 
     if (updateSystemCounter() && ensureConnected())
     {
@@ -1006,6 +1039,7 @@ void loop()
     updateSwitch(systemState.switchEnabled);
 
     doUpdateFlag = false;
+    feedWatchdog(PHASE_SERVER); // the cycle is done, only server.handleClient() runs from here
 
     DEBUGF("ESP Heap %uk CPU: %uMhz valid: %d\n", ESP.getFreeHeap() >> 10, ESP.getCpuFreqMHz(), status);
   }
@@ -1041,7 +1075,7 @@ static bool ensureConnected()
     DEBUG("Connecting");
     for (int retry = 1; retry <= WIFI_RECONNECT_RETRIES; retry++)
     {
-      feedWatchdog();
+      feedWatchdog(PHASE_WIFI);
       statusLED(0);
       DEBUG(".");
       delay(WIFI_RECONNECT_DELAY_MS);
@@ -1087,7 +1121,7 @@ bool fetchBatteryApi(String uri, JsonDocument &json, const JsonField *expectedFi
   {
     char url[128];
     snprintf_P(url, sizeof(url), PSTR("http://%.31s/%s/%s"), config.sonnenHostname, SONNEN_API_URI, uri.c_str());
-    feedWatchdog();
+    feedWatchdog(PHASE_BATTERY);
     r = restClient.get(String(url), json, filter, expectedFields, expectedFieldCount, "auth-token", config.sonnenApiToken);
     if (!r)
     {
