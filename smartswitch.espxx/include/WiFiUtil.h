@@ -4,7 +4,10 @@
 
 #ifdef ESP32
 #include <LittleFS.h>
+#include <WiFi.h>
 #include <mbedtls/x509_crt.h>
+#else
+#include <ESP8266WiFi.h>
 #endif
 
 #include "certs.h"
@@ -131,4 +134,34 @@ inline void releaseWiFiClient(WiFiClient *client)
 #ifdef ESP32
   caTrustStore() = String(); // release the buffer, the client using it is gone
 #endif
+}
+
+// names the wifi status for the event log - the numeric values differ between esp8266 and esp32
+inline const __FlashStringHelper *wifiStatusLabel(wl_status_t status)
+{
+  switch (status)
+  {
+  case WL_IDLE_STATUS:
+    return F("idle");
+  case WL_NO_SSID_AVAIL:
+    return F("no ssid available");
+  case WL_SCAN_COMPLETED:
+    return F("scan completed");
+  case WL_CONNECTED:
+    return F("connected");
+  case WL_CONNECT_FAILED:
+    return F("connect failed");
+  case WL_CONNECTION_LOST:
+    return F("connection lost");
+#ifdef ESP8266
+  case WL_WRONG_PASSWORD:
+    return F("wrong password");
+#endif
+  case WL_DISCONNECTED:
+    return F("disconnected");
+  case WL_NO_SHIELD:
+    return F("no wifi hardware");
+  default:
+    return F("unknown");
+  }
 }
