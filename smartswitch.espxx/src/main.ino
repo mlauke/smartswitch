@@ -25,12 +25,15 @@
 #include <Ticker.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#ifndef NET_ETHERNET
 #include <WiFiManager.h>
+#endif
 
 // echo -e "const char index_html[] PROGMEM = { $(gzip -9 -c nginx/index.html | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/index_html.h && \
 // echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
 // echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
 
+#include "EthernetUtil.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
 #include "JsonFields.h"
@@ -72,7 +75,9 @@ static ESP8266WebServer server(WEBSERVER_PORT);
 volatile bool doUpdateFlag = false;
 
 LPB *lpb;
+#ifndef NET_ETHERNET
 WiFiManager wifiManager;
+#endif
 Ticker timer;
 SystemState systemState;
 SystemConfig config;
@@ -87,14 +92,14 @@ void saveConfigCallback()
 // labels and the pointer array both in flash - on esp8266 plain .rodata would land in dram
 static const char PHASE_LABEL_SERVER[] PROGMEM = "web server";
 static const char PHASE_LABEL_CYCLE[] PROGMEM = "update cycle";
-static const char PHASE_LABEL_WIFI[] PROGMEM = "wifi reconnect";
+static const char PHASE_LABEL_NETWORK[] PROGMEM = "network reconnect";
 static const char PHASE_LABEL_BATTERY[] PROGMEM = "battery api";
 static const char PHASE_LABEL_FORECAST[] PROGMEM = "pv forecast";
 static const char PHASE_LABEL_BOILER[] PROGMEM = "boiler transfer";
 static const char PHASE_LABEL_UPDATE[] PROGMEM = "update check";
 
 static const char *const WatchdogPhaseLabel[PHASE_COUNT] PROGMEM = {
-    NULL, PHASE_LABEL_SERVER, PHASE_LABEL_CYCLE, PHASE_LABEL_WIFI,
+    NULL, PHASE_LABEL_SERVER, PHASE_LABEL_CYCLE, PHASE_LABEL_NETWORK,
     PHASE_LABEL_BATTERY, PHASE_LABEL_FORECAST, PHASE_LABEL_BOILER, PHASE_LABEL_UPDATE};
 
 // survives watchdog, panic and external reset - only a power loss clears it, hence the magic
@@ -136,8 +141,12 @@ void start()
     putBoilerError(String("LPB: No device found after ") + retries + " retries!");
   }
 #ifdef ESP32
-  esp_task_wdt_init(WDT_TIMEOUT_S, true); // panic handler reboots, the ssr input is high-z until setup() drives it
-  esp_task_wdt_add(NULL);                 // watch the task running loop()
+  // the core already started the watchdog, only its timeout is raised. the panic handler reboots,
+  // the ssr input is high-z until setup() drives it. cpu0 idle stays watched as configured by the core
+  const esp_task_wdt_config_t watchdogConfig = {
+      .timeout_ms = WDT_TIMEOUT_S * 1000, .idle_core_mask = WDT_IDLE_CORE_MASK, .trigger_panic = true};
+  esp_task_wdt_reconfigure(&watchdogConfig);
+  esp_task_wdt_add(NULL); // watch the task running loop()
 #elif ESP8266
   ESP.wdtEnable(20000);
 #endif
@@ -201,6 +210,7 @@ void setup()
   pinMode(PIN_SSR, OUTPUT);
   updateSwitch(false);
 
+#ifndef NET_ETHERNET
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   WiFiManagerParameter custom_hostname("hostname", "Hostname", config.hostname, CFG_SZ_HOSTNAME);
@@ -211,6 +221,7 @@ void setup()
     DEBUGLN("Failed to connect, restarting...");
     restart();
   }
+#endif
 
   lpb = new LPB(PIN_LPB_RX, PIN_LPB_TX, LPB_ADDR_SELF, LPB_ADDR_DEST);
 
@@ -229,6 +240,14 @@ void setup()
 
   currentState = stateForMode(config.mode);
 
+#ifdef NET_ETHERNET
+  if (!connectEthernet(config.hostname)) // the hostname comes from the config, so ethernet starts only now
+  {
+    DEBUGF("Ethernet not connected, %s - restarting...\n", String(ethernetStatusLabel()).c_str());
+    restart();
+  }
+  DEBUGF("Connected. IP address: %s\n", ETH.localIP().toString().c_str());
+#else
   if (saveConfigFile)
   {
     String lcHostname = String(custom_hostname.getValue());
@@ -241,6 +260,7 @@ void setup()
   }
 
   WiFi.setHostname(config.hostname);
+#endif
   MDNS.begin(config.hostname);
 
   timer.attach_ms(SYSTEM_UPDATE_INTERVAL_MS, timerCallback);
@@ -328,7 +348,9 @@ void systemDefaults()
 void configDefaults()
 { // init config struct with default values
 
-#ifdef ESP32
+#ifdef NET_ETHERNET
+  setConfigStr(config, hostname, HOSTNAME);
+#elif ESP32
   setConfigStr(config, hostname, WiFi.getHostname());
 #elif ESP8266
   setConfigStr(config, hostname, WiFi.hostname().c_str());
@@ -708,7 +730,9 @@ void handleAPI()
     if (server.arg(F("reset")).toInt())
     {
       configDefaults();
+#ifndef NET_ETHERNET
       wifiManager.resetSettings(); // reset wifi settings
+#endif
       doRestart = saveConfig();
     }
   }
@@ -1067,18 +1091,44 @@ void statusLED(int status)
   }
 }
 
+#ifdef NET_ETHERNET
+// dhcp reconnects on its own after a link loss, so there is nothing to do but wait for it
+static bool ensureConnected()
+{
+  if (ethernetConnected())
+  {
+    return true;
+  }
+  DEBUG("Connecting");
+  for (int retry = 1; retry <= NET_RECONNECT_RETRIES; retry++)
+  {
+    feedWatchdog(PHASE_NETWORK);
+    statusLED(0);
+    DEBUG(".");
+    delay(NET_RECONNECT_DELAY_MS);
+    if (ethernetConnected())
+    {
+      DEBUGF("Connected. IP address: %s\n", ETH.localIP().toString().c_str());
+      return true;
+    }
+  }
+  putEvent(String(F("restart: ethernet not connected, ")) + ethernetStatusLabel());
+  restart();
+  return false;
+}
+#else
 static bool ensureConnected()
 {
   wl_status_t status = WiFi.status();
   if (status != WL_CONNECTED)
   {
     DEBUG("Connecting");
-    for (int retry = 1; retry <= WIFI_RECONNECT_RETRIES; retry++)
+    for (int retry = 1; retry <= NET_RECONNECT_RETRIES; retry++)
     {
-      feedWatchdog(PHASE_WIFI);
+      feedWatchdog(PHASE_NETWORK);
       statusLED(0);
       DEBUG(".");
-      delay(WIFI_RECONNECT_DELAY_MS);
+      delay(NET_RECONNECT_DELAY_MS);
 
       status = WiFi.status();
       if (status == WL_CONNECTED)
@@ -1104,6 +1154,7 @@ static bool ensureConnected()
   }
   return status == WL_CONNECTED;
 }
+#endif
 
 bool fetchBatteryApi(String uri, JsonDocument &json, const JsonField *expectedFields, uint8_t expectedFieldCount)
 {
@@ -1179,9 +1230,11 @@ static bool updateSystemData()
   {
     systemState.utc_offset = json[FPSTR(KEY_SN_UTC_OFFSET)].as<int16_t>() * 3600;
     systemState.fullChargeRequest = json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SETPOINT_PRIORITY)][FPSTR(KEY_SN_FULL_CHARGE_REQUEST)].as<bool>();
-    systemState.fullChargeRequestIn =
-        json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_NEXT_FULL_CHARGE_START)].as<uint32_t>() -
-        json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SECONDS_SINCE_FULL_CHARGE)].as<uint32_t>();
+    // the battery requests a full charge once the seconds since the last one reach nextfullchargestarttime
+    int32_t fullChargeIn =
+        json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_NEXT_FULL_CHARGE_START)].as<int32_t>() -
+        json[FPSTR(KEY_SN_IC_STATUS)][FPSTR(KEY_SN_SECONDS_SINCE_FULL_CHARGE)].as<int32_t>();
+    systemState.fullChargeRequestIn = MAX(0, fullChargeIn); // 0 once overdue
 
     DEBUGF("UTC offset %d, discharge not allowed: %d %u\n", systemState.utc_offset, systemState.fullChargeRequest, systemState.fullChargeRequestIn);
   }

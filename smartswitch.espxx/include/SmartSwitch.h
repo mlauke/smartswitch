@@ -30,6 +30,15 @@
 #define PIN_LPB_RX GPIO_NUM_16
 #define PIN_SSR GPIO_NUM_23
 
+// w5500 on spi - mosi moved off the vspi default 23, which drives the ssr
+#define PIN_ETH_SCK GPIO_NUM_18
+#define PIN_ETH_MISO GPIO_NUM_19
+#define PIN_ETH_MOSI GPIO_NUM_27
+#define PIN_ETH_CS GPIO_NUM_5
+#define PIN_ETH_INT GPIO_NUM_4
+#define PIN_ETH_RST GPIO_NUM_25
+#define ETH_PHY_ADDR_W5500 1
+
 #elif ESP8266
 #define LED_BUILTIN 2
 #define PIN_LPB_TX 5 // GPIO5 (D1)
@@ -55,8 +64,10 @@
 #define LPB_ADDR_DEST 0
 #define LPB_RETRIES 5
 
-#define WIFI_RECONNECT_RETRIES 8
-#define WIFI_RECONNECT_DELAY_MS 500
+#define NET_RECONNECT_RETRIES 8
+#define NET_RECONNECT_DELAY_MS 500
+#define NET_CONNECT_TIMEOUT_MS 15000 // link negotiation plus dhcp at boot
+#define NET_CONNECT_POLL_MS 250
 
 // the watchdog is fed between the blocking calls (feedWatchdog() in main.ino), so it only has to
 // cover the longest single phase: one rest request, or the boiler transfer which runs as one block.
@@ -67,6 +78,7 @@
 
 #define WDT_RESERVE_MS 10000 // headroom for everything that is not a remote call
 #define WDT_TIMEOUT_S ((SYSTEM_UPDATE_TIMEOUT_MS + WDT_RESERVE_MS) / 1000)
+#define WDT_IDLE_CORE_MASK (1 << 0) // idle task of cpu0, the core default
 
 #define SYSTEM_UPDATE_INTERVAL_MS 2000 // update intervall millis
 #define SYSTEM_ON_COUNT MAX(1, (10000 + (SYSTEM_UPDATE_INTERVAL_MS >> 1)) / SYSTEM_UPDATE_INTERVAL_MS)
@@ -166,7 +178,7 @@ enum WatchdogPhase
   PHASE_IDLE, // nothing to report, set on an intentional restart
   PHASE_SERVER,
   PHASE_CYCLE,
-  PHASE_WIFI,
+  PHASE_NETWORK,
   PHASE_BATTERY,
   PHASE_FORECAST,
   PHASE_BOILER,

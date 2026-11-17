@@ -9,7 +9,9 @@
 #define UPDATE_URL "/repos/mlauke/smartswitch/releases/latest"
 #define UPDATE_TYPE "application/gzip"
 
-#ifdef ESP32
+#if defined(ESP32) && defined(NET_ETHERNET) // a wifi image would leave an ethernet device unreachable
+#define UPDATE_FILENAME "smartswitch.esp32_eth.ino.bin"
+#elif defined(ESP32)
 #define UPDATE_FILENAME "smartswitch.esp32.ino.bin"
 #elif defined(ESP8266)
 #define UPDATE_FILENAME "smartswitch.esp8266.ino.bin.gz"

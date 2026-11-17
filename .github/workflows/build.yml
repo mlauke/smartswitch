@@ -47,7 +47,7 @@ jobs:
 
       - name: Build ESP32 and ESP8266 firmware
         run:
-          uv run pio run -e esp32 -e esp8266
+          uv run pio run -e esp32 -e esp32_eth -e esp8266
 
       - name: Minimize uv cache
         run:
@@ -57,6 +57,7 @@ jobs:
         run: |
           mv .pio/build/esp8266/firmware.bin .pio/build/smartswitch.esp8266.ino.bin
           mv .pio/build/esp32/firmware.bin .pio/build/smartswitch.esp32.ino.bin
+          mv .pio/build/esp32_eth/firmware.bin .pio/build/smartswitch.esp32_eth.ino.bin
           gzip -9 -k .pio/build/smartswitch.esp8266.ino.bin
           gzip -9 -k .pio/build/smartswitch.esp32.ino.bin
 
@@ -67,6 +68,7 @@ jobs:
           path: |
             ${{ env.WORKDIR }}/.pio/build/smartswitch.esp8266.ino.bin.gz
             ${{ env.WORKDIR }}/.pio/build/smartswitch.esp32.ino.bin
+            ${{ env.WORKDIR }}/.pio/build/smartswitch.esp32_eth.ino.bin
           retention-days: 1 # delete after build
 
   release:
@@ -96,3 +98,4 @@ jobs:
           artifacts: |
             smartswitch.esp8266.ino.bin.gz
             smartswitch.esp32.ino.bin
+            smartswitch.esp32_eth.ino.bin
