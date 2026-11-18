@@ -1,5 +1,4 @@
 #pragma once
-#ifdef NET_ETHERNET
 #include <ETH.h>
 
 #include "SmartSwitch.h"
@@ -55,5 +54,3 @@ inline const __FlashStringHelper *ethernetStatusLabel()
   }
   return ETH.hasIP() ? F("connected") : F("no ip address");
 }
-
-#endif

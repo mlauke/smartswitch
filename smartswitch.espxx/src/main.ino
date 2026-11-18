@@ -25,7 +25,9 @@
 #include <Ticker.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
-#ifndef NET_ETHERNET
+#ifdef NET_ETHERNET
+#include "EthernetUtil.h"
+#else
 #include <WiFiManager.h>
 #endif
 
@@ -33,7 +35,6 @@
 // echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
 // echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
 
-#include "EthernetUtil.h"
 #include "GithubOTA.h"
 #include "RestClient.h"
 #include "JsonFields.h"
