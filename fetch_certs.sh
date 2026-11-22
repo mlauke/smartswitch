@@ -5,6 +5,7 @@
 #
 # Only the OTA path uses TLS: api.github.com serves the release metadata,
 # objects.githubusercontent.com the firmware asset after the redirect.
+# codeberg.org serves both, metadata and asset, when built with -DOTA_CODEBERG.
 # Servers usually send their chain up to an intermediate, not up to the root -
 # pinning that intermediate breaks as soon as the CA rotates it. So the issuer of
 # the last chain element is looked up in the local trust store and that root is pinned.
@@ -14,7 +15,7 @@ set -e
 OUT="smartswitch.espxx/include/certs.h"
 TRUST_STORE=/etc/ssl/certs/ca-certificates.crt
 
-HOSTS=(api.github.com objects.githubusercontent.com)
+HOSTS=(api.github.com objects.githubusercontent.com codeberg.org)
 
 get_last_chain_cert() {
   local host=$1

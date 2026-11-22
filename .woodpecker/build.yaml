@@ -1,0 +1,46 @@
+# Build Sonnen SmartSwitch Release on ci.codeberg.org
+#
+# every push to main builds all firmware targets and publishes them as release v<pipeline number>.
+# the images are built with -DOTA_CODEBERG, so devices flashed from here also update from codeberg.
+# runtime variables are written as $$VAR, woodpecker substitutes plain $VAR when it parses the file
+
+when:
+  - event: push
+    branch: main
+
+steps:
+  - name: test-build
+    image: ghcr.io/astral-sh/uv:0.10.9-python3.12-bookworm
+    environment:
+      PLATFORMIO_BUILD_FLAGS: -DOTA_CODEBERG
+    commands:
+      - cd smartswitch.espxx
+      - uv sync --locked --all-extras --dev
+      - uv run pio test -e native
+      - uv run pio run -e esp32 -e esp32_eth -e esp8266
+      - mkdir -p ../release
+      - mv .pio/build/esp32/firmware.bin ../release/smartswitch.esp32.ino.bin
+      - mv .pio/build/esp32_eth/firmware.bin ../release/smartswitch.esp32_eth.ino.bin
+      - mv .pio/build/esp8266/firmware.bin ../release/smartswitch.esp8266.ino.bin
+      - gzip -9 ../release/smartswitch.esp8266.ino.bin
+
+  # the release plugin expects a tag event, so the release and its tag are created via the forgejo api
+  - name: release
+    image: ghcr.io/astral-sh/uv:0.10.9-python3.12-bookworm
+    environment:
+      RELEASE_TOKEN:
+        from_secret: release_token
+    commands:
+      - API="$${CI_FORGE_URL}/api/v1/repos/$${CI_REPO}"
+      - 'AUTH="Authorization: token $${RELEASE_TOKEN}"' # quoted, the colon would make it a yaml mapping
+      - >
+        RELEASE_ID=$(curl --silent --show-error --fail-with-body -X POST "$${API}/releases"
+        -H "$${AUTH}" -H "Content-Type: application/json"
+        -d "{\"tag_name\": \"v$${CI_PIPELINE_NUMBER}\", \"target_commitish\": \"$${CI_COMMIT_SHA}\",
+        \"name\": \"Release $${CI_PIPELINE_NUMBER}\", \"body\": \"Automatically generated release $${CI_PIPELINE_NUMBER}\"}"
+        | python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])')
+      - >
+        for file in release/*; do
+        curl --silent --show-error --fail-with-body -X POST "$${API}/releases/$${RELEASE_ID}/assets?name=$(basename "$${file}")"
+        -H "$${AUTH}" -F "attachment=@$${file}" > /dev/null || exit 1;
+        done

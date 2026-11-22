@@ -35,7 +35,13 @@
 // echo -e "const char app_js[] PROGMEM = { $(gzip -9 -c nginx/app.js | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_js.h && \
 // echo "const char app_css[] PROGMEM = { $(gzip -9 -c nginx/app.css | hexdump -v -e '1/1 "0x%02X, "') };" > src/smartswitch.esp8266/app_css.h
 
+#ifdef OTA_CODEBERG
+#include "CodebergOTA.h"
+typedef CodebergOTA FirmwareUpdater;
+#else
 #include "GithubOTA.h"
+typedef GithubOTA FirmwareUpdater;
+#endif
 #include "RestClient.h"
 #include "JsonFields.h"
 #include "SonnenApi.h"
@@ -275,7 +281,7 @@ void setup()
 
   if (config.update_startup)
   {
-    handleGithubUpdate();
+    handleFirmwareUpdate();
   }
 
   updateLocation();
@@ -739,7 +745,7 @@ void handleAPI()
   }
   else if (server.hasArg(F("update")))
   {
-    handleGithubUpdate();
+    handleFirmwareUpdate();
     return;
   }
 
@@ -781,17 +787,17 @@ void sendUpdateStatus(int code, const char *status)
   server.send(code, F("text/html;charset=utf-8"), buffer);
 }
 
-void handleGithubUpdate()
+void handleFirmwareUpdate()
 {
-  GithubOTA gh_updater(UPDATE_HOST, UPDATE_URL, UPDATE_TYPE, UPDATE_FILENAME);
+  FirmwareUpdater updater;
 
   feedWatchdog(PHASE_UPDATE); // the download itself unsubscribes the watchdog, see onOTABegin()
-  if (!gh_updater.checkUpdate(config.release_tag))
+  if (!updater.checkUpdate(config.release_tag))
   {
     if (server.client() && server.client().connected())
     {
       char msg[128];
-      snprintf_P(msg, sizeof(msg), PSTR("Update failed: %s"), gh_updater.getUpdateStatus().c_str());
+      snprintf_P(msg, sizeof(msg), PSTR("Update failed: %s"), updater.getUpdateStatus().c_str());
       sendUpdateStatus(404, msg);
     }
     return;
@@ -800,15 +806,15 @@ void handleGithubUpdate()
   if (server.client() && server.client().connected())
   {
     char msg[128];
-    snprintf_P(msg, sizeof(msg), PSTR("Update found: Going to install Release %s."), gh_updater.release_tag.c_str());
+    snprintf_P(msg, sizeof(msg), PSTR("Update found: Going to install Release %s."), updater.release_tag.c_str());
     sendUpdateStatus(200, msg);
   }
-  if (gh_updater.doUpdate(userAgent(), &onOTABegin, &onOTAEnd))
+  if (updater.doUpdate(userAgent(), &onOTABegin, &onOTAEnd))
   {
-    setConfigStr(config, release_tag, gh_updater.release_tag.c_str());
+    setConfigStr(config, release_tag, updater.release_tag.c_str());
     if (!saveConfig())
     {
-      putEvent(String(F("error saving config with release tag ")) + gh_updater.release_tag);
+      putEvent(String(F("error saving config with release tag ")) + updater.release_tag);
     }
     else
     {
@@ -818,7 +824,7 @@ void handleGithubUpdate()
   }
   else
   {
-    putEvent(gh_updater.getUpdateStatus());
+    putEvent(updater.getUpdateStatus());
   }
 }
 
